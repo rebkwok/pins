@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags wagtailimages_tags gallery_tags %}
+
+{% block content %}
+    {% include "dogs/includes/header-hero.html" %}
+
+    <div class="container dog-detail">
+        <div class="row">
+            <div class="col-md-12">
+
+                    <div class="row">
+                        <div class="dog-detail__meta">
+                            {% if page.location %}
+                                <p class="dog-detail__meta-title">Location</p>
+                                <p class="dog-detail__meta-content">{{ page.location }}</p>
+                            {% endif %}
+                            {% if page.description %}
+                                <p class="dog-detail__meta-title">Description</p>
+                                <p class="dog-detail__meta-content">{{ page.description|richtext }}</p>
+                            {% endif %}
+                            
+                        </div>
+                    </div>
+                
+                <div class="container gallery__container">
+                    <div class="gallery__grid">
+                        {% gallery page.album %}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+{% endblock content %}

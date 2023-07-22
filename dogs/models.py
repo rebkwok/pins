@@ -1,0 +1,151 @@
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.db import models
+from django.utils import timezone
+
+from modelcluster.fields import ParentalKey
+
+from wagtail.models import Collection, Orderable, Page
+from wagtail.fields import RichTextField
+from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, MultiFieldPanel
+from wagtail.snippets.models import register_snippet
+
+
+class DogIndexPageStatuses(Orderable):
+
+    page = ParentalKey("DogsIndexPage", related_name="dog_status_pages")
+    status_page = models.ForeignKey(
+        "DogStatusPage",
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        verbose_name="Dog status category"
+    )
+
+    panels = [FieldPanel("status_page")]
+
+
+class DogsIndexPage(Page):
+    parent_page_types = ["home.HomePage"]
+    subpage_types = ["DogStatusPage"]
+
+    content_panels = Page.content_panels + [
+        HelpPanel(
+            """
+            This is the index page for all dogs. It will display links to each of the
+            chosen dog status categories.<br/>
+            Add Dog Status pages as child pages of this page.<br/>
+            Then add each Dog Status page that you want to display on this index page
+            in the "Displayed Statuses" below (in the order you want them to display).
+            <br/>
+            Note that a status link will not be displayed until the Dog Status page is live.
+            """
+        ),
+        InlinePanel("dog_status_pages", label="Displayed statuses"),
+    ]
+
+    # Allows child objects (i.e. DogStatusPage objects) to be accessible via the
+    # template. We use this on the HomePage to display child items of featured
+    # content
+    def status_pages(self):
+        return [page.status_page for page in self.dog_status_pages.all() if page.status_page.live]
+
+
+class DogStatusPage(Page):
+
+    short_description = models.CharField(
+        max_length=255, null=True, blank=True,
+        help_text="A one-line description of this status"
+    )
+
+    intro = RichTextField(blank=True)
+
+    content_panels = Page.content_panels + [
+        HelpPanel(
+            """
+            This page will show all dogs with the selected status.
+            <br/>
+            Create a child page for each dog that has this status (you can 
+            move them later if their status changes.)
+            """
+        ),
+        FieldPanel('short_description'),
+        FieldPanel('intro'),
+    ]
+
+    parent_page_types = ["DogsIndexPage"]
+    subpage_types = ["DogPage"]
+
+    # Returns a queryset of DogPage objects that are live, that are direct
+    # descendants of this index page with most recent first
+    def get_dogs(self):
+        return (
+            DogPage.objects.live().descendant_of(self).order_by("-date_posted")
+        )
+
+    # Allows child objects (e.g. DogPage objects) to be accessible via the
+    # template. We use this on the HomePage to display child items of featured
+    # content
+    def children(self):
+        return self.get_children().specific().live()
+
+    # Pagination for the index page. We use the `django.core.paginator` as any
+    # standard Django app would, but the difference here being we have it as a
+    # method on the model rather than within a view function
+    def paginate(self, request, *args):
+        page = request.GET.get("page")
+        paginator = Paginator(self.get_dogs(), 12)
+        try:
+            pages = paginator.page(page)
+        except PageNotAnInteger:
+            pages = paginator.page(1)
+        except EmptyPage:
+            pages = paginator.page(paginator.num_pages)
+        return pages
+
+    # Returns the above to the get_context method that is used to populate the
+    # template
+    def get_context(self, request):
+        context = super().get_context(request)
+
+        # BreadPage objects (get_breads) are passed through pagination
+        dogs = self.paginate(request, self.get_dogs())
+
+        context["dogs"] = dogs
+
+        return context
+    
+
+class DogPage(Page):
+
+    date_posted = models.DateField(default=timezone.now)
+    location = models.CharField(null=True, blank=True, max_length=255)
+    description = RichTextField(blank=True)
+    image = models.ForeignKey(
+        "wagtailimages.Image",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="Landscape mode only; horizontal width between 1000px and " "3000px.",
+    )
+    album = models.ForeignKey(
+        Collection,
+        limit_choices_to=~models.Q(name__in=["Root"]),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        help_text="Select the image collection (album) for this dog. To set up "
+                  "a collection, go to Settings > Collections and add a new collection for "
+                  "this dog, then upload images and allocate them to the collection.",
+    )
+
+    content_panels = Page.content_panels + [
+        FieldPanel('date_posted'),
+        FieldPanel('location'),
+        FieldPanel('description'),
+        FieldPanel('image'),
+        FieldPanel('album'),
+    ]
+
+    subpage_types = []
+    parent_page_types = ["DogStatusPage"]

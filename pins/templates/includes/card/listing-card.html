@@ -1,0 +1,30 @@
+{% load wagtailcore_tags wagtailimages_tags %}
+
+<div class="listing-card">
+    <a class="listing-card__link" href="{{ page.url }}">
+        {% if page.image %}
+            <figure class="listing-card__image">
+                {% image page.image fill-180x180-c100 loading="lazy" %}
+            </figure>
+        {% endif %}
+        <div class="listing-card__contents">
+            <h3 class="listing-card__title">{{ page.title }}</h3>
+            {% if page.location or page.description %}
+                <table class="listing-card__meta">
+                    {% if page.location %}
+                        <tr>
+                            <td class="listing-card__meta-category">Location</td>
+                            <td class="listing-card__meta-content">{{ page.location }}</td>
+                        </tr>
+                    {% endif %}
+                    {% if page.description %}
+                        <tr>
+                            <td class="listing-card__meta-category">Description</td>
+                            <td class="listing-card__meta-content">{{ page.description|richtext }}</td>
+                        </tr>
+                    {% endif %}
+                </table>
+            {% endif %}
+        </div>
+    </a>
+</div>

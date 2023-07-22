@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% load wagtailcore_tags %}
+
+{% block body_class %}template-dogstatusindexpage{% endblock %}
+
+{% block content %}
+<div class="container dogs-index">
+    <h1>{{ page.title }}</h1>
+    
+    {% for dog_status_page in page.status_pages %}
+        <h2>
+            <a href="{% pageurl dog_status_page %}">{{ dog_status_page.title }}
+                {% include "includes/chevron-icon.html" with class="dogsindex__chevron-icon" %}
+            </a>
+        </h2>
+        {{ dog_status_page.specific.short_description|richtext }}
+    {% endfor %}
+</div>
+{% endblock %}

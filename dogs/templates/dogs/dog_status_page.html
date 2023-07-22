@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags navigation_tags wagtailimages_tags %}
+
+{% block body_class %}template-dogstatuspage{% endblock %}
+
+
+{% block content %}
+    {% include "dogs/includes/header-index.html" %}
+
+    <div class="container">
+        <ul class="dog-list">
+            {% for dog in dogs %}
+                <li>
+                    {% include "includes/card/listing-card.html" with page=dog %}
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    {% if dogs.paginator.count > 12 %}
+        <div class="container">
+            <div class="row">
+                <div class="col-sm-12">
+                    {% include "includes/pagination.html" with subpages=dogs %}
+                </div>
+            </div>
+        </div>
+    {% endif %}
+{% endblock content %}
