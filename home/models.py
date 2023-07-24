@@ -267,8 +267,26 @@ class FormPage(AbstractEmailForm):
     subpage_types = []
 
 
-class PrivacyPolicyPage:
-    ...
+class StandardPage(Page):
+    """
+    A generic content page.
+    """
+    introduction = models.TextField(help_text="Text to describe the page", blank=True)
+    image = models.ForeignKey(
+        "wagtailimages.Image",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="Landscape mode only; horizontal width between 1000px and 3000px.",
+    )
+    body = RichTextField(verbose_name="Page body", blank=True)
+
+    content_panels = Page.content_panels + [
+        FieldPanel("introduction"),
+        FieldPanel("body"),
+        FieldPanel("image"),
+    ]
 
 
 class FAQPage(Page):
