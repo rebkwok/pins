@@ -1,5 +1,7 @@
 from django.db import models
 
+from modelcluster.fields import ParentalKey
+
 from wagtail.admin.panels import (
     FieldPanel,
     FieldRowPanel,
@@ -7,9 +9,11 @@ from wagtail.admin.panels import (
     MultiFieldPanel,
     PublishingPanel,
 )
+from wagtail.contrib.forms.models import AbstractEmailForm, AbstractFormField
 from wagtail.fields import RichTextField
 from wagtail.models import (
     DraftStateMixin,
+    Orderable,
     Page,
     PreviewableMixin,
     RevisionMixin,
@@ -25,7 +29,8 @@ class HomePage(Page):
     - Hero area
     - Body area
     - A promotional area
-    - Moveable featured site sections
+    - A featured site section
+    - Links to other pages
     """
 
     # Hero section of HomePage
@@ -38,7 +43,7 @@ class HomePage(Page):
         help_text="Homepage image",
     )
     hero_text = models.CharField(
-        max_length=255, help_text="Write an introduction for the home page"
+        max_length=255, help_text="Write a  short introduction for the home page"
     )
     hero_cta = models.CharField(
         verbose_name="Hero CTA",
@@ -56,7 +61,7 @@ class HomePage(Page):
     )
 
     # Body section of the HomePage
-    body = RichTextField()
+    body = RichTextField(help_text="Main body text for the home page")
 
     # Promo section of the HomePage
     promo_image = models.ForeignKey(
@@ -79,10 +84,10 @@ class HomePage(Page):
     # in different ways, and displayed in different areas of the page.
     # Each list their children items that we access via the children function
     # that we define on the individual Page models e.g. BlogIndexPage
-    featured_section_1_title = models.CharField(
+    featured_section_title = models.CharField(
         blank=True, max_length=255, help_text="Title to display above the promo copy"
     )
-    featured_section_1 = models.ForeignKey(
+    featured_section = models.ForeignKey(
         "wagtailcore.Page",
         null=True,
         blank=True,
@@ -92,33 +97,40 @@ class HomePage(Page):
         "three child items.",
         verbose_name="Featured section 1",
     )
-
-    featured_section_2_title = models.CharField(
-        blank=True, max_length=255, help_text="Title to display above the promo copy"
+    featured_section_show_more_text = models.CharField(
+        blank=True, max_length=255, help_text="Text to display for link to featured section"
     )
-    featured_section_2 = models.ForeignKey(
+
+    page_link_1_title = models.CharField(
+        blank=True, max_length=255, help_text="Title to display for first page link"
+    )
+    page_link_1 = models.ForeignKey(
         "wagtailcore.Page",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
-        help_text="Second featured section for the homepage. Will display up to "
-        "three child items.",
-        verbose_name="Featured section 2",
+        help_text="First page link for the homepage.",
+        verbose_name="Page link 1",
+    )
+    page_link_1_btn_text = models.CharField(
+        blank=True, max_length=255, help_text="Text to display on first page link button"
     )
 
-    featured_section_3_title = models.CharField(
-        blank=True, max_length=255, help_text="Title to display above the promo copy"
+    page_link_2_title = models.CharField(
+        blank=True, max_length=255, help_text="Title to display for second page link"
     )
-    featured_section_3 = models.ForeignKey(
+    page_link_2 = models.ForeignKey(
         "wagtailcore.Page",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
-        help_text="Third featured section for the homepage. Will display up to "
-        "six child items.",
-        verbose_name="Featured section 3",
+        help_text="Second page link for the homepage.",
+        verbose_name="Page link 2",
+    )
+    page_link_2_btn_text = models.CharField(
+        blank=True, max_length=255, help_text="Text to display on second page link button"
     )
 
     hero_footer_text = models.CharField(
@@ -171,20 +183,23 @@ class HomePage(Page):
             [
                 MultiFieldPanel(
                     [
-                        FieldPanel("featured_section_1_title"),
-                        FieldPanel("featured_section_1"),
+                        FieldPanel("featured_section_title"),
+                        FieldPanel("featured_section"),
+                        FieldPanel("featured_section_show_more_text")
                     ]
                 ),
                 MultiFieldPanel(
                     [
-                        FieldPanel("featured_section_2_title"),
-                        FieldPanel("featured_section_2"),
+                        FieldPanel("page_link_1_title"),
+                        FieldPanel("page_link_1"),
+                        FieldPanel("page_link_1_btn_text"),
                     ]
                 ),
                 MultiFieldPanel(
                     [
-                        FieldPanel("featured_section_3_title"),
-                        FieldPanel("featured_section_3"),
+                        FieldPanel("page_link_2_title"),
+                        FieldPanel("page_link_2"),
+                        FieldPanel("page_link_2_btn_text"),
                     ]
                 ),
             ],
@@ -200,7 +215,7 @@ class HomePage(Page):
                     ]
                 ),
             ],
-            heading="Hero section",
+            heading="Hero footer section",
         ),
     ]
 
@@ -208,16 +223,79 @@ class HomePage(Page):
         return self.title
 
 
-class FormPage:
-    # for contact form and adoption application form
-    ...
+class FormField(AbstractFormField):
+    """
+    for contact form and adoption application form:
+    https://docs.wagtail.org/en/stable/reference/contrib/forms/index.html
+    """
+
+    page = ParentalKey("FormPage", related_name="form_fields", on_delete=models.CASCADE)
+
+
+class FormPage(AbstractEmailForm):
+    image = models.ForeignKey(
+        "wagtailimages.Image",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    body = RichTextField(blank=True)
+    thank_you_text = RichTextField(blank=True)
+
+    # Note how we include the FormField object via an InlinePanel using the
+    # related_name value
+    content_panels = AbstractEmailForm.content_panels + [
+        FieldPanel("image"),
+        FieldPanel("body"),
+        InlinePanel("form_fields", heading="Form fields", label="Field"),
+        FieldPanel("thank_you_text"),
+        MultiFieldPanel(
+            [
+                FieldRowPanel(
+                    [
+                        FieldPanel("from_address"),
+                        FieldPanel("to_address"),
+                    ]
+                ),
+                FieldPanel("subject"),
+            ],
+            "Email",
+        ),
+    ]
+
+    subpage_types = []
+
 
 class PrivacyPolicyPage:
     ...
 
 
-class FAQpage:
-    ...
+class FAQPage(Page):
+    
+    introduction = RichTextField(null=True, blank=True, help_text="Optional introduction text")
+
+    content_panels = Page.content_panels + [
+        FieldPanel('introduction',),
+        InlinePanel('faqs', label="FAQs")
+    ]
+
+    parent_page_types = ["HomePage"]
+    subpage_types = []
+
+    class Meta:
+        verbose_name = "FAQ Page"
+
+
+class FAQ(Orderable):
+    page = ParentalKey(FAQPage, on_delete=models.CASCADE, related_name='faqs')
+    question = models.CharField(max_length=255)
+    answer = RichTextField()
+
+    panels = [
+        FieldPanel('question'),
+        FieldPanel('answer'),
+    ]
 
 
 class FooterText(
