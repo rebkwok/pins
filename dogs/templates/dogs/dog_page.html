@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load wagtailcore_tags wagtailimages_tags gallery_tags %}
+{% load wagtailcore_tags wagtailimages_tags wagtailembeds_tags gallery_tags %}
 
 {% block content %}
     {% include "dogs/includes/header-hero.html" %}
@@ -15,13 +15,13 @@
                                 <p class="dog-detail__meta-content">{{ page.location }}</p>
                             {% endif %}
                             {% if page.description %}
-                                <p class="dog-detail__meta-title">Description</p>
+                                <p class="dog-detail__meta-title">About {{ page.title }}</p>
                                 <p class="dog-detail__meta-content">{{ page.description|richtext }}</p>
-                            {% endif %}
-                            
+                            {% endif %}             
                         </div>
                     </div>
                 
+
                 <div class="container gallery__container">
                     <div class="gallery__grid">
                         {% gallery page.album %}

@@ -29,17 +29,17 @@
         <div class="container">
             <div class="row promo-row">
                 <div class="featured-cards col-sm-5 col-sm-offset-1">
-                    {% if page.featured_section_1 %}
-                        <h2 class="featured-cards__title">{{ page.featured_section_1_title }}</h2>
+                    {% if page.featured_section %}
+                        <h2 class="featured-cards__title">{{ page.featured_section_title }}</h2>
                         <ul class="featured-cards__list">
-                            {% for childpage in page.featured_section_1.specific.children|slice:"3" %}
+                            {% for childpage in page.featured_section.specific.children|slice:"3" %}
                                 <li>
                                     {% include "includes/card/listing-card.html" with page=childpage %}
                                 </li>
                             {% endfor %}
                         </ul>
-                        <a class="featured-cards__link" href="/dogs">
-                            <span>View more of our dogs</span>
+                        <a class="featured-cards__link" href="{{ page.featured_section }}">
+                            <span>{{ page.featured_section_show_more_text }}</span>
                             {% include "includes/chevron-icon.html" with class="featured-cards__chevron-icon" %}
                         </a>
                     {% endif %}
@@ -76,27 +76,21 @@
         <div class="container">
             <div class="row">
                 <div class="col-md-12 locations-section">
-                    {% if page.featured_section_2 %}
-                        <h2 class="locations-section__title">{{ page.featured_section_2_title }}</h2>
-                        {% for childpage in page.featured_section_2.specific.children|slice:"3" %}
-                            {% include "includes/card/location-card.html" with page=childpage %}
-                        {% endfor %}
+                    {% if page.page_link_1 %}
+                        <h2 class="locations-section__title">{{ page.page_link_1_title }}</h2>
+                        <a class="btn" href="{{ page.page_link_1 }}">{{ page.page_link_1_btn_text }}</a>
                     {% endif %}
                 </div>
             </div>
         </div>
 
-        {% if page.featured_section_3 %}
+        {% if page.page_link_2 %}
             <div class="blog-section__background">
                 <div class="container">
                     <div class="row">
                         <div class="col-md-12 blog-section">
-                            <h2 class="blog-section__title">{{ page.featured_section_3_title }}</h2>
-                            <div class="blog-section__grid">
-                                {% for childpage in page.featured_section_3.specific.children|slice:"6" %}
-                                    {% include "includes/card/picture-card.html" with page=childpage portrait=True %}
-                                {% endfor %}
-                            </div>
+                            <h2 class="">{{ page.page_link_2_title }}</h2>
+                            <a class="btn" href="{{ page.page_link_2 }}">{{ page.page_link_2_btn_text }}</a>
                         </div>
                     </div>
                 </div>
