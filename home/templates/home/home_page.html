@@ -54,11 +54,12 @@
                             {% if page.promo_text %}
                                 {{ page.promo_text|richtext }}
                             {% endif %}
+                            {% if page.promo_image %}
+                                <figure>{% image page.promo_image fill-590x413-c100 %}</figure>
+                            {% endif %}
                         </div>
                     {% endif %}
-                    {% if page.promo_image %}
-                        <figure>{% image page.promo_image fill-590x413-c100 %}</figure>
-                    {% endif %}
+                    
                 </div>
             </div>
         </div>

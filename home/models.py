@@ -288,6 +288,9 @@ class StandardPage(Page):
         FieldPanel("image"),
     ]
 
+    parent_page_types = ["HomePage"]
+    subpage_types = []
+
 
 class FAQPage(Page):
     
