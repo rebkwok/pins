@@ -1,0 +1,8 @@
+SECRET_KEY=
+DEBUG=
+LOCAL=
+CONSOLE_EMAIL=
+EMAIL_HOST_USER='dummy_user'
+EMAIL_HOST_PASSWORD='dummy_password'
+DATABASE_URL=postgres://user:password@localhost/pins
+LOG_FOLDER='path/to/log/folder'

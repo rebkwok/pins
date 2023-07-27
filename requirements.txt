@@ -23,6 +23,7 @@ defusedxml==0.7.1
 django==4.2.3
     # via
     #   -r requirements.in
+    #   django-extensions
     #   django-filter
     #   django-modelcluster
     #   django-permissionedforms
@@ -30,6 +31,10 @@ django==4.2.3
     #   django-treebeard
     #   djangorestframework
     #   wagtail
+django-environ==0.10.0
+    # via -r requirements.in
+django-extensions==3.2.3
+    # via -r requirements.in
 django-filter==22.1
     # via wagtail
 django-modelcluster==6.0

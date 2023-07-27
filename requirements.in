@@ -1,3 +1,5 @@
 Django
 wagtail
 pip-tools
+django-environ
+django-extensions
