@@ -52,7 +52,7 @@ else:  # pragma: no cover
     DEBUG = False
 
 ALLOWED_HOSTS = [
-    'pins.scot', 'www.pins.scot', 'pins.rebkwok.co.uk', 'vagrant.pins.scot'
+    'pins.scot', 'www.pins.scot', 'pins.rebkwok.co.uk', 'www.pins.rebkwok.co.uk', 'vagrant.pins.scot'
 ]
 # https://docs.djangoproject.com/en/4.0/ref/settings/#std:setting-CSRF_TRUSTED_ORIGINS
 CSRF_TRUSTED_ORIGINS = ['https://pins.scot', 'https://pins.rebkwok.co.uk', 'https://vagrant.pins.scot']
@@ -191,7 +191,7 @@ STATICFILES_DIRS = [
 # See https://docs.djangoproject.com/en/4.2/ref/contrib/staticfiles/#manifeststaticfilesstorage
 STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
 
-STATIC_ROOT = os.path.join(BASE_DIR, "static")
+STATIC_ROOT = os.path.join(BASE_DIR, "collected-static")
 STATIC_URL = "/static/"
 
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")

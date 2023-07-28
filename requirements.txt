@@ -53,6 +53,8 @@ et-xmlfile==1.1.0
     # via openpyxl
 filetype==1.2.0
     # via willow
+gunicorn==21.2.0
+    # via -r requirements.in
 html5lib==1.1
     # via wagtail
 idna==3.4
@@ -62,7 +64,9 @@ l18n==2021.3
 openpyxl==3.1.2
     # via wagtail
 packaging==23.1
-    # via build
+    # via
+    #   build
+    #   gunicorn
 pillow==9.5.0
     # via wagtail
 pip-tools==7.1.0
