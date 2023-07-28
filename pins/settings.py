@@ -20,16 +20,10 @@ root = environ.Path(__file__) - 2  # two folders back (/a/b/ - 3 = /)
 # defaults
 env = environ.Env(DEBUG=(bool, False),
                   SHOW_DEBUG_TOOLBAR=(bool, False),
-                  PAYPAL_TEST=(bool, False),
                   USE_MAILCATCHER=(bool, False),
-                  CONSOLE_EMAIL=(bool, False),
-                  SEND_ALL_STUDIO_EMAILS=(bool, False),
-                  AUTO_BOOK_EMAILS=(list, []),
-                  REGULAR_STUDENT_WHITELIST_IDS=(list, []),
-                  WACTHLIST=(list, []),
                   LOCAL=(bool, False),
-                  SHOW_VAT=(bool, True),
-                  TESTING=(bool, False)
+                  TESTING=(bool, False),
+                  CI=(bool, False),
                   )
 
 environ.Env.read_env(root('pins/.env'))  # reading .env file
