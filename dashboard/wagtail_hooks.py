@@ -28,7 +28,7 @@ class FooterSnippetViewSetGroup(SnippetViewSetGroup):
 
 @hooks.register('register_admin_menu_item')
 def register_collections_menu_item():
-  return MenuItem('Image Collections', reverse('wagtailadmin_collections:index'), icon_name='folder-inverse', order=10000)
+  return MenuItem('Image Collections', reverse('wagtailadmin_collections:index'), icon_name='folder-inverse', order=200)
 
 
 register_snippet(FooterSnippetViewSetGroup)
