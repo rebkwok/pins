@@ -10,7 +10,7 @@
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 col-lg-12 home-hero">
                         <div class="hero__image">
-                        {% image page.image max-400x400 %}
+                        {% image page.image max-400x400 loading="lazy" %}
                         </div>
                         <h1>{{ page.title }}</h1>
                         <p class="lead">{{ page.hero_text }}</p>
@@ -28,7 +28,7 @@
 
         <div class="container">
             <div class="row promo-row">
-                <div class="featured-cards col-sm-5 col-sm-offset-1">
+                <div class="featured-cards col-sm-6 col-sm-offset-1">
                     {% if page.featured_section %}
                         <h2 class="featured-cards__title">{{ page.featured_section_title }}</h2>
                         <ul class="featured-cards__list">
@@ -45,7 +45,7 @@
                     {% endif %}
                 </div>
 
-                <div class="col-sm-6 promo">
+                <div class="col-sm-5 promo">
                     {% if page.promo_image or page.promo_title or page.promo_text %}
                         <div class="col-lg-10 promo-text">
                             {% if page.promo_title %}
@@ -55,7 +55,7 @@
                                 {{ page.promo_text|richtext }}
                             {% endif %}
                             {% if page.promo_image %}
-                                <figure>{% image page.promo_image fill-590x413-c100 %}</figure>
+                                <figure>{% image page.promo_image fill-590x413-c100 loading="lazy" %}</figure>
                             {% endif %}
                         </div>
                     {% endif %}
