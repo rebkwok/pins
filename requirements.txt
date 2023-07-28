@@ -67,6 +67,8 @@ pillow==9.5.0
     # via wagtail
 pip-tools==7.1.0
     # via -r requirements.in
+psycopg2==2.9.6
+    # via -r requirements.in
 pyproject-hooks==1.0.0
     # via build
 pytz==2023.3

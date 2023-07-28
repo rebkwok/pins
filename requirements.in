@@ -3,3 +3,4 @@ wagtail
 pip-tools
 django-environ
 django-extensions
+psycopg2
