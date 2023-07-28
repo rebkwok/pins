@@ -204,18 +204,20 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 MEDIA_URL = "/media/"
 
 # Email
-if env("CONSOLE_EMAIL"):
+if env("LOCAL") or env("CI"):
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-else:
+else:  # pragma: no cover
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_USE_TLS = True
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_HOST_USER = 'pins_web@gmail.com'
-EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', None)
-if EMAIL_HOST_PASSWORD is None:  # pragma: no cover
-    print("No email host password provided!")
-EMAIL_PORT = 587
-DEFAULT_FROM_EMAIL = 'pinscotland16@gmail.com'
+    EMAIL_USE_TLS = True
+    EMAIL_HOST = 'email-smtp.eu-west-1.amazonaws.com'
+    EMAIL_HOST_USER = env('EMAIL_HOST_USER', None)
+    EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', None)
+    if EMAIL_HOST_USER is None:  # pragma: no cover
+        print("No email host user provided!")
+    if EMAIL_HOST_PASSWORD is None:  # pragma: no cover
+        print("No email host password provided!")
+    EMAIL_PORT = 587
+DEFAULT_FROM_EMAIL = 'pins.scot.web+no-reply@gmail.com'
 SUPPORT_EMAIL = 'rebkwok@gmail.com'
 
 # MAILCATCHER
@@ -246,7 +248,6 @@ if not TESTING:  # pragma: no cover
             'file_app': {
                 'level': 'INFO',
                 'class': 'logging.handlers.RotatingFileHandler',
-                # 'filename': '/var/log/pipsevents/pipsevents.log',
                 'filename': os.path.join(LOG_FOLDER, 'pins.log'),
                 'maxBytes': 1024*1024*5,  # 5 MB
                 'backupCount': 5,
