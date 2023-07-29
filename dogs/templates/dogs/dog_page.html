@@ -21,12 +21,19 @@
                         </div>
                     </div>
                 
-
                 <div class="container gallery__container">
                     <div class="gallery__grid">
-                        {% gallery page.album %}
+                        {% gallery page.gallery_images.all %}
                     </div>
                 </div>
+                
+                {% if page.facebook_url %}
+                <div class="row">
+                    <div class="dog-detail__meta">
+                        <p class="dog-detail__meta-content">See <a href={{ page.facebook_url }}>facebook album page</a> for more details and photos.</p>
+                    </div>
+                </div>
+                {% endif %}
 
             </div>
         </div>

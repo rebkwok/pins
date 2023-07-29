@@ -1,13 +1,12 @@
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import models
 from django.utils import timezone
+from django.utils.safestring import mark_safe
 
 from modelcluster.fields import ParentalKey
-
-from wagtail.models import Collection, Orderable, Page
+from wagtail.models import Orderable, Page
 from wagtail.fields import RichTextField
-from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, MultiFieldPanel
-from wagtail.snippets.models import register_snippet
+from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, MultiFieldPanel, MultipleChooserPanel
 
 
 class DogIndexPageStatuses(Orderable):
@@ -30,17 +29,19 @@ class DogsIndexPage(Page):
 
     content_panels = Page.content_panels + [
         HelpPanel(
-            """
-            This is the index page for all dogs. It will display links to each of the
-            chosen dog status categories.<br/>
-            Add Dog Status pages as child pages of this page.<br/>
-            Then add each Dog Status page that you want to display on this index page
-            in the "Displayed Statuses" below (in the order you want them to display).
-            <br/>
-            Note that a status link will not be displayed until the Dog Status page is live.
-            """
+            """This is the index page for all dogs. It will display links to each of the
+            chosen dog status categories.<br>
+            A status can be hidden by removing it from this page."""
         ),
-        InlinePanel("dog_status_pages", label="Displayed statuses"),
+        InlinePanel(
+            "dog_status_pages", label="Displayed statuses",
+            help_text=mark_safe("""
+            Add Dog Status pages as child pages of this page.<br/>
+            Then add each Dog Status page that you want to be visible on this index page
+            (in the order you want them to display).<br/>
+            Note that only live Dog Status pages will be visible."
+            """)
+        )
     ]
 
     # Allows child objects (i.e. DogStatusPage objects) to be accessible via the
@@ -61,12 +62,13 @@ class DogStatusPage(Page):
 
     content_panels = Page.content_panels + [
         HelpPanel(
-            """
-            This page will show all dogs with the selected status.
-            <br/>
-            Create a child page for each dog that has this status (you can 
-            move them later if their status changes.)
-            """
+            mark_safe(
+                """
+                This page will show all dogs with the selected status.\n
+                Create a child page for each dog that has this status (you can 
+                move them later if their status changes.)
+                """
+            )
         ),
         FieldPanel('short_description'),
         FieldPanel('intro'),
@@ -115,37 +117,50 @@ class DogStatusPage(Page):
         return context
     
 
+class DogPageGalleryImage(Orderable):
+    """
+    Example related image
+    """
+    page = ParentalKey("DogPage", on_delete=models.CASCADE, related_name='gallery_images')
+    image = models.ForeignKey(
+        'wagtailimages.Image', on_delete=models.CASCADE, related_name='+'
+    )
+    caption = models.CharField(blank=True, max_length=250)
+
+    panels = [
+        FieldPanel('image'),
+        FieldPanel('caption'),
+    ]
+
+
 class DogPage(Page):
 
     date_posted = models.DateField(default=timezone.now)
     location = models.CharField(null=True, blank=True, max_length=255)
     description = RichTextField(blank=True)
-    image = models.ForeignKey(
-        "wagtailimages.Image",
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="+",
-        help_text="Landscape mode only; horizontal width between 1000px and " "3000px.",
-    )
-    album = models.ForeignKey(
-        Collection,
-        limit_choices_to=~models.Q(name__in=["Root"]),
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        help_text="Select the image collection (album) for this dog. To set up "
-                  "a collection, go to Settings > Collections and add a new collection for "
-                  "this dog, then upload images and allocate them to the collection.",
-    )
+    facebook_url = models.URLField(null=True, blank=True, help_text="Link to Facebook album page for this dog")
 
     content_panels = Page.content_panels + [
         FieldPanel('date_posted'),
         FieldPanel('location'),
         FieldPanel('description'),
-        FieldPanel('image'),
-        FieldPanel('album'),
+        FieldPanel('facebook_url'),
+        MultipleChooserPanel(
+            'gallery_images',
+            label="Images",
+            chooser_field_name="image",
+            help_text=(
+                "Select up to 6 images to display on the page. The first image will be used "
+                "as the banner image and preview image on the category list page. "
+                "If you have multiple images to upload, you can upload them all at "
+                "once by going to Images in the main menu and return to this page to select them."
+            ),
+            max_num=6
+        )
     ]
 
     subpage_types = []
     parent_page_types = ["DogStatusPage"]
+
+    def image(self):
+        return self.gallery_images.first().image

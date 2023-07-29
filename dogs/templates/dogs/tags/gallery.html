@@ -1,15 +1,15 @@
 {% load wagtailimages_tags %}
 
-{% for img in images %}
+{% for gallery_image in images %}
     <div class="picture-card">
-        <a href="{{ img.file.url }}">
+        <a href="{{ gallery_image.image.file.url }}">
         <figure class="picture-card__image">
-            {% image img fill-645x480-c100 loading="lazy" %}
+            {% image gallery_image.image fill-645x480-c100 loading="lazy" %}
             <div class="picture-card__contents">
                 {% comment %} <p class="picture-card__title">{{ img.title }}</p> {% endcomment %}
             </div>
         </figure>
-        {{ img.caption }}
+        {{ gallery_image.caption }}
         </a>
     </div>
     

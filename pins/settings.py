@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     "dashboard",
     "django_extensions",
     "wagtail.contrib.forms",
+    "wagtail.contrib.modeladmin",
     "wagtail.contrib.redirects",
     "wagtail.contrib.settings",
     "wagtail.embeds",

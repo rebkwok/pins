@@ -6,9 +6,8 @@ register = template.Library()
 
 # Retrieves a single gallery item and returns a gallery of images
 @register.inclusion_tag("dogs/tags/gallery.html", takes_context=True)
-def gallery(context, gallery):
-    images = Image.objects.filter(collection=gallery)
+def gallery(context, gallery_images):
     return {
-        "images": images,
+        "images": gallery_images,
         "request": context["request"],
     }

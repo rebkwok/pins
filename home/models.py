@@ -6,6 +6,7 @@ from wagtail.admin.panels import (
     FieldPanel,
     FieldRowPanel,
     InlinePanel,
+    HelpPanel,
     MultiFieldPanel,
     PublishingPanel,
 )
@@ -337,6 +338,9 @@ class FooterText(
     body = RichTextField()
 
     panels = [
+        HelpPanel(
+            """Footer added to every page. Note that if more than one footer text is
+              defined, the most recently created published version will be used."""),
         FieldPanel("body"),
         PublishingPanel(),
     ]

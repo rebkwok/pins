@@ -103,7 +103,7 @@ def get_footer_text(context):
 
     # If the context doesn't have footer_text defined, get one that's live
     # if not footer_text:
-    instance = FooterText.objects.filter(live=True).first()
+    instance = FooterText.objects.filter(live=True).latest("id")
     footer_text = instance.body if instance else ""
 
     return {
