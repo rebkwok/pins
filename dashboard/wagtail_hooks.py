@@ -1,4 +1,5 @@
 from django.urls import reverse
+from django.utils.safestring import mark_safe
 
 from wagtail import hooks
 from wagtail.admin.menu import Menu, MenuItem, SubmenuMenuItem
@@ -19,7 +20,22 @@ from dogs.models import DogPage
 # ensure our modeladmin is created
 class DogPageModelAdmin(ModelAdmin):
     model = DogPage
+    list_display = ("title", "page_status", "category")
     menu_order = 150
+    help_text = "Help"
+    
+    def category(self, obj):
+       move_url = reverse(
+            f"wagtailadmin_pages:move",
+            args=[obj.id],
+        )
+       return mark_safe(
+          f"{obj.get_parent().specific.title} <a class='button button-secondary button-small' href='{move_url}'>Change</a>"
+        )
+    category.short_description = "Dog Status/Category"
+
+    def page_status(self, obj):
+        return mark_safe(f"<span class='w-status w-status--primary'>{obj.status_string.title()}</span>")
 
 
 class FooterTextViewSet(SnippetViewSet):

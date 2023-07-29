@@ -163,4 +163,5 @@ class DogPage(Page):
     parent_page_types = ["DogStatusPage"]
 
     def image(self):
-        return self.gallery_images.first().image
+        if self.gallery_images.exists():
+            return self.gallery_images.first().image
