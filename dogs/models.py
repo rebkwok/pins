@@ -88,7 +88,7 @@ class DogStatusPage(Page):
     # template. We use this on the HomePage to display child items of featured
     # content
     def children(self):
-        return self.get_children().specific().live()
+        return self.get_dogs()
 
     # Pagination for the index page. We use the `django.core.paginator` as any
     # standard Django app would, but the difference here being we have it as a
