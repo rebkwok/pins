@@ -149,9 +149,10 @@ class DogPage(Page):
             'gallery_images',
             label="Images",
             chooser_field_name="image",
-            help_text=(
+            help_text=mark_safe(
                 "Select up to 6 images to display on the page. The first image will be used "
-                "as the banner image and preview image on the category list page. "
+                "as the banner image and preview image on the category list page.<br/><br/>"
+                "Use the arrows on the right of the images to change order.</br/><br/>"
                 "If you have multiple images to upload, you can upload them all at "
                 "once by going to Images in the main menu and return to this page to select them."
             ),
