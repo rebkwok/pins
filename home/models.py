@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 from modelcluster.fields import ParentalKey
@@ -234,6 +235,7 @@ class FormField(AbstractFormField):
 
 
 class FormPage(AbstractEmailForm):
+
     image = models.ForeignKey(
         "wagtailimages.Image",
         null=True,
@@ -255,7 +257,6 @@ class FormPage(AbstractEmailForm):
             [
                 FieldRowPanel(
                     [
-                        FieldPanel("from_address"),
                         FieldPanel("to_address"),
                     ]
                 ),
@@ -266,6 +267,10 @@ class FormPage(AbstractEmailForm):
     ]
 
     subpage_types = []
+
+    def save(self, *args, **kwargs):
+        self.from_address = settings.DEFAULT_FROM_EMAIL
+        super().save(*args, **kwargs)
 
 
 class StandardPage(Page):
