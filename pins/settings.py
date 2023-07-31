@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     "search",
     "dashboard",
     "django_extensions",
+    "django_ses",
     "wagtail.contrib.forms",
     "wagtail.contrib.modeladmin",
     "wagtail.contrib.redirects",
@@ -202,18 +203,15 @@ MEDIA_URL = "/media/"
 if env("LOCAL") or env("CI"):
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 else:  # pragma: no cover
-    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-    EMAIL_USE_TLS = True
-    EMAIL_HOST = 'email-smtp.eu-west-1.amazonaws.com'
-    EMAIL_HOST_USER = env('EMAIL_HOST_USER', None)
-    EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', None)
-    if EMAIL_HOST_USER is None:  # pragma: no cover
-        print("No email host user provided!")
-    if EMAIL_HOST_PASSWORD is None:  # pragma: no cover
-        print("No email host password provided!")
-    EMAIL_PORT = 587
+    EMAIL_BACKEND = 'django_ses.SESBackend'
+    AWS_SES_ACCESS_KEY_ID = env('AWS_SES_ACCESS_KEY_ID')
+    AWS_SES_SECRET_ACCESS_KEY = env('AWS_SES_SECRET_ACCESS_KEY')
+    AWS_SES_REGION_NAME=env('AWS_SES_REGION_NAME')
+    AWS_SES_REGION_ENDPOINT=env('AWS_SES_REGION_ENDPOINT')
+
 DEFAULT_FROM_EMAIL = 'pins.scot.web+no-reply@gmail.com'
 SUPPORT_EMAIL = 'rebkwok@gmail.com'
+SERVER_EMAIL = SUPPORT_EMAIL
 
 # MAILCATCHER
 if env('USE_MAILCATCHER'):  # pragma: no cover
