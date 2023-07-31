@@ -55,7 +55,13 @@ ALLOWED_HOSTS = [
     'pins.scot', 'www.pins.scot', 'pins.rebkwok.co.uk', 'www.pins.rebkwok.co.uk', 'vagrant.pins.scot'
 ]
 # https://docs.djangoproject.com/en/4.0/ref/settings/#std:setting-CSRF_TRUSTED_ORIGINS
-CSRF_TRUSTED_ORIGINS = ['https://pins.scot', 'https://pins.rebkwok.co.uk', 'https://vagrant.pins.scot']
+CSRF_TRUSTED_ORIGINS = [
+    'https://pins.scot', 
+    'https://*.pins.scot', 
+    'https://pins.rebkwok.co.uk',
+    'https://*.pins.rebkwok.co.uk', 
+    'https://vagrant.pins.scot'
+]
 
 
 if env('LOCAL'):  # pragma: no cover
