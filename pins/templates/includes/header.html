@@ -44,7 +44,7 @@
                     {% top_menu parent=site_root calling_page=self %}
                 </ul>
             </nav>
-
+            {% if not hide_search %}
             <form action="/search" method="get" class="navigation__search" role="search">
                 <label for="search-input" class="u-sr-only">Search</label>
                 <input class="navigation__search-input" id="search-input" type="text" placeholder="Search for dogs by name" autocomplete="off" name="q">
@@ -54,6 +54,7 @@
                     </svg>
                 </div>
             </form>
+            {% endif %}
         </div>
     </div>
 </div>
