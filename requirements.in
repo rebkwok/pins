@@ -6,3 +6,4 @@ django-extensions
 psycopg2
 gunicorn
 django_ses[events]
+htmx

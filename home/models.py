@@ -273,6 +273,67 @@ class FormPage(AbstractEmailForm):
         super().save(*args, **kwargs)
 
 
+class OrderFormField(AbstractFormField):
+    """
+    for contact form and adoption application form:
+    https://docs.wagtail.org/en/stable/reference/contrib/forms/index.html
+    """
+    page = ParentalKey("OrderFormPage", related_name="order_form_fields", on_delete=models.CASCADE)
+
+
+class OrderFormPage(AbstractEmailForm):
+
+    body = RichTextField(blank=True)
+    image = models.ForeignKey(
+        'wagtailimages.Image', on_delete=models.SET_NULL, related_name='+', blank=True, null=True
+    )
+
+    product_name = models.CharField(blank=True, max_length=250)
+    product_description = models.CharField(blank=True, max_length=250)
+    product_cost = models.DecimalField(max_digits=10, decimal_places=2)
+    shipping_cost = models.DecimalField(max_digits=10, decimal_places=2)
+
+    thank_you_text = RichTextField(blank=True)
+
+    # Note how we include the FormField object via an InlinePanel using the
+    # related_name value
+    content_panels = AbstractEmailForm.content_panels + [
+        FieldPanel("body"),
+        MultiFieldPanel(
+            [
+                FieldPanel("image"),
+                FieldPanel("product_name"),
+                FieldPanel("product_description"),
+                FieldPanel("product_cost"),
+                FieldPanel("shipping_cost"),
+            ],
+            "Product details"
+        ),
+        InlinePanel("order_form_fields", heading="Form fields", label="Field"),
+        FieldPanel("thank_you_text"),
+        MultiFieldPanel(
+            [
+                FieldRowPanel(
+                    [
+                        FieldPanel("to_address"),
+                    ]
+                ),
+                FieldPanel("subject"),
+            ],
+            "Email",
+        ),
+    ]
+
+    subpage_types = []
+
+    def save(self, *args, **kwargs):
+        self.from_address = settings.DEFAULT_FROM_EMAIL
+        super().save(*args, **kwargs)
+
+    def get_form_fields(self):
+        return self.order_form_fields.all()
+    
+
 class StandardPage(Page):
     """
     A generic content page.

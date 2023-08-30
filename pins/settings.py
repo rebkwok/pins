@@ -52,7 +52,15 @@ else:  # pragma: no cover
     DEBUG = False
 
 ALLOWED_HOSTS = [
-    'pins.scot', 'www.pins.scot', 'pins.rebkwok.co.uk', 'www.pins.rebkwok.co.uk', 'vagrant.pins.scot'
+    'pins.scot', 
+    'www.pins.scot', 
+    'pins.rebkwok.co.uk', 
+    'www.pins.rebkwok.co.uk',
+    'pins-orders.rebkwok.co.uk', 
+    'www.pins-orders.rebkwok.co.uk', 
+    'vagrant.pins.scot',
+    'vagrant.pins-orders.scot'
+
 ]
 # https://docs.djangoproject.com/en/4.0/ref/settings/#std:setting-CSRF_TRUSTED_ORIGINS
 CSRF_TRUSTED_ORIGINS = [

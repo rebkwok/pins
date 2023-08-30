@@ -4,12 +4,29 @@
 #
 #    pip-compile
 #
+aiofiles==23.2.1
+    # via nicegui
+aiohttp==3.8.5
+    # via nicegui
+aiosignal==1.3.1
+    # via aiohttp
 anyascii==0.3.2
     # via wagtail
+anyio==3.7.1
+    # via
+    #   httpcore
+    #   starlette
+    #   watchfiles
 asgiref==3.7.2
     # via django
+async-timeout==4.0.3
+    # via aiohttp
+attrs==23.1.0
+    # via aiohttp
 beautifulsoup4==4.11.2
     # via wagtail
+bidict==0.22.1
+    # via python-socketio
 boto3==1.28.15
     # via django-ses
 botocore==1.31.15
@@ -19,13 +36,20 @@ botocore==1.31.15
 build==0.10.0
     # via pip-tools
 certifi==2023.7.22
-    # via requests
+    # via
+    #   httpcore
+    #   httpx
+    #   requests
 cffi==1.15.1
     # via cryptography
 charset-normalizer==3.2.0
-    # via requests
+    # via
+    #   aiohttp
+    #   requests
 click==8.1.6
-    # via pip-tools
+    # via
+    #   pip-tools
+    #   uvicorn
 cryptography==41.0.2
     # via django-ses
 defusedxml==0.7.1
@@ -64,22 +88,66 @@ draftjs-exporter==2.1.7
     # via wagtail
 et-xmlfile==1.1.0
     # via openpyxl
+exceptiongroup==1.1.3
+    # via anyio
+fastapi==0.103.0
+    # via
+    #   fastapi-socketio
+    #   nicegui
+fastapi-socketio==0.0.10
+    # via nicegui
 filetype==1.2.0
     # via willow
+frozenlist==1.4.0
+    # via
+    #   aiohttp
+    #   aiosignal
 gunicorn==21.2.0
     # via -r requirements.in
+h11==0.14.0
+    # via
+    #   httpcore
+    #   uvicorn
 html5lib==1.1
     # via wagtail
+htmx==0.0.0
+    # via -r requirements.in
+httpcore==0.17.3
+    # via httpx
+httptools==0.6.0
+    # via uvicorn
+httpx==0.24.1
+    # via nicegui
 idna==3.4
-    # via requests
+    # via
+    #   anyio
+    #   httpx
+    #   requests
+    #   yarl
+itsdangerous==2.1.2
+    # via nicegui
+jinja2==3.1.2
+    # via nicegui
 jmespath==1.0.1
     # via
     #   boto3
     #   botocore
 l18n==2021.3
     # via wagtail
+markdown2==2.4.10
+    # via nicegui
+markupsafe==2.1.3
+    # via jinja2
+multidict==6.0.4
+    # via
+    #   aiohttp
+    #   yarl
+nicegui==1.3.13
+    # via htmx
 openpyxl==3.1.2
     # via wagtail
+orjson==3.9.5
+    # via nicegui
 packaging==23.1
     # via
     #   build
@@ -88,20 +156,38 @@ pillow==9.5.0
     # via wagtail
 pip-tools==7.1.0
     # via -r requirements.in
+pscript==0.7.7
+    # via vbuild
 psycopg2==2.9.6
     # via -r requirements.in
 pycparser==2.21
     # via cffi
+pydantic==1.10.12
+    # via
+    #   fastapi
+    #   htmx
+pygments==2.16.1
+    # via nicegui
 pyproject-hooks==1.0.0
     # via build
 python-dateutil==2.8.2
     # via botocore
+python-dotenv==1.0.0
+    # via uvicorn
+python-engineio==4.6.1
+    # via python-socketio
+python-multipart==0.0.6
+    # via nicegui
+python-socketio==5.8.0
+    # via fastapi-socketio
 pytz==2023.3
     # via
     #   django-modelcluster
     #   django-ses
     #   djangorestframework
     #   l18n
+pyyaml==6.0.1
+    # via uvicorn
 requests==2.31.0
     # via
     #   django-ses
@@ -113,10 +199,17 @@ six==1.16.0
     #   html5lib
     #   l18n
     #   python-dateutil
+sniffio==1.3.0
+    # via
+    #   anyio
+    #   httpcore
+    #   httpx
 soupsieve==2.4.1
     # via beautifulsoup4
 sqlparse==0.4.4
     # via django
+starlette==0.27.0
+    # via fastapi
 telepath==0.3.1
     # via wagtail
 tomli==2.0.1
@@ -125,19 +218,38 @@ tomli==2.0.1
     #   pip-tools
     #   pyproject-hooks
 typing-extensions==4.7.1
-    # via asgiref
+    # via
+    #   asgiref
+    #   fastapi
+    #   nicegui
+    #   pydantic
+    #   starlette
 urllib3==1.26.16
     # via
     #   botocore
     #   requests
+uvicorn[standard]==0.22.0
+    # via nicegui
+uvloop==0.17.0
+    # via uvicorn
+vbuild==0.8.2
+    # via nicegui
 wagtail==5.0.2
     # via -r requirements.in
+watchfiles==0.20.0
+    # via
+    #   nicegui
+    #   uvicorn
 webencodings==0.5.1
     # via html5lib
+websockets==11.0.3
+    # via uvicorn
 wheel==0.41.0
     # via pip-tools
 willow==1.5.1
     # via wagtail
+yarl==1.9.2
+    # via aiohttp
 
 # The following packages are considered to be unsafe in a requirements file:
 # pip
