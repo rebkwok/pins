@@ -45,8 +45,9 @@
                     {% endif %}
                 </div>
 
-                <div class="col-sm-5 promo">
+                
                     {% if page.promo_image or page.promo_title or page.promo_text %}
+                    <div class="col-sm-5 promo">
                         <div class="col-lg-10 promo-text">
                             {% if page.promo_title %}
                                 <h2>{{ page.promo_title }}</h2>
@@ -58,9 +59,10 @@
                                 <figure>{% image page.promo_image fill-590x413-c100 loading="lazy" %}</figure>
                             {% endif %}
                         </div>
+                    </div>    
                     {% endif %}
                     
-                </div>
+                
             </div>
         </div>
 
@@ -97,7 +99,8 @@
                 </div>
             </div>
         {% endif %}
-
+        
+        {% if page.hero_footer_text or page.hero_footer_link or page.hero_footer %}
         <div class="container-fluid hero">
             <div class="hero-footer-mask"></div>
             <div class="container">
@@ -115,6 +118,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
     </div>
 
 {% endblock content %}
