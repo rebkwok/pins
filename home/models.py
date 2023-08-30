@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.template.response import TemplateResponse
 
 from modelcluster.fields import ParentalKey
 
@@ -281,6 +282,11 @@ class OrderFormField(AbstractFormField):
     page = ParentalKey("OrderFormPage", related_name="order_form_fields", on_delete=models.CASCADE)
 
 
+class ProductVariant(Orderable):
+    page = ParentalKey("OrderFormPage", related_name="product_variants", on_delete=models.CASCADE)
+    description = models.CharField(blank=True, max_length=250)
+    cost = models.DecimalField(max_digits=10, decimal_places=2)
+
 class OrderFormPage(AbstractEmailForm):
 
     body = RichTextField(blank=True)
@@ -290,7 +296,6 @@ class OrderFormPage(AbstractEmailForm):
 
     product_name = models.CharField(blank=True, max_length=250)
     product_description = models.CharField(blank=True, max_length=250)
-    product_cost = models.DecimalField(max_digits=10, decimal_places=2)
     shipping_cost = models.DecimalField(max_digits=10, decimal_places=2)
 
     thank_you_text = RichTextField(blank=True)
@@ -304,11 +309,21 @@ class OrderFormPage(AbstractEmailForm):
                 FieldPanel("image"),
                 FieldPanel("product_name"),
                 FieldPanel("product_description"),
-                FieldPanel("product_cost"),
                 FieldPanel("shipping_cost"),
+                InlinePanel(
+                    "product_variants", label="Product Variants",
+                ),
             ],
             "Product details"
         ),
+        HelpPanel(
+            content="""
+            Add fields for name, address etc., plus quantity fields.
+
+            Add a dropdown field labelled quantity_n for each product variant in order (starting at 1).
+
+            NOTE: Do NOT change the quantity label after creation. Delete and recreate if necessary.
+            """),
         InlinePanel("order_form_fields", heading="Form fields", label="Field"),
         FieldPanel("thank_you_text"),
         MultiFieldPanel(
@@ -330,9 +345,49 @@ class OrderFormPage(AbstractEmailForm):
         self.from_address = settings.DEFAULT_FROM_EMAIL
         super().save(*args, **kwargs)
 
+    def default_total(self):
+        return self.product_variants.first().cost + self.shipping_cost
+
     def get_form_fields(self):
         return self.order_form_fields.all()
     
+    def get_variant_quantities_and_total(self, data):
+        def get_item(v):
+            if isinstance(v, list):
+                return int(v[0])
+            return int(v)        
+        quantities = {
+            k: get_item(v) for k, v in data.items() if k.startswith("quantity_")
+        }
+        total = 0
+        variant_quantities = {}
+        for key, quantity in quantities.items():
+            variant_id = key.strip("quantity_")
+            variant = self.product_variants.get(id=variant_id)
+            variant_quantities[key] = (variant, quantity)
+            total += (variant.cost * quantity)
+        total += self.shipping_cost
+
+        return variant_quantities, total
+
+    def render_email(self, form):
+        content = super().render_email(form)
+        variant_quantities, total = self.get_variant_quantities_and_total(form.cleaned_data)
+        
+        for key, (variant, _) in variant_quantities.items():
+            content = content.replace(key, variant.description)
+        content += f"\nTotal amount due: £{total}"
+        return content
+    
+    def render_landing_page(self, request, form_submission=None, *args, **kwargs):
+        context = self.get_context(request)
+        context["form_submission"] = form_submission
+        _, total = self.get_variant_quantities_and_total(form_submission.get_data())
+        context["total"] = total
+        return TemplateResponse(
+            request, self.get_landing_page_template(request), context
+        )
+
 
 class StandardPage(Page):
     """

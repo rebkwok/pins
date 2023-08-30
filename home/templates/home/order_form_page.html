@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load wagtailcore_tags navigation_tags wagtailimages_tags %}
+{% load wagtailcore_tags navigation_tags wagtailimages_tags ordertags %}
 
 {% block content %}
 
@@ -20,7 +20,13 @@
                 {% if page.product.description %}
                     <p class="intro">{{ page.product_description|richtext }}</p>
                 {% endif %}
-                <p>Each {{ page.product_name|lower }} costs £{{ page.product_cost }} {% if page.shipping_cost %}(plus £{{page.shipping_cost }} P&P){% endif %}
+                
+                <p>
+                    {% for variant in page.product_variants.all %}
+                    {{ variant.description }}: £{{ variant.cost }}<br/>
+                    {% endfor %}
+                </p>
+                {% if page.shipping_cost %}Plus P&P: £{{page.shipping_cost }} per order{% endif %}
             </div>
         </div>
     </div>
@@ -44,33 +50,55 @@
                     
                     {% for field in form %}
                         <div class="form-page__field" aria-required={% if field.field.required %}"true"{% else %}"false"{% endif %}>
-                            
+                        {% if field.name|is_order_quantity %}
+                            {% get_product_variant page=page field_name=field.name as variant %}
+                            <strong>{{ variant.description }} (£{{ variant.cost }})</strong><br/>
+                            <label for={{ field.id }}>Quantity</label>
+                            {% if field.field.required %}<span class="required">*</span>{% endif %}
+
+                            {% if field.help_text %}
+                                <p class="help">{{ field.help_text }}</p>
+                            {% endif %}
+            
+                            <select 
+                                name="{{ field.name }}" 
+                                required="" 
+                                id="id_{{ field.name }}"
+                                hx-post="{% url 'orders:calculate_order_total' page.id %}"
+                                hx-trigger="change"
+                                hx-target="#order-total"
+                            >
+                                {% for choice, _ in field.field.choices %}
+                                <option value="{{ choice }}" {% if choice == field.field.initial %}selected{% endif %}>{{ choice }}</option>
+                                {% endfor %}
+                              </select>
+
+                        {% else %}
                             {{ field.label_tag }}{% if field.field.required %}<span class="required">*</span>{% endif %}
 
                             {% if field.help_text %}
                                 <p class="help">{{ field.help_text }}</p>
                             {% endif %}
-                            {% if field.name == "quantity" %}
-                            <input 
-                              type="number" 
-                              name="quantity" 
-                              value="1" 
-                              step="any" 
-                              required="" 
-                              id="id_quantity"
-                              hx-post="{% url 'orders:calculate_order_total' page.id %}"
-                              hx-trigger="change"
-                              hx-target="#order-total"
-                            >
-                            {% else %}
-                                {{ field }}
-                            {% endif %}
+
+                            {{ field }}
+                        {% endif %}
                         </div>
                     {% endfor %}
                     
                     <div>
                         <p><strong>
-                            Total: £<span id="order-total">{{ page.product_cost|add:page.shipping_cost }}</span>
+                            Total: £<span id="order-total">-- <input type="submit" 
+                                class="order-btn-sm" 
+                                value="Update"
+                                hx-post="{% url 'orders:calculate_order_total' page.id %}"
+                                hx-trigger="click"
+                                hx-target="#order-total"
+                            ></span> 
+                            
+                            {% for choice, _ in field.field.choices %}
+                            <option value="{{ choice }}" {% if choice == field.field.initial %}selected{% endif %}>{{ choice }}</option>
+                            {% endfor %}
+                          </select>
                         </strong></p>
                         <p>
                             After submitting this form, please pay for your order by paypal (Friends and Family) to pinscotland16@gmail.com, including your name and "tea towel order" in the message.

@@ -1339,6 +1339,20 @@ select {
   width: max-content;
 }
 
+.form-page input[type='submit'].order-btn-sm {
+  border: solid  var(--dark);
+  padding: 5px 10px;
+  border-radius: 10%;
+  background-color: rgb(255 255 255);
+  color: var(--dark);
+  font-weight: lighter;
+}
+
+
+.form-page input[type='submit'].order-btn-sm:hover {
+  color: var(--white);
+}
+
 .form-page input[type='submit']:hover {
   background-color: var(--dark);
 }
