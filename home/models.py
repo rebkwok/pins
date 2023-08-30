@@ -375,7 +375,7 @@ class OrderFormPage(AbstractEmailForm):
         variant_quantities, total = self.get_variant_quantities_and_total(form.cleaned_data)
         
         for key, (variant, _) in variant_quantities.items():
-            content = content.replace(key, variant.description)
+            content = content.replace(key, f"{variant.description} ({key})")
         content += f"\nTotal amount due: £{total}"
         return content
     
