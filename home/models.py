@@ -22,6 +22,7 @@ from wagtail.models import (
     RevisionMixin,
     TranslatableMixin,
 )
+from .utils import slugify_desc
 
 
 class HomePage(Page):
@@ -320,7 +321,7 @@ class OrderFormPage(AbstractEmailForm):
             content="""
             Add fields for name, address etc., plus quantity fields.
 
-            Add a dropdown field labelled quantity_n for each product variant in order (starting at 1).
+            For quantity fields: add a dropdown field labelled with each product variant description (exactly).
 
             NOTE: Do NOT change the quantity label after creation. Delete and recreate if necessary.
             """),
@@ -345,8 +346,8 @@ class OrderFormPage(AbstractEmailForm):
         self.from_address = settings.DEFAULT_FROM_EMAIL
         super().save(*args, **kwargs)
 
-    def default_total(self):
-        return self.product_variants.first().cost + self.shipping_cost
+    def product_variant_descriptions(self):
+        return [slugify_desc(desc) for desc in self.product_variants.values_list("description", flat=True)]
 
     def get_form_fields(self):
         return self.order_form_fields.all()
@@ -355,15 +356,14 @@ class OrderFormPage(AbstractEmailForm):
         def get_item(v):
             if isinstance(v, list):
                 return int(v[0])
-            return int(v)        
+            return int(v)     
         quantities = {
-            k: get_item(v) for k, v in data.items() if k.startswith("quantity_")
+            k: get_item(v) for k, v in data.items() if k in self.product_variant_descriptions()
         }
         total = 0
         variant_quantities = {}
         for key, quantity in quantities.items():
-            variant_id = key.strip("quantity_")
-            variant = self.product_variants.get(id=variant_id)
+            variant = next(var for var in self.product_variants.all() if slugify_desc(var.description) == key)
             variant_quantities[key] = (variant, quantity)
             total += (variant.cost * quantity)
         total += self.shipping_cost
@@ -372,10 +372,7 @@ class OrderFormPage(AbstractEmailForm):
 
     def render_email(self, form):
         content = super().render_email(form)
-        variant_quantities, total = self.get_variant_quantities_and_total(form.cleaned_data)
-        
-        for key, (variant, _) in variant_quantities.items():
-            content = content.replace(key, f"{variant.description} ({key})")
+        _, total = self.get_variant_quantities_and_total(form.cleaned_data)
         content += f"\nTotal amount due: £{total}"
         return content
     

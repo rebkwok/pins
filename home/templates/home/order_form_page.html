@@ -49,9 +49,10 @@
                     {% endif %}
                     
                     {% for field in form %}
+                    {{ field.label }}
                         <div class="form-page__field" aria-required={% if field.field.required %}"true"{% else %}"false"{% endif %}>
-                        {% if field.name|is_order_quantity %}
-                            {% get_product_variant page=page field_name=field.name as variant %}
+                        {% if page|is_order_quantity:field.name %}
+                            {% get_product_variant page=page field_label=field.label as variant %}
                             <strong>{{ variant.description }} (£{{ variant.cost }})</strong><br/>
                             <label for={{ field.id }}>Quantity</label>
                             {% if field.field.required %}<span class="required">*</span>{% endif %}
