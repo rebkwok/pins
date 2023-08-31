@@ -282,6 +282,12 @@ class OrderFormField(AbstractFormField):
     """
     page = ParentalKey("OrderFormPage", related_name="order_form_fields", on_delete=models.CASCADE)
 
+    def get_field_clean_name(self):
+        # if clean name is already set, just return it
+        if self.clean_name:
+            return self.clean_name
+        return get_field_clean_name(self.label)
+
 
 class ProductVariant(Orderable):
     page = ParentalKey("OrderFormPage", related_name="product_variants", on_delete=models.CASCADE)
@@ -300,7 +306,7 @@ class ProductVariant(Orderable):
             base_slug = f"pv__{get_field_clean_name(self.name)}"
             slug = base_slug
             counter = 0
-            while ProductVariant.objects.filter(page=self.page, slug=slug).exists():
+            while ProductVariant.objects.filter(page=self.page, slug=slug).exclude(id-self.id).exists():
                 counter += 1
                 slug = f"{base_slug}_{counter}"
             self.slug = slug
@@ -348,7 +354,8 @@ class OrderFormPage(AbstractEmailForm):
             Quantity fields will be added when the page is published 
             and updated automatically based on product variants.  
             Note they will not show in the preview until published.
-            Do not modify the field label (starts with 'pv__').
+            Changes to the label or choices in these fields will have no effect - change
+            the product variant name/choices instead.
             """),
         InlinePanel("order_form_fields", heading="Form fields", label="Field"),
         FieldPanel("thank_you_text"),
@@ -388,12 +395,13 @@ class OrderFormPage(AbstractEmailForm):
             field = self.order_form_fields.create(
                 page_id=self.pk, 
                 clean_name=product_variant_slug, 
-                label=product_variant_slug,
+                label=variant.name,
                 field_type="dropdown", 
                 default_value = 0
             )
-        if field.choices != variant.quantity_choices: 
+        if (field.choices != variant.quantity_choices) or (field.label != variant.name): 
             field.choices = variant.quantity_choices
+            field.label = variant.name
             field.save()
 
     @property
