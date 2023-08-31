@@ -102,9 +102,9 @@ def get_footer_text(context):
     footer_text = context.get("footer_text", "")
 
     # If the context doesn't have footer_text defined, get one that's live
-    # if not footer_text:
-    instance = FooterText.objects.filter(live=True).latest("id")
-    footer_text = instance.body if instance else ""
+    if not footer_text:
+        instances = FooterText.objects.filter(live=True)
+        footer_text = instances.latest("id").body if instances.exists() else ""
 
     return {
         "footer_text": footer_text,
