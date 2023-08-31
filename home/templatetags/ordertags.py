@@ -5,11 +5,11 @@ register = template.Library()
 
 
 @register.filter
-def is_order_quantity(page, field_label):
-    return field_label in page.product_variant_descriptions()
+def is_order_quantity(page, field_name):
+    return field_name in page.product_quantity_field_names
 
 
 @register.simple_tag
-def get_product_variant(page, field_label):
-    return page.product_variants.get(description=field_label)
+def get_product_variant(page, field_name):
+    return page.product_variants.get(slug=field_name)
 

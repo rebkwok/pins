@@ -22,7 +22,7 @@ from wagtail.models import (
     RevisionMixin,
     TranslatableMixin,
 )
-from .utils import slugify_desc
+from wagtail.contrib.forms.utils import get_field_clean_name
 
 
 class HomePage(Page):
@@ -285,8 +285,27 @@ class OrderFormField(AbstractFormField):
 
 class ProductVariant(Orderable):
     page = ParentalKey("OrderFormPage", related_name="product_variants", on_delete=models.CASCADE)
+    name = models.CharField(max_length=50)
     description = models.CharField(blank=True, max_length=250)
     cost = models.DecimalField(max_digits=10, decimal_places=2)
+    quantity_choices = models.CharField(
+        max_length=255, 
+        default="0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20",
+        help_text="Comma separated list of quantity choices for the drop down menu"
+    )
+    slug = models.CharField(max_length=60, blank=True, default="", help_text="This field will be autopoulated")
+    
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base_slug = f"pv__{get_field_clean_name(self.name)}"
+            slug = base_slug
+            counter = 0
+            while ProductVariant.objects.filter(page=self.page, slug=slug).exists():
+                counter += 1
+                slug = f"{base_slug}_{counter}"
+            self.slug = slug
+        super().save(*args, **kwargs)
+
 
 class OrderFormPage(AbstractEmailForm):
 
@@ -312,18 +331,24 @@ class OrderFormPage(AbstractEmailForm):
                 FieldPanel("product_description"),
                 FieldPanel("shipping_cost"),
                 InlinePanel(
-                    "product_variants", label="Product Variants",
+                    "product_variants", label="Product Variants", 
+                    panels=[
+                        FieldPanel("name"),
+                        FieldPanel("description"),
+                        FieldPanel("cost"),
+                        FieldPanel("quantity_choices"),
+                    ]
                 ),
             ],
             "Product details"
         ),
         HelpPanel(
             content="""
-            Add fields for name, address etc., plus quantity fields.
-
-            For quantity fields: add a dropdown field labelled with each product variant description (exactly).
-
-            NOTE: Do NOT change the quantity label after creation. Delete and recreate if necessary.
+            Add fields for name, address etc.
+            Quantity fields will be added when the page is published 
+            and updated automatically based on product variants.  
+            Note they will not show in the preview until published.
+            Do not modify the field label (starts with 'pv__').
             """),
         InlinePanel("order_form_fields", heading="Form fields", label="Field"),
         FieldPanel("thank_you_text"),
@@ -345,9 +370,39 @@ class OrderFormPage(AbstractEmailForm):
     def save(self, *args, **kwargs):
         self.from_address = settings.DEFAULT_FROM_EMAIL
         super().save(*args, **kwargs)
+        # Save the product variants to ensure slugs have been generated
+        for pr in self.product_variants.all():
+            pr.save()
+        # generate/update quantity fields
+        for slug in self.product_variant_slugs:
+            self.create_or_update_order_form_field(slug)
+        fields_to_remove = self.product_quantity_field_names - self.product_variant_slugs
+        for field_name in fields_to_remove:
+            self.order_form_fields.get(clean_name=field_name).delete()        
 
-    def product_variant_descriptions(self):
-        return [slugify_desc(desc) for desc in self.product_variants.values_list("description", flat=True)]
+    def create_or_update_order_form_field(self, product_variant_slug):
+        variant = self.product_variants.get(slug=product_variant_slug)
+        try:
+            field = self.order_form_fields.get(clean_name=product_variant_slug)
+        except OrderFormField.DoesNotExist:
+            field = self.order_form_fields.create(
+                page_id=self.pk, 
+                clean_name=product_variant_slug, 
+                label=product_variant_slug,
+                field_type="dropdown", 
+                default_value = 0
+            )
+        if field.choices != variant.quantity_choices: 
+            field.choices = variant.quantity_choices
+            field.save()
+
+    @property
+    def product_quantity_field_names(self):
+        return set(self.order_form_fields.filter(clean_name__startswith="pv__").values_list("clean_name", flat=True))
+
+    @property
+    def product_variant_slugs(self):
+        return set(self.product_variants.values_list("slug", flat=True))
 
     def get_form_fields(self):
         return self.order_form_fields.all()
@@ -358,12 +413,12 @@ class OrderFormPage(AbstractEmailForm):
                 return int(v[0])
             return int(v)     
         quantities = {
-            k: get_item(v) for k, v in data.items() if k in self.product_variant_descriptions()
+            k: get_item(v) for k, v in data.items() if k in self.product_variant_slugs
         }
         total = 0
         variant_quantities = {}
         for key, quantity in quantities.items():
-            variant = next(var for var in self.product_variants.all() if slugify_desc(var.description) == key)
+            variant = self.product_variants.get(slug=key)
             variant_quantities[key] = (variant, quantity)
             total += (variant.cost * quantity)
         total += self.shipping_cost

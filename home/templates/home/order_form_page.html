@@ -17,13 +17,13 @@
                 {% endif %}
             </div>
             <div class="col-md-8 index-header__body-introduction">
-                {% if page.product.description %}
+                {% if page.product_description %}
                     <p class="intro">{{ page.product_description|richtext }}</p>
                 {% endif %}
                 
                 <p>
                     {% for variant in page.product_variants.all %}
-                    {{ variant.description }}: £{{ variant.cost }}<br/>
+                    {{ variant.name }}: £{{ variant.cost }}<br/>
                     {% endfor %}
                 </p>
                 {% if page.shipping_cost %}Plus P&P: £{{page.shipping_cost }} per order{% endif %}
@@ -49,41 +49,48 @@
                     {% endif %}
                     
                     {% for field in form %}
-                    {{ field.label }}
-                        <div class="form-page__field" aria-required={% if field.field.required %}"true"{% else %}"false"{% endif %}>
-                        {% if page|is_order_quantity:field.name %}
-                            {% get_product_variant page=page field_label=field.label as variant %}
-                            <strong>{{ variant.description }} (£{{ variant.cost }})</strong><br/>
-                            <label for={{ field.id }}>Quantity</label>
-                            {% if field.field.required %}<span class="required">*</span>{% endif %}
+                        {% if not page|is_order_quantity:field.name %}
+                            <div class="form-page__field" aria-required={% if field.field.required %}"true"{% else %}"false"{% endif %}>
+                            
+                                {{ field.label_tag }}{% if field.field.required %}<span class="required">*</span>{% endif %}
 
-                            {% if field.help_text %}
-                                <p class="help">{{ field.help_text }}</p>
-                            {% endif %}
-            
-                            <select 
-                                name="{{ field.name }}" 
-                                required="" 
-                                id="id_{{ field.name }}"
-                                hx-post="{% url 'orders:calculate_order_total' page.id %}"
-                                hx-trigger="change"
-                                hx-target="#order-total"
-                            >
-                                {% for choice, _ in field.field.choices %}
-                                <option value="{{ choice }}" {% if choice == field.field.initial %}selected{% endif %}>{{ choice }}</option>
-                                {% endfor %}
-                              </select>
+                                {% if field.help_text %}
+                                    <p class="help">{{ field.help_text }}</p>
+                                {% endif %}
 
-                        {% else %}
-                            {{ field.label_tag }}{% if field.field.required %}<span class="required">*</span>{% endif %}
-
-                            {% if field.help_text %}
-                                <p class="help">{{ field.help_text }}</p>
-                            {% endif %}
-
-                            {{ field }}
+                                {{ field }}
+                            </div>
                         {% endif %}
-                        </div>
+                    {% endfor %}
+
+                    {% for field in form %}
+                        {% if page|is_order_quantity:field.name %}
+                            <div class="form-page__field" aria-required={% if field.field.required %}"true"{% else %}"false"{% endif %}>
+                                {% get_product_variant page=page field_name=field.name as variant %}
+                                <strong>{{ variant.name }} (£{{ variant.cost }})</strong><br/>
+                                
+                                {% if variant.description %}
+                                    <p class="help">{{ variant.description }}</p>
+                                {% endif %}
+                                
+                                <label for={{ field.id }}>Quantity</label>
+                                {% if field.field.required %}<span class="required">*</span>{% endif %}
+
+
+                                <select 
+                                    name="{{ field.name }}" 
+                                    required="" 
+                                    id="id_{{ field.name }}"
+                                    hx-post="{% url 'orders:calculate_order_total' page.id %}"
+                                    hx-trigger="change"
+                                    hx-target="#order-total"
+                                >
+                                    {% for choice, _ in field.field.choices %}
+                                    <option value="{{ choice }}" {% if choice == field.field.initial %}selected{% endif %}>{{ choice }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        {% endif %}
                     {% endfor %}
                     
                     <div>
