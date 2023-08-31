@@ -40,7 +40,9 @@
 
         {% block breadcrumbs %}
             {# breadcrumbs is defined in base/templatetags/navigation_tags.py #}
-            {% breadcrumbs %}
+            {% if not hide_breadcrumbs %}
+                {% breadcrumbs %}
+            {% endif %}
         {% endblock breadcrumbs %}
 
         {% block messages %}
