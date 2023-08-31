@@ -306,7 +306,7 @@ class ProductVariant(Orderable):
             base_slug = f"pv__{get_field_clean_name(self.name)}"
             slug = base_slug
             counter = 0
-            while ProductVariant.objects.filter(page=self.page, slug=slug).exclude(id-self.id).exists():
+            while ProductVariant.objects.filter(page=self.page, slug=slug).exclude(id=self.id).exists():
                 counter += 1
                 slug = f"{base_slug}_{counter}"
             self.slug = slug
@@ -474,7 +474,7 @@ class StandardPage(Page):
         FieldPanel("image"),
     ]
 
-    parent_page_types = ["HomePage"]
+    parent_page_types = ["HomePage", "OrderFormPage"]
     subpage_types = []
 
 
