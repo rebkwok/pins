@@ -324,7 +324,9 @@ class OrderFormPage(AbstractEmailForm):
     product_description = models.CharField(blank=True, max_length=250)
     shipping_cost = models.DecimalField(max_digits=10, decimal_places=2)
 
+    form_footer_text = RichTextField(blank=True)
     thank_you_text = RichTextField(blank=True)
+    
 
     # Note how we include the FormField object via an InlinePanel using the
     # related_name value
@@ -358,6 +360,7 @@ class OrderFormPage(AbstractEmailForm):
             the product variant name/choices instead.
             """),
         InlinePanel("order_form_fields", heading="Form fields", label="Field"),
+        FieldPanel("form_footer_text"),
         FieldPanel("thank_you_text"),
         MultiFieldPanel(
             [

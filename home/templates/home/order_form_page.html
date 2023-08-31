@@ -108,9 +108,10 @@
                             {% endfor %}
                           </select>
                         </strong></p>
-                        <p>
-                            After submitting this form, please pay for your order by paypal (Friends and Family) to pinscotland16@gmail.com, including your name and "tea towel order" in the message.
-                        </p> 
+
+                        <div>
+                            {{ page.form_footer_text|richtext }}
+                        </div> 
                     </div>
                     
                     <input type="submit">
