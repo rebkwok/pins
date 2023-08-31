@@ -421,7 +421,8 @@ class OrderFormPage(AbstractEmailForm):
             variant = self.product_variants.get(slug=key)
             variant_quantities[key] = (variant, quantity)
             total += (variant.cost * quantity)
-        total += self.shipping_cost
+        if total > 0:
+            total += self.shipping_cost
 
         return variant_quantities, total
 
