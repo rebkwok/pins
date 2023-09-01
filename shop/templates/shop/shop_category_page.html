@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags wagtailimages_tags %}
+
+{% block content %}
+    {% include "includes/header-hero.html" %}
+
+    <div class="container dog-detail">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="row">
+                    {% if page.introduction %}
+                        <p class="dog-detail__introduction">
+                            {{ page.introduction }}
+                        </p>
+                    {% endif %}
+                    {{ page.body|richtext }}
+                </div>
+                {% for product_listing in page.products.all %}
+                    <h2>
+                        {{ product_listing.product.name }}
+                        <ul>
+                        {% for variant in product_listing.product.variants.all %}
+                            <li>{{ variant.name }} - £{{ variant.price }} </li>
+                        {% endfor %}
+                        </ul>
+                    </h2>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+{% endblock content %}
