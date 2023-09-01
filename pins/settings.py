@@ -96,6 +96,7 @@ INSTALLED_APPS = [
     "django_extensions",
     "django_ses",
     "wagtail.contrib.forms",
+    "wagtail.contrib.frontend_cache",
     "wagtail.contrib.modeladmin",
     "wagtail.contrib.redirects",
     "wagtail.contrib.settings",
@@ -116,8 +117,18 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+<<<<<<< HEAD
     "wagtail_json_widget",
+=======
+    'salesman.core',
+    'salesman.basket',
+    'salesman.checkout',
+    'salesman.orders',
+    'salesman.admin',
+    'rest_framework',
+>>>>>>> b3bba0e (Add salesman)
     "dogs",
+    "shop",
 ]
 
 
@@ -373,6 +384,11 @@ else:
                 'level': 'INFO',
                 'propogate': True,
             },
+            'shop': {
+                'handlers': ['console'],
+                'level': 'INFO',
+                'propogate': True,
+            },
         },
     }
 
@@ -423,3 +439,18 @@ FB_APP_SECRET = env.str("FB_APP_SECRET")
 FB_ACCESS_TOKEN = env.str("FB_ACCESS_TOKEN")
 FB_ACCESS_TOKEN_PATH = Path("pins/.fb_access_token")
 FB_PAGE_ID = env.str("FB_PAGE_ID")
+
+# Salesman
+
+SALESMAN_BASKET_MODEL = 'shop.Basket'
+SALESMAN_BASKET_ITEM_MODEL = 'shop.BasketItem'
+SALESMAN_ORDER_MODEL = 'shop.Order'
+SALESMAN_ORDER_ITEM_MODEL = 'shop.OrderItem'
+SALESMAN_ORDER_PAYMENT_MODEL = 'shop.OrderPayment'
+SALESMAN_ORDER_NOTE_MODEL = 'shop.OrderNote'
+SALESMAN_PRODUCT_TYPES = {
+    'shop.ProductVariant': 'shop.serializers.ProductVariantSerializer',
+}
+SALESMAN_PAYMENT_METHODS = [
+    'shop.payment.PayInAdvance',
+]

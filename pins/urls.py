@@ -8,13 +8,17 @@ from wagtail.documents import urls as wagtaildocs_urls
 
 from search import views as search_views
 from home import orders_urls
+from shop import urls as shop_urls
+
 
 urlpatterns = [
     path("django-admin/", admin.site.urls),
     path("admin/", include(wagtailadmin_urls)),
     path("documents/", include(wagtaildocs_urls)),
     path("search/", search_views.search, name="search"),
-    path("orders/", include(orders_urls))
+    path("orders/", include(orders_urls)),
+    path("shop/", include(shop_urls)),
+    path('api/', include('salesman.urls')),
 ]
 
 
@@ -27,6 +31,7 @@ if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 urlpatterns += (path(r'django-admin/django-ses/', include('django_ses.urls')),)
+
 
 urlpatterns = urlpatterns + [
     # For anything not caught by a more specific rule above, hand over to
