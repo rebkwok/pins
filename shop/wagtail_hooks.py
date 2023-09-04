@@ -1,20 +1,10 @@
-from django.urls import reverse
-from django.utils.safestring import mark_safe
 
-from wagtail import hooks
-from wagtail.admin.menu import Menu, MenuItem, SubmenuMenuItem
 
 from wagtail.admin.ui.tables import BooleanColumn
-from wagtail.admin.userbar import AccessibilityItem
-from wagtail.contrib.modeladmin.options import (
-    ModelAdmin,
-    ModelAdminGroup,
-    modeladmin_register,
-)
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
-from .models import ProductCategory, Product, ProductVariant
+from .models import Product, ProductCategory, ProductVariant
 
 
 class ProductCategoryViewSet(SnippetViewSet):

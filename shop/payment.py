@@ -1,7 +1,7 @@
 # payment.py
 from django.urls import reverse
-
 from salesman.checkout.payment import PaymentMethod
+
 from shop.models import Order
 
 

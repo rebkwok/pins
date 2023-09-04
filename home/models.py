@@ -11,13 +11,14 @@ from wagtail.admin.mail import send_mail
 from wagtail.admin.panels import (
     FieldPanel,
     FieldRowPanel,
-    InlinePanel,
     HelpPanel,
+    InlinePanel,
     MultiFieldPanel,
     PublishingPanel,
 )
 from wagtail.contrib.forms.models import AbstractEmailForm, AbstractFormField
 from wagtail.contrib.forms.views import SubmissionsListView
+from wagtail.contrib.forms.utils import get_field_clean_name
 from wagtail.fields import RichTextField
 from wagtail.models import (
     DraftStateMixin,
@@ -27,7 +28,6 @@ from wagtail.models import (
     RevisionMixin,
     TranslatableMixin,
 )
-from wagtail.contrib.forms.utils import get_field_clean_name
 
 
 class HomePage(Page):
@@ -488,8 +488,8 @@ class OrderFormPage(AbstractEmailForm):
         HelpPanel(
             content="""
             Add fields for name, address etc.
-            Quantity fields will be added when the page is published 
-            and updated automatically based on product variants.  
+            Quantity fields will be added when the page is published
+            and updated automatically based on product variants.
             Note they will not show in the preview until published.
             Changes to the label or choices in these fields will have no effect - change
             the product variant name/choices instead.

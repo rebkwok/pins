@@ -1,14 +1,12 @@
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-
 from wagtail import hooks
 from wagtail.admin.menu import MenuItem
-
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet
 
-from home.models import FooterText
 from dogs.models import DogPage
+from home.models import FooterText
 
 
 # ensure our modeladmin is created

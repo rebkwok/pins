@@ -1,13 +1,12 @@
 from datetime import datetime
-import requests
-from urllib.parse import urlunparse, urlparse, parse_qsl
+from urllib.parse import parse_qsl, urlparse, urlunparse
 
+import requests
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.template.loader import render_to_string
-from django.views.generic import DetailView
 from django.urls import reverse
-
+from django.views.generic import DetailView
 from salesman.basket.views import BasketViewSet
 from salesman.checkout.views import CheckoutViewSet
 
@@ -44,14 +43,14 @@ class ProductCategoryDetailView(DetailView):
 
 
 def decrease_quantity(request, product_id):
-    value = int(request.GET.get(f"quantity", 1))
+    value = int(request.GET.get("quantity", 1))
     if value > 1:
         value -= 1
     return _change_quantity(request, product_id, value)
 
 
 def increase_quantity(request, product_id):
-    value = int(request.GET.get(f"quantity", 1))
+    value = int(request.GET.get("quantity", 1))
     value += 1
     return _change_quantity(request, product_id, value)
 

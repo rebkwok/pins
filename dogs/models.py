@@ -109,7 +109,7 @@ class DogStatusPage(Page):
             mark_safe(
                 """
                 This page will show all dogs with the selected status.\n
-                Create a child page for each dog that has this status (you can 
+                Create a child page for each dog that has this status (you can
                 move them later if their status changes.)
                 """
             )

@@ -1,18 +1,17 @@
-from django.urls import include, path
-from django.views.generic import RedirectView
+from django.urls import path
 
 from .views import (
     ProductCategoryDetailView,
-    decrease_quantity,
-    increase_quantity,
     add_to_basket,
-    update_quantity,
-    delete_basket_item,
     basket_view,
     checkout_view,
     copy_shipping_address,
-    order_status_view,
+    decrease_quantity,
+    delete_basket_item,
+    increase_quantity,
     new_order_view,
+    order_status_view,
+    update_quantity,
 )
 
 

@@ -1,9 +1,8 @@
 # signals.py
 from django.conf import settings
 from django.core.mail import send_mail
-from django.dispatch import receiver
 from django.db.models.signals import post_save
-
+from django.dispatch import receiver
 from salesman.core.utils import get_salesman_model
 from salesman.orders.signals import status_changed
 

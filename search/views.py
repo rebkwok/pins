@@ -1,11 +1,10 @@
 from django.conf import settings
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.template.response import TemplateResponse
-
 from wagtail.models import Page
 from wagtail.search.models import Query
 
-from dogs.models import DogPage, DogStatusPage, DogsIndexPage
+from dogs.models import DogPage
 
 
 def search(request):

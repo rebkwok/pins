@@ -1,9 +1,7 @@
-from typing import Any, Dict
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Button, Field, Hidden, Layout, Submit
 from django import forms
 from django.urls import reverse
-
-from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Button, Submit, Hidden, Field
 
 from .payment import PAYMENT_METHOD_BUTTON_TEXT
 

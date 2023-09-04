@@ -1,7 +1,6 @@
 from django.db import models
-from django.utils.text import slugify
 from django.urls import reverse
-
+from django.utils.text import slugify
 from salesman.basket.models import BaseBasket, BaseBasketItem
 from salesman.orders.models import (
     BaseOrder,
@@ -9,11 +8,10 @@ from salesman.orders.models import (
     BaseOrderNote,
     BaseOrderPayment,
 )
-
+from wagtail.admin.panels import FieldPanel
 from wagtail.fields import RichTextField
-from wagtail.models import Orderable, Page
+from wagtail.models import Page
 from wagtail.snippets.models import register_snippet
-from wagtail.admin.panels import FieldPanel, HelpPanel, InlinePanel
 
 
 # ORDERS
@@ -155,7 +153,7 @@ class ProductVariant(models.Model):
         help_text="""
             A variant represents a single item that can be ordered/purchased. E.g.
             if the product is 'T-shirt', a variant might be "Black, Small".  A product
-            'Pen' might have variants 'Single', 'Pack of 5', 'Pack of 10'     
+            'Pen' might have variants 'Single', 'Pack of 5', 'Pack of 10'
         """,
     )
     price = models.DecimalField(max_digits=18, decimal_places=2, default=0)

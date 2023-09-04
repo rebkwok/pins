@@ -11,11 +11,11 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
-import environ
 import os
 import sys
 
 from pathlib import Path
+import environ
 
 
 root = environ.Path(__file__) - 2  # two folders back (/a/b/ - 3 = /)
@@ -294,7 +294,7 @@ if not TESTING:  # pragma: no cover
         "disable_existing_loggers": False,
         "formatters": {
             "verbose": {
-                "format": "[%(levelname)s] - %(asctime)s - %(name)s - " "%(message)s",
+                "format": "[%(levelname)s] - %(asctime)s - %(name)s - %(message)s",
                 "datefmt": "%Y-%m-%d %H:%M:%S",
             }
         },

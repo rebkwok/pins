@@ -5,6 +5,7 @@ from wagtail.models import Page
 
 from shop.models import ShopPage
 
+
 register = template.Library()
 
 
