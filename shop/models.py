@@ -92,9 +92,9 @@ class ProductCategory(models.Model):
 
     @property
     def live_products(self):
-        # products are live if they are set to live AND have at least one variant
+        # products are live if they are set to live AND have at least one live variant
         return (
-            self.products.filter(live=True, variants__isnull=False)
+            self.products.filter(live=True, variants__isnull=False, variants__live=True)
             .order_by("index")
             .distinct()
         )
