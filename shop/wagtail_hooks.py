@@ -4,6 +4,7 @@ from django.utils.safestring import mark_safe
 from wagtail import hooks
 from wagtail.admin.menu import Menu, MenuItem, SubmenuMenuItem
 
+from wagtail.admin.ui.tables import BooleanColumn
 from wagtail.admin.userbar import AccessibilityItem
 from wagtail.contrib.modeladmin.options import (
     ModelAdmin,
@@ -18,33 +19,26 @@ from .models import ProductCategory, Product, ProductVariant
 
 class ProductCategoryViewSet(SnippetViewSet):
     model = ProductCategory
-    list_display = ("name",)
+    list_display = ("name", "index", BooleanColumn("live"), "get_product_count")
+    list_editable = ("index", "live")
 
 
 class ProductViewSet(SnippetViewSet):
     model = Product
-    list_display = ("name",)
+    list_display = ("name", "category", "index", BooleanColumn("live"), "get_variant_count")
     list_filter = ("category",)
 
 
 class ProductVariantViewSet(SnippetViewSet):
     model = ProductVariant
-    list_display = ("product", "name", "category", "price")
+    list_display = ("product", "name", "get_category", "price", BooleanColumn("live"))
     list_filter = ("product",)
-    fields = ("product", "name", "price")
     
 
 class ProductGroup(SnippetViewSetGroup):
     menu_label = "Products" 
     menu_icon = "pick"
     items = (ProductCategoryViewSet, ProductViewSet, ProductVariantViewSet)
-
-
-class ProductVariantViewSet(SnippetViewSet):
-    model = ProductVariant
-    list_display = ("product", "name", "category", "price")
-    list_filter = ("product",)
-    fields = ("product", "name", "price")
 
 
 register_snippet(ProductGroup)

@@ -5,6 +5,17 @@ from salesman.checkout.payment import PaymentMethod
 from shop.models import Order
 
 
+PAYMENT_METHOD_DESCRIPTIONS = {
+    "pay-in-advance": """
+        Offline payment; your order will be placed on hold until
+        payment has been received
+    """,
+}
+
+PAYMENT_METHOD_BUTTON_TEXT = {
+    "pay-in-advance": "Submit Order",
+}
+
 class PayInAdvance(PaymentMethod):
     """
     Payment method that requires advance payment via bank account.

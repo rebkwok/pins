@@ -1,0 +1,52 @@
+{% extends "shop/base.html" %}
+{% load wagtailcore_tags wagtailimages_tags %}
+{% load crispy_forms_tags %}
+
+
+{% block content %}
+    {% include "includes/header-hero.html" %}
+
+    <div class="container shop-basket">
+        <div class="row">
+            <div class="col-md-12">
+                <h1>Checkout</h1>
+                {% if checkout_error %}
+                <div class="alert-danger">There was an error submitting this order</div>
+                {% endif %}
+                {% if basket.items %}
+                {% for product_identifier, items in basket.items.items %}
+                        <div id="row-{{ product_identifier}}">
+                            <h3>{{ items.0.product_type }} ({{ items.0.category }})</h3>
+                            <ul>    
+                            {% for item in items %}
+                            <div id="row-{{ item.product_id }}">
+                                <li>{{ item.product.name }} - 
+                                    <span id="quantity_{{ item.product_id }}">{{ item.quantity }}</span> -  
+                                    £{{ item.unit_price }} - 
+                                    £<span id="subtotal_{{ item.product_id }}">{{ item.subtotal }}</span>
+                                </li>
+                            </div>
+                            {% endfor %}
+                            </ul>
+                        </div>
+                    {% endfor %}
+
+                    <div>Items in basket: <span id="basket_quantity">{{ basket_quantity }}</span></div>
+                    <div>Total: £<span id="total">{{ basket.total }}</span>
+                    
+                    <div class="col-md-12 mt-4">
+                        {% if form.errors %}
+                            <p class="text-danger">Please correct the errors below:</p>
+                        {% endif %}
+                        <form method="post" action="">
+                            {% csrf_token %}
+                            {%  crispy form %}
+                        </form>
+                    </div>
+                {% else %}
+                    <p>Basket is empty.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock content %}

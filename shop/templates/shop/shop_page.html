@@ -1,26 +1,28 @@
-{% extends "base.html" %}
+{% extends "shop/base.html" %}
 {% load wagtailcore_tags wagtailimages_tags %}
 
 {% block content %}
     {% include "includes/header-hero.html" %}
 
-    <div class="container dog-detail">
+    <div class="container shop-detail">
         <div class="row">
             <div class="col-md-12">
-                <div class="row">
                     {% if page.introduction %}
-                        <p class="dog-detail__introduction">
+                        <p class="shop-detail__introduction">
                             {{ page.introduction }}
                         </p>
                     {% endif %}
-                    {{ page.body|richtext }}
-                </div>
-                {% for category_page in page.category_pages %}
-                    <h2>
-                        <a href="{% pageurl category_page %}">{{ category_page.category.name }}
-                            {% include "includes/chevron-icon.html" with class="dogsindex__chevron-icon" %}
-                        </a>
-                    </h2>
+
+                        {{ page.body|richtext }}
+                    
+                {% for category in page.categories %}
+                    {% if category.live_products %}
+                        <h2>
+                            <a href="{{ category.get_absolute_url }}">{{ category.name }}
+                                {% include "includes/chevron-icon.html" with class="dogsindex__chevron-icon" %}
+                            </a>
+                        </h2>
+                    {% endif %}
                 {% endfor %}
             </div>
         </div>

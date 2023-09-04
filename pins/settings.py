@@ -117,16 +117,15 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-<<<<<<< HEAD
     "wagtail_json_widget",
-=======
+    "crispy_forms",
+    "crispy_bootstrap4",
     'salesman.core',
     'salesman.basket',
     'salesman.checkout',
     'salesman.orders',
     'salesman.admin',
     'rest_framework',
->>>>>>> b3bba0e (Add salesman)
     "dogs",
     "shop",
 ]
@@ -454,3 +453,7 @@ SALESMAN_PRODUCT_TYPES = {
 SALESMAN_PAYMENT_METHODS = [
     'shop.payment.PayInAdvance',
 ]
+
+# for crispy forms
+CRISPY_TEMPLATE_PACK = 'bootstrap4'
+USE_CRISPY = True

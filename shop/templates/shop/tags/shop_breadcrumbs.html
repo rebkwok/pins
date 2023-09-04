@@ -1,0 +1,24 @@
+{% load wagtailcore_tags %}
+
+{% if ancestors %}
+    <nav class="breadcrumb-container" aria-label="Breadcrumb">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-12">
+                    <ol class="breadcrumb">
+                        {% for ancestor in ancestors %}
+                            <li><a href="{% pageurl ancestor %}">{% if forloop.first %}Home{% else %}{{ ancestor }}{% endif %}</a>
+                            {% if this_page or not forloop.last %}
+                                {% include "includes/chevron-icon.html" with class="breadcrumb__chevron-icon" %}
+                            {% endif %}
+                            </li>
+                        {% endfor %}
+                        {% if this_page %}
+                        <li aria-current="page">{{ this_page }}</li>
+                        {% endif %}
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </nav>
+{% endif %}

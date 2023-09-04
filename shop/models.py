@@ -1,6 +1,6 @@
 from django.db import models
-
-from modelcluster.fields import ParentalKey
+from django.utils.text import slugify
+from django.urls import reverse
 
 from salesman.basket.models import BaseBasket, BaseBasketItem
 from salesman.orders.models import (
@@ -46,25 +46,6 @@ class BasketItem(BaseBasketItem):
 
 # PRODUCTS
 
-# class Product(models.Model):
-#     """
-#     Simple single type product.
-#     Unused, but salesman requires at least one model named Product
-#     """
-
-#     name = models.CharField(max_length=255)
-#     price = models.DecimalField(max_digits=18, decimal_places=2, default=0)
-
-#     def __str__(self):
-#         return self.name
-
-#     def get_price(self, request):
-#         return self.price
-
-#     @property
-#     def code(self):
-#         return str(self.id)
-
 
 @register_snippet
 class ProductCategory(models.Model):
@@ -82,12 +63,28 @@ class ProductCategory(models.Model):
     ProductVariant = Pack of 10
     """
     name = models.CharField(max_length=255)
-
+    body = RichTextField(verbose_name="Page body", blank=True, help_text="Optional text to describe the category")
+    index = models.PositiveIntegerField(default=100, help_text="Used for ordering categories on the shop page")
+    live = models.BooleanField(default=True, help_text="Display this category in the shop")
     class Meta:
         verbose_name_plural = "product categories"
 
     def __str__(self):
         return self.name
+    
+    def get_absolute_url(self):
+        return reverse("shop:productcategory_detail", kwargs={"pk": self.pk})
+    
+    def get_product_count(self):
+        return f"{self.live_products.count()} live ({self.products.count()} total)"
+    get_product_count.short_description = "# products"
+
+    @property
+    def live_products(self):
+        # products are live if they are set to live AND have at least one variant
+        return (
+            self.products.filter(live=True, variants__isnull=False).order_by("index").distinct()
+        )
 
 
 class Product(models.Model):
@@ -95,11 +92,30 @@ class Product(models.Model):
     Product, used to subgroup products in display.
     ProductVariant is the actual product that gets added to basket.
     """
-    category = models.ForeignKey(ProductCategory, on_delete=models.CASCADE)
+    category = models.ForeignKey(ProductCategory, on_delete=models.CASCADE, related_name="products")
     name = models.CharField(max_length=255)
-        
+    
+    image = models.ForeignKey(
+        'wagtailimages.Image', null=True, blank=True, on_delete=models.SET_NULL, related_name='+'
+    )
+    description = RichTextField(help_text="Description of the product", blank=True)
+    index = models.PositiveIntegerField(default=100, help_text="Used for ordering products on the category page")
+    live = models.BooleanField(default=True, help_text="Display this product in the shop")
+
     def __str__(self):
         return self.name
+
+    def get_variant_count(self):
+        return f"{self.live_variants.count()} live ({self.variants.count()} total)"
+    get_variant_count.short_description = "# variants"
+
+    @property
+    def live_variants(self):
+        return self.variants.filter(live=True)
+    
+    @property
+    def identifier(self):
+        return slugify(f"{self.category.name}-{self.name}")
 
 
 class ProductVariant(models.Model):
@@ -114,6 +130,7 @@ class ProductVariant(models.Model):
         """
     )
     price = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    live = models.BooleanField(default=True, help_text="Display this product variant in the shop")
 
     # COLORS = [
     #     ("black", "Black"),
@@ -159,6 +176,11 @@ class ProductVariant(models.Model):
     def category(self):
         return self.product.category
     
+    def get_category(self):
+        return self.category
+    get_category.admin_order_field = "product__category"
+    get_category.short_description = "Category"
+
     @property
     def code(self):
         return str(self.id)
@@ -183,46 +205,8 @@ class ShopPage(Page):
     ]
 
     parent_page_types = ["home.HomePage"]
-    subpage_types = ["ShopCategoryPage"]
 
-    def category_pages(self):
+    def categories(self):
         return (
-            ShopCategoryPage.objects.live().descendant_of(self).order_by("index")
+            ProductCategory.objects.filter(live=True).order_by("index")
         )
-
-
-class ShopCategoryPage(Page):
-    category = models.ForeignKey(ProductCategory, on_delete=models.PROTECT, related_name='+')
-    introduction = models.TextField(help_text="Text to describe the page", blank=True)
-    body = RichTextField(verbose_name="Page body", blank=True)
-    index = models.PositiveIntegerField(default=1, help_text="Used for ordering categories on the shop page")
-
-    content_panels = Page.content_panels + [
-        FieldPanel('category'),
-        FieldPanel("index"),
-        FieldPanel("introduction"),
-        FieldPanel("body"),
-        InlinePanel("products", label="Products")
-    ]
-    parent_page_types = ["ShopPage"]
-    subpage_types = []
-
-    def __str__(self):
-        return self.category.name
-
-
-class ProductItem(Orderable, models.Model):
-    page = ParentalKey(ShopCategoryPage, on_delete=models.PROTECT, related_name="products")
-    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name='+')
-    image = models.ForeignKey(
-        'wagtailimages.Image', null=True, blank=True, on_delete=models.SET_NULL, related_name='+'
-    )
-    introduction = models.TextField(help_text="Text to describe the page", blank=True)
-    body = RichTextField(verbose_name="Page body", blank=True)
-
-    panels = [
-        FieldPanel('product'),
-        FieldPanel('image'),
-        FieldPanel("introduction"),
-        FieldPanel("body"),
-    ]

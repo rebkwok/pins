@@ -1,0 +1,38 @@
+{% extends "shop/base.html" %}
+{% load wagtailcore_tags wagtailimages_tags %}
+
+
+{% block content %}
+    {% include "includes/header-hero.html" %}
+
+    <div class="container shop-basket">
+        <div class="row">
+            <div class="col-md-12">
+                <h1>Order Status</h1>
+
+                {% if new_order %}
+                    <h4>Thank you for your order!</h4>
+                {% endif %}
+
+                <ul>
+                    <li>Ref: {{ order.ref }}</li>
+                    <li>Status: {{ order.status_display }}</li>
+                    <li>Items ordered:
+                        <ul>
+                        {% for products in order.items.values %}
+                            {% for product in products %}
+                            <li>{{ product.product_type }} ({{ product.category }})- {{ product.product.name }} - {{ product.quantity }} - £{{ product.subtotal }}</li>
+                            {% endfor %}
+                        {% endfor %}
+                        </ul>
+                    <li>Order date: {{ order.date_created|date:"d M Y" }}</li>
+                    <li>Shipping address: {{ order.shipping_address }}</li>
+                    <li>Billing address: {{ order.billing_address }}</li>
+                    <li>Order total: £{{ order.total }}</li>
+                    <li>Amount paid: £{{ order.amount_paid }}</li>
+                    <li>Amount outstanding: £{{ order.amount_outstanding }}</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

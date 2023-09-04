@@ -25,3 +25,4 @@ ipython
 playwright
 tqdm
 django-salesman[pygments]
+crispy-bootstrap4

@@ -59,6 +59,8 @@ coverage[toml]==7.3.2
     # via
     #   -r requirements.in
     #   pytest-cov
+crispy-bootstrap4==2022.1
+    # via -r requirements.in
 cryptography==41.0.4
     # via django-ses
 decorator==5.1.1
@@ -68,6 +70,8 @@ defusedxml==0.7.1
 django==4.2.6
     # via
     #   -r requirements.in
+    #   crispy-bootstrap4
+    #   django-crispy-forms
     #   django-extensions
     #   django-filter
     #   django-modelcluster
@@ -78,6 +82,8 @@ django==4.2.6
     #   django-treebeard
     #   djangorestframework
     #   wagtail
+django-crispy-forms==2.0
+    # via crispy-bootstrap4
 django-environ==0.11.2
     # via -r requirements.in
 django-extensions==3.2.3
