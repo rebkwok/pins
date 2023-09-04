@@ -40,3 +40,7 @@ lines-after-imports = 2
 
 [tool.ruff.per-file-ignores]
 "manage.py" = ["INP001"]
+
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "pins.settings"
