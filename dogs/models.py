@@ -26,14 +26,13 @@ logger = logging.getLogger(__name__)
 
 
 class DogIndexPageStatuses(Orderable):
-
     page = ParentalKey("DogsIndexPage", related_name="dog_status_pages")
     status_page = models.ForeignKey(
         "DogStatusPage",
         null=True,
         on_delete=models.SET_NULL,
         related_name="+",
-        verbose_name="Dog status category"
+        verbose_name="Dog status category",
     )
 
     panels = [FieldPanel("status_page")]
@@ -62,21 +61,28 @@ class DogsIndexPage(Page):
         FieldPanel("image"),
         FieldPanel('body'),
         InlinePanel(
-            "dog_status_pages", label="Displayed statuses",
-            help_text=mark_safe("""
+            "dog_status_pages",
+            label="Displayed statuses",
+            help_text=mark_safe(
+                """
             Add Dog Status pages as child pages of this page.<br/>
             Then add each Dog Status page that you want to be visible on this index page
             (in the order you want them to display).<br/>
             Note that only live Dog Status pages will be visible."
-            """)
-        )
+            """
+            ),
+        ),
     ]
 
     # Allows child objects (i.e. DogStatusPage objects) to be accessible via the
     # template. We use this on the HomePage to display child items of featured
     # content
     def status_pages(self):
-        return [page.status_page for page in self.dog_status_pages.all() if page.status_page.live]
+        return [
+            page.status_page
+            for page in self.dog_status_pages.all()
+            if page.status_page.live
+        ]
 
 
 class DogStatusPage(Page):
@@ -90,8 +96,10 @@ class DogStatusPage(Page):
         help_text="Header image",
     )
     short_description = models.CharField(
-        max_length=255, null=True, blank=True,
-        help_text="A one-line description of this status"
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="A one-line description of this status",
     )
 
     intro = RichTextField(blank=True)
@@ -117,9 +125,7 @@ class DogStatusPage(Page):
     # Returns a queryset of DogPage objects that are live, that are direct
     # descendants of this index page with most recent first
     def get_dogs(self):
-        return (
-            DogPage.objects.live().descendant_of(self).order_by("-date_posted")
-        )
+        return DogPage.objects.live().descendant_of(self).order_by("-date_posted")
 
     # Allows child objects (e.g. DogPage objects) to be accessible via the
     # template. We use this on the HomePage to display child items of featured
@@ -474,7 +480,6 @@ class DogPageForm(WagtailAdminPageForm):
 
 
 class DogPage(Page):
-
     date_posted = models.DateField(default=timezone.now)
     location = models.CharField(null=True, blank=True, max_length=255)
     description = RichTextField(

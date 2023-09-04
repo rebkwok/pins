@@ -18,7 +18,7 @@ urlpatterns = [
     path("search/", search_views.search, name="search"),
     path("orders/", include(orders_urls)),
     path("shop/", include(shop_urls)),
-    path('api/', include('salesman.urls')),
+    path("api/", include("salesman.urls")),
 ]
 
 
@@ -30,7 +30,7 @@ if settings.DEBUG:
     urlpatterns += staticfiles_urlpatterns()
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-urlpatterns += (path(r'django-admin/django-ses/', include('django_ses.urls')),)
+urlpatterns += (path(r"django-admin/django-ses/", include("django_ses.urls")),)
 
 
 urlpatterns = urlpatterns + [

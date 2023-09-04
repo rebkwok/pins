@@ -33,13 +33,12 @@ def get_basket_quantity_and_total(request):
 
 
 class ProductCategoryDetailView(DetailView):
-
     model = ProductCategory
     template_name = "shop/shop_category_page.html"
     context_object_name = "category"
 
     def get_context_data(self, **kwargs):
-        context_data = super().get_context_data(**kwargs) 
+        context_data = super().get_context_data(**kwargs)
         context_data["basket_quantity"] = get_basket_quantity(self.request)
         return context_data
 
@@ -55,7 +54,7 @@ def increase_quantity(request, product_id):
     value = int(request.GET.get(f"quantity", 1))
     value += 1
     return _change_quantity(request, product_id, value)
-    
+
 
 def _change_quantity(request, product_id, new_value):
     context = {"product_id": product_id, "value": new_value}
@@ -65,6 +64,7 @@ def _change_quantity(request, product_id, new_value):
         <div id='updated_{product_id}' hx-swap-oob='true'></div>
     """
     return HttpResponse(resp_str)
+
 
 def add_to_basket(request, product_id):
     resp = BasketViewSet.as_view({"post": "create"})(request)
@@ -114,7 +114,7 @@ def update_quantity(request, ref):
             <span id='basket_quantity' hx-swap-oob='true'>{new_basket_quantity}</span>
             <div id='updated_{product_id}' class='alert-success' hx-swap-oob='true'>Basket updated</div>
         """
-    
+
     return HttpResponse(resp_str)
 
 
@@ -133,7 +133,10 @@ def delete_basket_item(request, ref):
         new_basket_quantity = get_basket_quantity(request)
         basket = get_basket(request)
         any_products = any(
-            1 for item in basket["items"] if ProductVariant.objects.get(id=item["product_id"]).product.identifier == product_identifier
+            1
+            for item in basket["items"]
+            if ProductVariant.objects.get(id=item["product_id"]).product.identifier
+            == product_identifier
         )
 
         if not any_products:
@@ -146,7 +149,7 @@ def delete_basket_item(request, ref):
             {row_hide}
             <span id='total' hx-swap-oob='true'>{basket['total']}</span>
         """
-    
+
     return HttpResponse(resp_str)
 
 
@@ -157,7 +160,11 @@ def basket_view(request):
     payment_methods = checkout_methods.data["payment_methods"]
     for method in payment_methods:
         method["help"] = PAYMENT_METHOD_DESCRIPTIONS[method["identifier"]]
-    return render(request, "shop/basket.html", {**basket_context, "payment_methods": payment_methods})
+    return render(
+        request,
+        "shop/basket.html",
+        {**basket_context, "payment_methods": payment_methods},
+    )
 
 
 def get_basket_context(basket):
@@ -170,7 +177,7 @@ def get_basket_context(basket):
         items_by_product.setdefault(product_type.identifier, []).append(item)
     basket["items"] = items_by_product
     return {"basket": basket, "basket_quantity": basket_quantity}
-   
+
 
 def _get_basket_quantity(basket):
     return sum(int(item["quantity"]) for item in basket.get("items", []))
@@ -191,20 +198,20 @@ def checkout_view(request):
         context["checkout_error"] = True
     else:
         form = CheckoutForm(payment_method=payment_method)
-    
+
     request.method = "GET"
     resp = BasketViewSet.as_view({"get": "list"})(request)
     context = {**context, "form": form, **get_basket_context(resp.data)}
-    
+
     return render(request, "shop/checkout.html", context)
-    
+
 
 def copy_shipping_address(request):
     billing_address_html = (
         '<label for="id_billing_address" class=" requiredField">Billing address<span class="asteriskField">*</span> </label>'
         '<textarea name="billing_address" cols="40" rows="6" class="textarea form-control" required="" id="id_billing_address">'
         f'{request.GET["shipping_address"]}'
-        '</textarea>'
+        "</textarea>"
     )
     return HttpResponse(billing_address_html)
 
@@ -221,16 +228,18 @@ def _order_status(request, token, new=False):
     parsed = urlparse(request.build_absolute_uri())
     url = urlunparse(
         (
-            parsed.scheme, 
-            parsed.netloc, 
-            "/api/orders/last/", 
-            "", 
-            f"token={token}&format=json", 
-            ""
+            parsed.scheme,
+            parsed.netloc,
+            "/api/orders/last/",
+            "",
+            f"token={token}&format=json",
+            "",
         )
     )
     resp = requests.get(url)
     order = resp.json()
-    order["date_created"] = datetime.strptime(order["date_created"], "%Y-%m-%dT%H:%M:%S.%fZ")
+    order["date_created"] = datetime.strptime(
+        order["date_created"], "%Y-%m-%dT%H:%M:%S.%fZ"
+    )
     order = get_basket_context(order)["basket"]
     return render(request, "shop/order_status.html", {"order": order, "new_order": new})

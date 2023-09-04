@@ -8,4 +8,3 @@ class ProductVariantSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.ProductVariant
         fields = ["name", "code"]
-

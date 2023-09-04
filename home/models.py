@@ -110,7 +110,9 @@ class HomePage(Page):
         verbose_name="Featured section 1",
     )
     featured_section_show_more_text = models.CharField(
-        blank=True, max_length=255, help_text="Text to display for link to featured section"
+        blank=True,
+        max_length=255,
+        help_text="Text to display for link to featured section",
     )
 
     page_link_1_title = models.CharField(
@@ -134,7 +136,9 @@ class HomePage(Page):
         help_text="Background image",
     )
     page_link_1_btn_text = models.CharField(
-        blank=True, max_length=255, help_text="Text to display on first page link button"
+        blank=True,
+        max_length=255,
+        help_text="Text to display on first page link button",
     )
 
     page_link_2_title = models.CharField(
@@ -158,14 +162,16 @@ class HomePage(Page):
         help_text="Background image",
     )
     page_link_2_btn_text = models.CharField(
-        blank=True, max_length=255, help_text="Text to display on second page link button"
+        blank=True,
+        max_length=255,
+        help_text="Text to display on second page link button",
     )
 
     hero_footer_text = models.CharField(
         max_length=255,
         null=True,
         blank=True,
-        help_text="Text to display on the home page footer image"
+        help_text="Text to display on the home page footer image",
     )
     hero_footer = models.CharField(
         verbose_name="Hero Footer",
@@ -214,7 +220,7 @@ class HomePage(Page):
                         FieldPanel("featured_section_title"),
                         FieldPanel("featured_section_body"),
                         FieldPanel("featured_section"),
-                        FieldPanel("featured_section_show_more_text")
+                        FieldPanel("featured_section_show_more_text"),
                     ]
                 ),
                 MultiFieldPanel(
@@ -264,7 +270,6 @@ class FormField(AbstractFormField):
 
 
 class FormPage(AbstractEmailForm):
-
     image = models.ForeignKey(
         "wagtailimages.Image",
         null=True,
@@ -358,7 +363,10 @@ class OrderFormField(AbstractFormField):
     for contact form and adoption application form:
     https://docs.wagtail.org/en/stable/reference/contrib/forms/index.html
     """
-    page = ParentalKey("OrderFormPage", related_name="order_form_fields", on_delete=models.CASCADE)
+
+    page = ParentalKey(
+        "OrderFormPage", related_name="order_form_fields", on_delete=models.CASCADE
+    )
 
     def get_field_clean_name(self):
         # if clean name is already set, just return it
@@ -368,23 +376,34 @@ class OrderFormField(AbstractFormField):
 
 
 class ProductVariant(Orderable):
-    page = ParentalKey("OrderFormPage", related_name="product_variants", on_delete=models.CASCADE)
+    page = ParentalKey(
+        "OrderFormPage", related_name="product_variants", on_delete=models.CASCADE
+    )
     name = models.CharField(max_length=50)
     description = models.CharField(blank=True, max_length=250)
     cost = models.DecimalField(max_digits=10, decimal_places=2)
     quantity_choices = models.CharField(
-        max_length=255, 
+        max_length=255,
         default="0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20",
-        help_text="Comma separated list of quantity choices for the drop down menu"
+        help_text="Comma separated list of quantity choices for the drop down menu",
     )
-    slug = models.CharField(max_length=60, blank=True, default="", help_text="This field will be autopoulated")
-    
+    slug = models.CharField(
+        max_length=60,
+        blank=True,
+        default="",
+        help_text="This field will be autopoulated",
+    )
+
     def save(self, *args, **kwargs):
         if not self.slug:
             base_slug = f"pv__{get_field_clean_name(self.name)}"
             slug = base_slug
             counter = 0
-            while ProductVariant.objects.filter(page=self.page, slug=slug).exclude(id=self.id).exists():
+            while (
+                ProductVariant.objects.filter(page=self.page, slug=slug)
+                .exclude(id=self.id)
+                .exists()
+            ):
                 counter += 1
                 slug = f"{base_slug}_{counter}"
             self.slug = slug
@@ -429,7 +448,11 @@ class OrderFormPage(AbstractEmailForm):
 
     body = RichTextField(blank=True)
     image = models.ForeignKey(
-        'wagtailimages.Image', on_delete=models.SET_NULL, related_name='+', blank=True, null=True
+        "wagtailimages.Image",
+        on_delete=models.SET_NULL,
+        related_name="+",
+        blank=True,
+        null=True,
     )
 
     product_name = models.CharField(blank=True, max_length=250)
@@ -438,7 +461,6 @@ class OrderFormPage(AbstractEmailForm):
 
     form_footer_text = RichTextField(blank=True)
     thank_you_text = RichTextField(blank=True)
-    
 
     # Note how we include the FormField object via an InlinePanel using the
     # related_name value
@@ -451,16 +473,17 @@ class OrderFormPage(AbstractEmailForm):
                 FieldPanel("product_description"),
                 FieldPanel("shipping_cost"),
                 InlinePanel(
-                    "product_variants", label="Product Variants", 
+                    "product_variants",
+                    label="Product Variants",
                     panels=[
                         FieldPanel("name"),
                         FieldPanel("description"),
                         FieldPanel("cost"),
                         FieldPanel("quantity_choices"),
-                    ]
+                    ],
                 ),
             ],
-            "Product details"
+            "Product details",
         ),
         HelpPanel(
             content="""
@@ -470,7 +493,8 @@ class OrderFormPage(AbstractEmailForm):
             Note they will not show in the preview until published.
             Changes to the label or choices in these fields will have no effect - change
             the product variant name/choices instead.
-            """),
+            """
+        ),
         InlinePanel("order_form_fields", heading="Form fields", label="Field"),
         FieldPanel("form_footer_text"),
         FieldPanel("thank_you_text"),
@@ -498,9 +522,11 @@ class OrderFormPage(AbstractEmailForm):
         # generate/update quantity fields
         for slug in self.product_variant_slugs:
             self.create_or_update_order_form_field(slug)
-        fields_to_remove = self.product_quantity_field_names - self.product_variant_slugs
+        fields_to_remove = (
+            self.product_quantity_field_names - self.product_variant_slugs
+        )
         for field_name in fields_to_remove:
-            self.order_form_fields.get(clean_name=field_name).delete()        
+            self.order_form_fields.get(clean_name=field_name).delete()
 
     def create_or_update_order_form_field(self, product_variant_slug):
         variant = self.product_variants.get(slug=product_variant_slug)
@@ -508,20 +534,24 @@ class OrderFormPage(AbstractEmailForm):
             field = self.order_form_fields.get(clean_name=product_variant_slug)
         except OrderFormField.DoesNotExist:
             field = self.order_form_fields.create(
-                page_id=self.pk, 
-                clean_name=product_variant_slug, 
+                page_id=self.pk,
+                clean_name=product_variant_slug,
                 label=variant.name,
-                field_type="dropdown", 
-                default_value = 0
+                field_type="dropdown",
+                default_value=0,
             )
-        if (field.choices != variant.quantity_choices) or (field.label != variant.name): 
+        if (field.choices != variant.quantity_choices) or (field.label != variant.name):
             field.choices = variant.quantity_choices
             field.label = variant.name
             field.save()
 
     @property
     def product_quantity_field_names(self):
-        return set(self.order_form_fields.filter(clean_name__startswith="pv__").values_list("clean_name", flat=True))
+        return set(
+            self.order_form_fields.filter(clean_name__startswith="pv__").values_list(
+                "clean_name", flat=True
+            )
+        )
 
     @property
     def product_variant_slugs(self):
@@ -529,12 +559,13 @@ class OrderFormPage(AbstractEmailForm):
 
     def get_form_fields(self):
         return self.order_form_fields.all()
-    
+
     def get_variant_quantities_and_total(self, data):
         def get_item(v):
             if isinstance(v, list):
                 return int(v[0])
-            return int(v)     
+            return int(v)
+
         quantities = {
             k: get_item(v) for k, v in data.items() if k in self.product_variant_slugs
         }
@@ -543,7 +574,7 @@ class OrderFormPage(AbstractEmailForm):
         for key, quantity in quantities.items():
             variant = self.product_variants.get(slug=key)
             variant_quantities[key] = (variant, quantity)
-            total += (variant.cost * quantity)
+            total += variant.cost * quantity
         if total > 0:
             total += self.shipping_cost
 
@@ -554,7 +585,7 @@ class OrderFormPage(AbstractEmailForm):
         _, total = self.get_variant_quantities_and_total(form.cleaned_data)
         content += f"\nTotal amount due: £{total}"
         return content
-    
+
     def render_landing_page(self, request, form_submission=None, *args, **kwargs):
         context = self.get_context(request)
         context["form_submission"] = form_submission
@@ -569,6 +600,7 @@ class StandardPage(Page):
     """
     A generic content page.
     """
+
     introduction = models.TextField(help_text="Text to describe the page", blank=True)
     image = models.ForeignKey(
         "wagtailimages.Image",
@@ -591,12 +623,15 @@ class StandardPage(Page):
 
 
 class FAQPage(Page):
-    
-    introduction = RichTextField(null=True, blank=True, help_text="Optional introduction text")
+    introduction = RichTextField(
+        null=True, blank=True, help_text="Optional introduction text"
+    )
 
     content_panels = Page.content_panels + [
-        FieldPanel('introduction',),
-        InlinePanel('faqs', label="FAQs")
+        FieldPanel(
+            "introduction",
+        ),
+        InlinePanel("faqs", label="FAQs"),
     ]
 
     parent_page_types = ["HomePage"]
@@ -607,13 +642,13 @@ class FAQPage(Page):
 
 
 class FAQ(Orderable):
-    page = ParentalKey(FAQPage, on_delete=models.CASCADE, related_name='faqs')
+    page = ParentalKey(FAQPage, on_delete=models.CASCADE, related_name="faqs")
     question = models.CharField(max_length=255)
     answer = RichTextField()
 
     panels = [
-        FieldPanel('question'),
-        FieldPanel('answer'),
+        FieldPanel("question"),
+        FieldPanel("answer"),
     ]
 
 
@@ -637,7 +672,8 @@ class FooterText(
     panels = [
         HelpPanel(
             """Footer added to every page. Note that if more than one footer text is
-              defined, the most recently created published version will be used."""),
+              defined, the most recently created published version will be used."""
+        ),
         FieldPanel("body"),
         PublishingPanel(),
     ]
@@ -653,4 +689,3 @@ class FooterText(
 
     class Meta(TranslatableMixin.Meta):
         verbose_name_plural = "Footer Text"
-

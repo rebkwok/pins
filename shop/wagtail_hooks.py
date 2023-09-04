@@ -25,7 +25,13 @@ class ProductCategoryViewSet(SnippetViewSet):
 
 class ProductViewSet(SnippetViewSet):
     model = Product
-    list_display = ("name", "category", "index", BooleanColumn("live"), "get_variant_count")
+    list_display = (
+        "name",
+        "category",
+        "index",
+        BooleanColumn("live"),
+        "get_variant_count",
+    )
     list_filter = ("category",)
 
 
@@ -33,10 +39,10 @@ class ProductVariantViewSet(SnippetViewSet):
     model = ProductVariant
     list_display = ("product", "name", "get_category", "price", BooleanColumn("live"))
     list_filter = ("product",)
-    
+
 
 class ProductGroup(SnippetViewSetGroup):
-    menu_label = "Products" 
+    menu_label = "Products"
     menu_icon = "pick"
     items = (ProductCategoryViewSet, ProductViewSet, ProductVariantViewSet)
 

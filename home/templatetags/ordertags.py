@@ -12,4 +12,3 @@ def is_order_quantity(page, field_name):
 @register.simple_tag
 def get_product_variant(page, field_name):
     return page.product_variants.get(slug=field_name)
-

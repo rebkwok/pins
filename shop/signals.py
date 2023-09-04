@@ -19,11 +19,11 @@ def send_notification(sender, order, new_status, old_status, **kwargs):
     if new_status == order.Status.COMPLETED:
         subject = f"Order '{order.ref}' is completed"
         message = "Thank you for your order! Your order is now complete."
-        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [order.email]) 
+        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [order.email])
     elif new_status == order.Status.PROCESSING:
         subject = f"Order '{order.ref}' is being processed"
         message = "Thank you for your order!  Your order is being processed."
-        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [order.email])        
+        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [order.email])
 
 
 @receiver(post_save, sender=Order)

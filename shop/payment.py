@@ -16,6 +16,7 @@ PAYMENT_METHOD_BUTTON_TEXT = {
     "pay-in-advance": "Submit Order",
 }
 
+
 class PayInAdvance(PaymentMethod):
     """
     Payment method that requires advance payment via bank account.

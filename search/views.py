@@ -25,9 +25,9 @@ def search(request):
             # So for demo purposes ONLY, we hard-code in the model names we want to search.
             dog_results = DogPage.objects.live().search(search_query)
             dog_page_ids = [p.page_ptr.id for p in dog_results]
-            
+
             search_results = Page.objects.live().filter(id__in=dog_page_ids)
-    
+
         search_results = Page.objects.live().search(search_query)
         query = Query.get(search_query)
 

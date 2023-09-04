@@ -21,19 +21,22 @@ from pathlib import Path
 root = environ.Path(__file__) - 2  # two folders back (/a/b/ - 3 = /)
 
 # defaults
-env = environ.Env(DEBUG=(bool, False),
-                  SHOW_DEBUG_TOOLBAR=(bool, False),
-                  USE_MAILCATCHER=(bool, False),
-                  LOCAL=(bool, False),
-                  TESTING=(bool, False),
-                  CI=(bool, False),
-                  )
+env = environ.Env(
+    DEBUG=(bool, False),
+    SHOW_DEBUG_TOOLBAR=(bool, False),
+    USE_MAILCATCHER=(bool, False),
+    LOCAL=(bool, False),
+    TESTING=(bool, False),
+    CI=(bool, False),
+)
 
-environ.Env.read_env(root('pins/.env'))  # reading .env file
+environ.Env.read_env(root("pins/.env"))  # reading .env file
 
 TESTING = env("TESTING")
 if not TESTING:  # pragma: no cover
-    TESTING = any([test_str in arg for arg in sys.argv for test_str in ["test", "pytest"]])
+    TESTING = any(
+        [test_str in arg for arg in sys.argv for test_str in ["test", "pytest"]]
+    )
 
 BASE_DIR = root()
 PROJECT_DIR = root("pins")
@@ -42,14 +45,14 @@ PROJECT_DIR = root("pins")
 # See https://docs.djangoproject.com/en/1.7/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env('SECRET_KEY')
+SECRET_KEY = env("SECRET_KEY")
 if SECRET_KEY is None:  # pragma: no cover
     print("No secret key!")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env('DEBUG')
+DEBUG = env("DEBUG")
 # when env variable is changed it will be a string, not bool
-if str(DEBUG).lower() in ['true', 'on']:  # pragma: no cover
+if str(DEBUG).lower() in ["true", "on"]:  # pragma: no cover
     DEBUG = True
 else:  # pragma: no cover
     DEBUG = False
@@ -79,8 +82,8 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 
-if env('LOCAL'):  # pragma: no cover
-    ALLOWED_HOSTS = ['*']
+if env("LOCAL"):  # pragma: no cover
+    ALLOWED_HOSTS = ["*"]
 
 
 # Quick-start development settings - unsuitable for production
@@ -120,12 +123,12 @@ INSTALLED_APPS = [
     "wagtail_json_widget",
     "crispy_forms",
     "crispy_bootstrap4",
-    'salesman.core',
-    'salesman.basket',
-    'salesman.checkout',
-    'salesman.orders',
-    'salesman.admin',
-    'rest_framework',
+    "salesman.core",
+    "salesman.basket",
+    "salesman.checkout",
+    "salesman.orders",
+    "salesman.admin",
+    "rest_framework",
     "dogs",
     "shop",
 ]
@@ -172,11 +175,11 @@ WSGI_APPLICATION = "pins.wsgi.application"
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 DATABASES = {
-    'default': env.db(),
+    "default": env.db(),
     # Raises ImproperlyConfigured exception if DATABASE_URL not in os.environ
 }
 
-DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -260,133 +263,132 @@ MEDIA_URL = "/media/"
 
 # Email
 if env("LOCAL") or env("CI"):
-    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 else:  # pragma: no cover
-    EMAIL_BACKEND = 'django_ses.SESBackend'
-    AWS_SES_ACCESS_KEY_ID = env('AWS_SES_ACCESS_KEY_ID')
-    AWS_SES_SECRET_ACCESS_KEY = env('AWS_SES_SECRET_ACCESS_KEY')
-    AWS_SES_REGION_NAME=env('AWS_SES_REGION_NAME')
-    AWS_SES_REGION_ENDPOINT=env('AWS_SES_REGION_ENDPOINT')
+    EMAIL_BACKEND = "django_ses.SESBackend"
+    AWS_SES_ACCESS_KEY_ID = env("AWS_SES_ACCESS_KEY_ID")
+    AWS_SES_SECRET_ACCESS_KEY = env("AWS_SES_SECRET_ACCESS_KEY")
+    AWS_SES_REGION_NAME = env("AWS_SES_REGION_NAME")
+    AWS_SES_REGION_ENDPOINT = env("AWS_SES_REGION_ENDPOINT")
 
-DEFAULT_FROM_EMAIL = 'pins.scot.web+no-reply@gmail.com'
-SUPPORT_EMAIL = 'rebkwok@gmail.com'
+DEFAULT_FROM_EMAIL = "pins.scot.web+no-reply@gmail.com"
+SUPPORT_EMAIL = "rebkwok@gmail.com"
 SERVER_EMAIL = SUPPORT_EMAIL
 
 # MAILCATCHER
-if env('USE_MAILCATCHER'):  # pragma: no cover
-    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-    EMAIL_HOST = '127.0.0.1'
-    EMAIL_HOST_USER = ''
-    EMAIL_HOST_PASSWORD = ''
+if env("USE_MAILCATCHER"):  # pragma: no cover
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = "127.0.0.1"
+    EMAIL_HOST_USER = ""
+    EMAIL_HOST_PASSWORD = ""
     EMAIL_PORT = 1025
     EMAIL_USE_TLS = False
 
 
 # #####LOGGING######
 if not TESTING:  # pragma: no cover
-    LOG_FOLDER = env('LOG_FOLDER')
+    LOG_FOLDER = env("LOG_FOLDER")
 
     LOGGING = {
-        'version': 1,
-        'disable_existing_loggers': False,
-        'formatters': {
-            'verbose': {
-                'format': '[%(levelname)s] - %(asctime)s - %(name)s - '
-                          '%(message)s',
-                'datefmt': '%Y-%m-%d %H:%M:%S',
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "verbose": {
+                "format": "[%(levelname)s] - %(asctime)s - %(name)s - " "%(message)s",
+                "datefmt": "%Y-%m-%d %H:%M:%S",
             }
         },
-        'handlers': {
-            'file_app': {
-                'level': 'INFO',
-                'class': 'logging.handlers.RotatingFileHandler',
-                'filename': os.path.join(LOG_FOLDER, 'pins.log'),
-                'maxBytes': 1024*1024*5,  # 5 MB
-                'backupCount': 5,
-                'formatter': 'verbose'
+        "handlers": {
+            "file_app": {
+                "level": "INFO",
+                "class": "logging.handlers.RotatingFileHandler",
+                "filename": os.path.join(LOG_FOLDER, "pins.log"),
+                "maxBytes": 1024 * 1024 * 5,  # 5 MB
+                "backupCount": 5,
+                "formatter": "verbose",
             },
-            'console': {
-                'level': 'DEBUG',
-                'class': 'logging.StreamHandler',
-                'formatter': 'verbose'
+            "console": {
+                "level": "DEBUG",
+                "class": "logging.StreamHandler",
+                "formatter": "verbose",
             },
-            'mail_admins': {
-                'level': 'ERROR',
-                'class': 'django.utils.log.AdminEmailHandler',
-                'include_html': True,
+            "mail_admins": {
+                "level": "ERROR",
+                "class": "django.utils.log.AdminEmailHandler",
+                "include_html": True,
             },
         },
-        'loggers': {
-            '': {
-                'handlers': ['console', 'file_app', 'mail_admins'],
-                'propagate': True,
+        "loggers": {
+            "": {
+                "handlers": ["console", "file_app", "mail_admins"],
+                "propagate": True,
             },
-            'django.request': {
-                'handlers': ['console', 'file_app', 'mail_admins'],
-                'propagate': True,
+            "django.request": {
+                "handlers": ["console", "file_app", "mail_admins"],
+                "propagate": True,
             },
-            'home': {
-                'handlers': ['console', 'file_app', 'mail_admins'],
-                'level': 'INFO',
-                'propagate': False,
+            "home": {
+                "handlers": ["console", "file_app", "mail_admins"],
+                "level": "INFO",
+                "propagate": False,
             },
-            'dogs': {
-                'handlers': ['console', 'file_app', 'mail_admins'],
-                'level': 'INFO',
-                'propagate': False,
+            "dogs": {
+                "handlers": ["console", "file_app", "mail_admins"],
+                "level": "INFO",
+                "propagate": False,
             },
-            'dashboard': {
-                'handlers': ['console', 'file_app', 'mail_admins'],
-                'level': 'INFO',
-                'propagate': False,
+            "dashboard": {
+                "handlers": ["console", "file_app", "mail_admins"],
+                "level": "INFO",
+                "propagate": False,
             },
-            'search': {
-                'handlers': ['console', 'file_app', 'mail_admins'],
-                'level': 'INFO',
-                'propagate': False,
+            "search": {
+                "handlers": ["console", "file_app", "mail_admins"],
+                "level": "INFO",
+                "propagate": False,
             },
         },
     }
 else:
     LOGGING = {
-        'version': 1,
-        'disable_existing_loggers': False,
-        'handlers': {
-            'console': {
-                'level': 'DEBUG',
-                'class': 'logging.StreamHandler',
+        "version": 1,
+        "disable_existing_loggers": False,
+        "handlers": {
+            "console": {
+                "level": "DEBUG",
+                "class": "logging.StreamHandler",
             }
         },
-        'loggers': {
-            'django.request': {
-                'handlers': ['console'],
-                'level': 'INFO',
-                'propagate': True,
+        "loggers": {
+            "django.request": {
+                "handlers": ["console"],
+                "level": "INFO",
+                "propagate": True,
             },
-            'home': {
-                'handlers': ['console'],
-                'level': 'INFO',
-                'propogate': True,
+            "home": {
+                "handlers": ["console"],
+                "level": "INFO",
+                "propogate": True,
             },
-            'dogs': {
-                'handlers': ['console'],
-                'level': 'INFO',
-                'propogate': True,
+            "dogs": {
+                "handlers": ["console"],
+                "level": "INFO",
+                "propogate": True,
             },
-            'dashboard': {
-                'handlers': ['console'],
-                'level': 'INFO',
-                'propogate': True,
+            "dashboard": {
+                "handlers": ["console"],
+                "level": "INFO",
+                "propogate": True,
             },
-            'search': {
-                'handlers': ['console'],
-                'level': 'INFO',
-                'propogate': True,
+            "search": {
+                "handlers": ["console"],
+                "level": "INFO",
+                "propogate": True,
             },
-            'shop': {
-                'handlers': ['console'],
-                'level': 'INFO',
-                'propogate': True,
+            "shop": {
+                "handlers": ["console"],
+                "level": "INFO",
+                "propogate": True,
             },
         },
     }
@@ -394,16 +396,16 @@ else:
 ADMINS = [("Becky Smith", SUPPORT_EMAIL)]
 
 # Honor the 'X-Forwarded-Proto' header for request.is_secure()
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-INTERNAL_IPS = ('127.0.0.1', '10.0.2.2')
+INTERNAL_IPS = ("127.0.0.1", "10.0.2.2")
 
 
 # Session cookies
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 SESSION_COOKIE_AGE = 604800  # 1 week
 
-if env('LOCAL') or TESTING:
+if env("LOCAL") or TESTING:
     SESSION_COOKIE_SECURE = False
 else:  # pragma: no cover
     SESSION_COOKIE_SECURE = True
@@ -441,19 +443,19 @@ FB_PAGE_ID = env.str("FB_PAGE_ID")
 
 # Salesman
 
-SALESMAN_BASKET_MODEL = 'shop.Basket'
-SALESMAN_BASKET_ITEM_MODEL = 'shop.BasketItem'
-SALESMAN_ORDER_MODEL = 'shop.Order'
-SALESMAN_ORDER_ITEM_MODEL = 'shop.OrderItem'
-SALESMAN_ORDER_PAYMENT_MODEL = 'shop.OrderPayment'
-SALESMAN_ORDER_NOTE_MODEL = 'shop.OrderNote'
+SALESMAN_BASKET_MODEL = "shop.Basket"
+SALESMAN_BASKET_ITEM_MODEL = "shop.BasketItem"
+SALESMAN_ORDER_MODEL = "shop.Order"
+SALESMAN_ORDER_ITEM_MODEL = "shop.OrderItem"
+SALESMAN_ORDER_PAYMENT_MODEL = "shop.OrderPayment"
+SALESMAN_ORDER_NOTE_MODEL = "shop.OrderNote"
 SALESMAN_PRODUCT_TYPES = {
-    'shop.ProductVariant': 'shop.serializers.ProductVariantSerializer',
+    "shop.ProductVariant": "shop.serializers.ProductVariantSerializer",
 }
 SALESMAN_PAYMENT_METHODS = [
-    'shop.payment.PayInAdvance',
+    "shop.payment.PayInAdvance",
 ]
 
 # for crispy forms
-CRISPY_TEMPLATE_PACK = 'bootstrap4'
+CRISPY_TEMPLATE_PACK = "bootstrap4"
 USE_CRISPY = True
