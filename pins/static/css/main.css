@@ -2412,3 +2412,18 @@ input[type='radio'] {
       left: 0;
     }
   }
+
+
+.carousel.shop-carousel {
+  width: 180px;
+}
+
+.carousel-control-next,
+.carousel-control-prev, 
+.carousel-indicators {
+    filter: invert(100%);
+}
+
+.carousel-indicators {
+  bottom: -40px;
+}

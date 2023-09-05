@@ -1,12 +1,29 @@
 {% load wagtailcore_tags wagtailimages_tags static %}
 
 <div>
-    <h2 class="listing-card__title">{{ product.name }}</h2>
-    {% if product.image %}
-        <figure class="product-listing-card__image">
-            {% image product.image fill-180x180-c100 loading="lazy" %}
-        </figure>
-    {% else %}
+    <h3 class="listing-card__title">{{ product.name }}</h3>
+    {% if product.images %}
+
+        <div id="shopCarousel" class="carousel shop-carousel slide" data-ride="carousel">
+            {% if product.images|length > 1 %}
+                <ol class="carousel-indicators">
+                    {% for im in product.images %}
+                        <li data-target="#shopCarousel" data-slide-to="{{ forloop.counter0 }}" {% if forloop.first %}class="active"{% endif %}></li>
+                    {% endfor %}
+                </ol>
+            {% endif %}
+            <div class="carousel-inner">
+                {% for pimage in product.images %}
+                <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                    <figure class="product-listing-card__image">
+                        {% image pimage fill-180x180-c100 loading="lazy" class="d-block w-180" %}
+                    </figure>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% else %}
         <figure class="product-listing-card__image">
             <img src={% static 'images/logo.png' %} height="180" width="180" loading="lazy">
             <div class="layer"></div>
@@ -63,7 +80,7 @@
             value="Add to basket"
             hx-post="{% url 'shop:add_to_basket' product.id %}"
             hx-trigger="click"
-            hx-target="#basket-count"
+            hx-target="#basket-icon"
         >        
     </form>
     <div id="added_{{ product.id }}"></div>

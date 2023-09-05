@@ -52,14 +52,14 @@
                                         value="Update"
                                         hx-post="{% url 'shop:update_quantity' item.ref %}"
                                         hx-trigger="click"
-                                        hx-target="#basket_quantity"
+                                        hx-target="#basket-icon"
                                     >
                                     <input type="submit" 
                                         class="btn btn-danger"
                                         value="Delete"
                                         hx-post="{% url 'shop:delete' item.ref %}"
                                         hx-trigger="click"
-                                        hx-target="#basket_quantity"
+                                        hx-target="#basket-icon"
                                     >
                                     <div id="updated_{{ item.product_id }}"></div>
                                 </form>
@@ -68,7 +68,6 @@
                             </ul>
                         </div>
                     {% endfor %}
-                    <div>Items in basket: <span id="basket_quantity">{{ basket_quantity }}</span></div>
                     <div>Total: £<span id="total">{{ basket.total }}</span></div>
                     <hr class="mt-4 mb-2">
                     <div class="col-md-12">

@@ -8,10 +8,12 @@ from salesman.orders.models import (
     BaseOrderNote,
     BaseOrderPayment,
 )
-from wagtail.admin.panels import FieldPanel
+from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtail.fields import RichTextField
-from wagtail.models import Page
+from wagtail.models import Page, Orderable
 from wagtail.snippets.models import register_snippet
+
+from modelcluster.models import ClusterableModel
 
 
 # ORDERS
@@ -47,7 +49,6 @@ class BasketItem(BaseBasketItem):
 # PRODUCTS
 
 
-@register_snippet
 class ProductCategory(models.Model):
     """
     Product category, used to categorise products in display.
@@ -117,6 +118,7 @@ class Product(models.Model):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
+        help_text="Images can be added to product and/or product variants, all will be displayed"
     )
     description = RichTextField(help_text="Description of the product", blank=True)
     index = models.PositiveIntegerField(
@@ -142,6 +144,15 @@ class Product(models.Model):
     def identifier(self):
         return slugify(f"{self.category.name}-{self.name}")
 
+    @property
+    def images(self):
+        all_images = []
+        if self.image:
+            all_images.append(self.image)
+        for variant in self.live_variants.filter(image__isnull=False):
+            all_images.append(variant.image)
+        return all_images
+
 
 class ProductVariant(models.Model):
     product = models.ForeignKey(
@@ -155,6 +166,13 @@ class ProductVariant(models.Model):
             if the product is 'T-shirt', a variant might be "Black, Small".  A product
             'Pen' might have variants 'Single', 'Pack of 5', 'Pack of 10'
         """,
+    )
+    image = models.ForeignKey(
+        "wagtailimages.Image",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
     )
     price = models.DecimalField(max_digits=18, decimal_places=2, default=0)
     live = models.BooleanField(
@@ -238,3 +256,10 @@ class ShopPage(Page):
 
     def categories(self):
         return ProductCategory.objects.filter(live=True).order_by("index")
+
+    def get_context(self, request):
+        from .views import get_basket_quantity
+
+        context = super().get_context(request)
+        context["basket_quantity"] = get_basket_quantity(request)
+        return context

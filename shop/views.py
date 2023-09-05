@@ -27,6 +27,10 @@ def get_basket_quantity(request):
     return resp.data["quantity"]
 
 
+def get_basket_total(request):
+    return get_basket(request)["total"]
+
+
 def get_basket_quantity_and_total(request):
     return get_basket_quantity(request), get_basket(request)["total"]
 
@@ -71,7 +75,7 @@ def add_to_basket(request, product_id):
         request.method = "GET"
         new_basket_quantity = get_basket_quantity(request)
         resp_str = f"""
-            <div>{new_basket_quantity}</div>
+            <div>{_basket_icon_html(request, new_basket_quantity)}</div>
             <div id='added_{product_id}' class='alert-success mt-2' hx-swap-oob='true'>Added!</div>
         """
     else:
@@ -84,37 +88,35 @@ def add_to_basket(request, product_id):
 def update_quantity(request, ref):
     product_id = request.POST.get("product_id")
     request.method = "GET"
-    resp = BasketViewSet.as_view({"get": "retrieve"})(request, ref=ref)
-    if resp.data["quantity"] == int(request.POST.get("quantity")):
+    current_item_resp = BasketViewSet.as_view({"get": "retrieve"})(request, ref=ref)
+
+    if current_item_resp.data["quantity"] == int(request.POST.get("quantity")):
         # nothing to do
-        basket_quantity, _ = get_basket_quantity_and_total(request)
-        return HttpResponse(
-            f"""
-                <div>{basket_quantity}</div>
-                <div id='updated_{product_id}' class='alert-info' hx-swap-oob='true'>Nothing to update</div>
-            """,
+        result_html = (
+            f"<div id='updated_{product_id}' class='alert-info' hx-swap-oob='true'>"
+            "Nothing to update</div>"
         )
-
-    request.method = "PUT"
-    resp = BasketViewSet.as_view({"put": "update"})(request, ref=ref)
-
-    if resp.status_code != 200:
-        resp_str = f"""
-            <div id='updated_{product_id}' class='alert-danger' hx-swap-oob='true'>Error</div>
-        """
     else:
-        request.method = "GET"
-        new_basket_quantity, new_basket_total = get_basket_quantity_and_total(request)
-        resp_str = f"""
-            <div>{new_basket_quantity}</div>
-            <span id='quantity_{product_id}' hx-swap-oob='true'>{resp.data['quantity']}</span>
-            <span id='subtotal_{product_id}' hx-swap-oob='true'>{resp.data['subtotal']}</span>
-            <span id='total' hx-swap-oob='true'>{new_basket_total}</span>
-            <span id='basket_quantity' hx-swap-oob='true'>{new_basket_quantity}</span>
-            <div id='updated_{product_id}' class='alert-success' hx-swap-oob='true'>Basket updated</div>
-        """
+        request.method = "PUT"
+        resp = BasketViewSet.as_view({"put": "update"})(request, ref=ref)
 
-    return HttpResponse(resp_str)
+        if resp.status_code != 200:
+            result_html = f"<div id='updated_{product_id}' class='alert-danger' hx-swap-oob='true'>Error</div>"
+        else:
+            new_basket_total = get_basket_total(request)
+            result_html = f"""
+                <span id='quantity_{product_id}' hx-swap-oob='true'>{resp.data['quantity']}</span>
+                <span id='subtotal_{product_id}' hx-swap-oob='true'>{resp.data['subtotal']}</span>
+                <span id='total' hx-swap-oob='true'>{new_basket_total}</span>
+                <div id='updated_{product_id}' class='alert-success' hx-swap-oob='true'>Basket updated</div>
+            """
+
+    basket_quantity = get_basket_quantity(request)
+    result_html = f"""
+        <div>{_basket_icon_html(request, basket_quantity)}</div>
+        {result_html}
+    """
+    return HttpResponse(result_html)
 
 
 def delete_basket_item(request, ref):
@@ -144,12 +146,16 @@ def delete_basket_item(request, ref):
             row_hide = f"<div id='row-{product_id}' hx-swap-oob='true'></div>"
 
         resp_str = f"""
-            <div>{new_basket_quantity}</div>
+            <div>{_basket_icon_html(request, new_basket_quantity)}</div>
             {row_hide}
             <span id='total' hx-swap-oob='true'>{basket['total']}</span>
         """
 
     return HttpResponse(resp_str)
+
+
+def _basket_icon_html(request, quantity):
+    return render_to_string("shop/includes/basket_icon.html", {"basket_quantity": quantity}, request)
 
 
 def basket_view(request):

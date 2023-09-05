@@ -3,15 +3,12 @@
 
 
 {% block content %}
-    {% include "includes/header-hero.html" %}
+    {% include "shop/includes/header-hero.html" %}
 
     <div class="container category-detail">
         <div class="row">
             <h1>{{ category.name }}</h1>
-            <div class="col-md-12">
-                <div>In basket: <span id="basket-count">{{ basket_quantity }}</span></div>
-                <a class="btn btn-sm" href="{% url 'shop:basket' %}">View basket</a>
-            </div>
+            
             
             <div class="col-md-12">
                 <div class="row">

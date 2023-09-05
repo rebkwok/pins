@@ -18,10 +18,15 @@
                 {% for category in page.categories %}
                     {% if category.live_products %}
                         <h2>
-                            <a href="{{ category.get_absolute_url }}">{{ category.name }}
-                                {% include "includes/chevron-icon.html" with class="dogsindex__chevron-icon" %}
-                            </a>
+                            <a href="{{ category.get_absolute_url }}">{{ category.name }}</a>
                         </h2>
+                        <div class="container product-listing-card__container">
+                            <div class="product-listing-card__grid">
+                                {% for product in category.live_products %}
+                                    {% include "shop/includes/product-listing-card.html" %}
+                                {% endfor %}
+                            </div>
+                        </div>
                     {% endif %}
                 {% endfor %}
             </div>
