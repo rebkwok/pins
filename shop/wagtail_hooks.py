@@ -1,10 +1,15 @@
-
-
+from salesman.admin.wagtail.panels import ReadOnlyPanel
+from salesman.admin.wagtail_hooks import OrderAdmin as SalesmanOrderAdmin
+from salesman.core.utils import get_salesman_model
 from wagtail.admin.ui.tables import BooleanColumn
+from wagtail.contrib.modeladmin.options import modeladmin_register
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
 from .models import Product, ProductCategory, ProductVariant
+
+
+Order = get_salesman_model("Order")
 
 
 class ProductCategoryViewSet(SnippetViewSet):
@@ -32,9 +37,16 @@ class ProductVariantViewSet(SnippetViewSet):
 
 
 class ProductGroup(SnippetViewSetGroup):
-    menu_label = "Products"
+    menu_label = "Shop Stock"
     menu_icon = "pick"
     items = (ProductCategoryViewSet, ProductViewSet, ProductVariantViewSet)
 
 
+class OrderAdmin(SalesmanOrderAdmin):
+    SalesmanOrderAdmin.list_display.insert(2, "name")
+    SalesmanOrderAdmin.search_fields.append("name")
+    SalesmanOrderAdmin.default_panels[2].children.insert(2, ReadOnlyPanel("name"))
+
+
 register_snippet(ProductGroup)
+modeladmin_register(OrderAdmin)

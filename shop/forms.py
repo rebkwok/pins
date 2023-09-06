@@ -9,6 +9,7 @@ from .payment import PAYMENT_METHOD_BUTTON_TEXT
 class CheckoutForm(forms.Form):
     email = forms.EmailField()
     email1 = forms.EmailField(label="Email (again)")
+    name = forms.CharField(label="Name")
     payment_method = forms.CharField()
     shipping_address = forms.CharField(
         widget=forms.Textarea(attrs={"cols": 40, "rows": 6})
@@ -27,6 +28,7 @@ class CheckoutForm(forms.Form):
             Hidden("payment_method", payment_method),
             "email",
             "email1",
+            "name",
             "shipping_address",
             Button(
                 "copy_shipping_address",

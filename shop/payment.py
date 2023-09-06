@@ -32,6 +32,8 @@ class PayInAdvance(PaymentMethod):
         changed to `PROCESSING`, `SHIPPED` or `COMPLETED` and a new payment should be
         added to order.
         """
+        basket.extra["name"] = request.POST.get("name")
+        basket.save()
         order = Order.objects.create_from_basket(basket, request, status="HOLD")
         basket.delete()
         url = reverse("salesman-order-last") + f"?token={order.token}"

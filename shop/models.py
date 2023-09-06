@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django.urls import reverse
 from django.utils.text import slugify
 from salesman.basket.models import BaseBasket, BaseBasketItem
@@ -8,19 +8,31 @@ from salesman.orders.models import (
     BaseOrderNote,
     BaseOrderPayment,
 )
-from wagtail.admin.panels import FieldPanel, InlinePanel
+from wagtail.admin.panels import FieldPanel
+from wagtail.contrib.forms.models import validate_to_address
+from wagtail.contrib.settings.models import (
+    BaseGenericSetting,
+    register_setting,
+)
 from wagtail.fields import RichTextField
-from wagtail.models import Page, Orderable
-from wagtail.snippets.models import register_snippet
-
-from modelcluster.models import ClusterableModel
+from wagtail.models import Page
 
 
 # ORDERS
 
 
 class Order(BaseOrder):
-    pass
+    name = models.CharField(max_length=255, verbose_name="Name")
+
+    @transaction.atomic
+    def populate_from_basket(
+        self,
+        basket,
+        request,
+        **kwargs,
+    ) -> None:
+        self.name = basket.extra.pop("name")
+        return super().populate_from_basket(basket, request, **kwargs)
 
 
 class OrderItem(BaseOrderItem):
@@ -118,7 +130,7 @@ class Product(models.Model):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
-        help_text="Images can be added to product and/or product variants, all will be displayed"
+        help_text="Images can be added to product and/or product variants, all will be displayed",
     )
     description = RichTextField(help_text="Description of the product", blank=True)
     index = models.PositiveIntegerField(
@@ -263,3 +275,26 @@ class ShopPage(Page):
         context = super().get_context(request)
         context["basket_quantity"] = get_basket_quantity(request)
         return context
+
+
+@register_setting
+class ShopSettings(BaseGenericSetting):
+    notify_email_addresses = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text=(
+            "Optional - new orders will be emailed to these addresses. "
+            "Separate multiple addresses by comma."
+        ),
+        validators=[validate_to_address],
+    )
+    reply_to = models.EmailField(
+        max_length=255,
+        blank=True,
+        help_text=("Optional - reply to email address for shop notification emails."),
+    )
+
+    panels = [
+        FieldPanel("notify_email_addresses"),
+        FieldPanel("reply_to"),
+    ]

@@ -411,7 +411,7 @@ else:  # pragma: no cover
 
 # Wagtail settings
 
-WAGTAIL_SITE_NAME = "pins"
+WAGTAIL_SITE_NAME = "Podencos in Need Scotland"
 
 # Search
 # https://docs.wagtail.org/en/stable/topics/search/backends.html
@@ -423,7 +423,7 @@ WAGTAILSEARCH_BACKENDS = {
 
 # Base URL to use when referring to full URLs within the Wagtail admin backend -
 # e.g. in notification emails. Don't include '/admin' or a trailing slash
-WAGTAILADMIN_BASE_URL = "http://example.com"
+WAGTAILADMIN_BASE_URL = env("WAGTAILADMIN_BASE_URL")
 
 WAGTAILIMAGES_JPEG_QUALITY = 65
 WAGTAILIMAGES_WEBP_QUALITY = 65
@@ -441,12 +441,14 @@ FB_PAGE_ID = env.str("FB_PAGE_ID")
 
 # Salesman
 
+SALESMAN_ADMIN_REGISTER = False
 SALESMAN_BASKET_MODEL = "shop.Basket"
 SALESMAN_BASKET_ITEM_MODEL = "shop.BasketItem"
 SALESMAN_ORDER_MODEL = "shop.Order"
 SALESMAN_ORDER_ITEM_MODEL = "shop.OrderItem"
 SALESMAN_ORDER_PAYMENT_MODEL = "shop.OrderPayment"
 SALESMAN_ORDER_NOTE_MODEL = "shop.OrderNote"
+SALESMAN_ORDER_SERIALIZER = "shop.serializers.OrderSerializer"
 SALESMAN_PRODUCT_TYPES = {
     "shop.ProductVariant": "shop.serializers.ProductVariantSerializer",
 }
