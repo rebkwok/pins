@@ -1,3 +1,5 @@
+{% if not hide_basket %}
 <div class="float-right">
-    <a class="btn btn-sm" href="{% url 'shop:basket' %}">View basket  ({{ basket_quantity }})</a>
+    <a class="btn btn-sm" href="{% url 'shop:basket' %}"><i class="fa-solid fa-basket-shopping"></i>  ({{ basket_quantity }})</a>
 </div>
+{% endif %}

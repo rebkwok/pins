@@ -2249,7 +2249,7 @@ input[type='radio'] {
 
 .product-listing-card__grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 30px;
 }
 
@@ -2293,7 +2293,9 @@ input[type='radio'] {
   transform: scale(1.05);
 }
 
-.shop-form input[type='submit'] {
+.shop-form input[type='submit'],
+.shop-form button[type='submit']
+{
   border: none;
   color: var(--white);
   background-color: rgba(207,148,131);
@@ -2305,8 +2307,19 @@ input[type='radio'] {
   width: max-content;
 }
 
-.shop-form input[type='submit']:hover {
+.shop-form input[type='submit']:hover,
+.shop-form button[type='submit'].basket-btn-danger:hover {
   background-color: var(--dark);
+}
+
+.shop-form input[type='submit'].basket-btn,
+.shop-form button[type='submit'].basket-btn {
+  padding: 0px 10px;
+  margin-left: 2px;
+}
+
+.shop-form button[type='submit'].basket-btn-danger {
+  background-color: darkred;
 }
 
 @media (min-width: 768px) {

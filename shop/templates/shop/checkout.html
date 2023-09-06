@@ -14,25 +14,27 @@
                 <div class="alert-danger">There was an error submitting this order</div>
                 {% endif %}
                 {% if basket.items %}
+                <h3>Order Summary</h3>
                 {% for product_identifier, items in basket.items.items %}
                         <div id="row-{{ product_identifier}}">
-                            <h3>{{ items.0.product_type }} ({{ items.0.category }})</h3>
-                            <ul>    
+                            <h4>{{ items.0.product_type }} ({{ items.0.category }})</h4>
+                            <div>    
                             {% for item in items %}
                             <div id="row-{{ item.product_id }}">
-                                <li>{{ item.product.name }} - 
-                                    <span id="quantity_{{ item.product_id }}">{{ item.quantity }}</span> -  
-                                    £{{ item.unit_price }} - 
+                                <div>{{ item.product.name }} (<span id="quantity_{{ item.product_id }}">{{ item.quantity }}</span>) -  
                                     £<span id="subtotal_{{ item.product_id }}">{{ item.subtotal }}</span>
-                                </li>
+                                </div>
                             </div>
                             {% endfor %}
-                            </ul>
+                        </div>
                         </div>
                     {% endfor %}
-
-                    <div>Total: £<span id="total">{{ basket.total }}</span>
                     
+                    <div class="mt-4"><h4>Total: £<span id="total">{{ basket.total }}</span></h4></div>
+                    
+                    <hr class="mt-4 mb-4"/>
+
+                    <h3>Shipping & Billing details</h3>
                     <div class="col-md-12 mt-4">
                         {% if form.errors %}
                             <p class="text-danger">Please correct the errors below:</p>

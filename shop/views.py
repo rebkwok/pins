@@ -106,16 +106,9 @@ def update_quantity(request, ref):
             new_basket_total = get_basket_total(request)
             result_html = f"""
                 <span id='quantity_{product_id}' hx-swap-oob='true'>{resp.data['quantity']}</span>
-                <span id='subtotal_{product_id}' hx-swap-oob='true'>{resp.data['subtotal']}</span>
                 <span id='total' hx-swap-oob='true'>{new_basket_total}</span>
                 <div id='updated_{product_id}' class='alert-success' hx-swap-oob='true'>Basket updated</div>
             """
-
-    basket_quantity = get_basket_quantity(request)
-    result_html = f"""
-        <div>{_basket_icon_html(request, basket_quantity)}</div>
-        {result_html}
-    """
     return HttpResponse(result_html)
 
 
@@ -141,21 +134,22 @@ def delete_basket_item(request, ref):
         )
 
         if not any_products:
-            row_hide = f"<div id='row-{product_identifier}' hx-swap-oob='true'></div>"
+            resp_str = f"<div id='row-{product_identifier}' hx-swap-oob='true'></div>"
         else:
-            row_hide = f"<div id='row-{product_id}' hx-swap-oob='true'></div>"
+            resp_str = f"<div id='row-{product_id}' hx-swap-oob='true'></div>"
 
-        resp_str = f"""
-            <div>{_basket_icon_html(request, new_basket_quantity)}</div>
-            {row_hide}
-            <span id='total' hx-swap-oob='true'>{basket['total']}</span>
-        """
+        if new_basket_quantity == 0:
+            resp_str += "<div id='basket-total-and-payment' hx-swap-oob='true'><p>Basket is empty.</p></div>"
+        else:
+            resp_str += f"<span id='total' hx-swap-oob='true'>{basket['total']}</span>"
 
     return HttpResponse(resp_str)
 
 
 def _basket_icon_html(request, quantity):
-    return render_to_string("shop/includes/basket_icon.html", {"basket_quantity": quantity}, request)
+    return render_to_string(
+        "shop/includes/basket_icon.html", {"basket_quantity": quantity}, request
+    )
 
 
 def basket_view(request):
@@ -168,7 +162,7 @@ def basket_view(request):
     return render(
         request,
         "shop/basket.html",
-        {**basket_context, "payment_methods": payment_methods},
+        {**basket_context, "payment_methods": payment_methods, "hide_basket": True},
     )
 
 
@@ -194,13 +188,15 @@ def checkout_view(request):
 
     if request.method == "POST":
         form = CheckoutForm(payment_method=payment_method, data=request.POST)
-        form.is_valid()
-        checkout = CheckoutViewSet.as_view({"post": "create"})(request)
-        if checkout.status_code == 201:
-            parsed_url = urlparse(checkout.data["url"])
-            token = dict(parse_qsl(parsed_url.query))["token"]
-            return HttpResponseRedirect(reverse("shop:new_order_status", args=(token,)))
-        context["checkout_error"] = True
+        if form.is_valid():
+            checkout = CheckoutViewSet.as_view({"post": "create"})(request)
+            if checkout.status_code == 201:
+                parsed_url = urlparse(checkout.data["url"])
+                token = dict(parse_qsl(parsed_url.query))["token"]
+                return HttpResponseRedirect(
+                    reverse("shop:new_order_status", args=(token,))
+                )
+            context["checkout_error"] = True
     else:
         form = CheckoutForm(payment_method=payment_method)
 
@@ -247,4 +243,5 @@ def _order_status(request, token, new=False):
         order["date_created"], "%Y-%m-%dT%H:%M:%S.%fZ"
     )
     order = get_basket_context(order)["basket"]
-    return render(request, "shop/order_status.html", {"order": order, "new_order": new})
+    context = {"order": order, "new_order": new, "hide_basket": True}
+    return render(request, "shop/order_status.html", context)

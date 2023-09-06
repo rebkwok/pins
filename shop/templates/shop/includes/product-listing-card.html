@@ -35,7 +35,6 @@
     <form class="shop-form" action="" method="POST">
         {% csrf_token %}
         <div class="form-group">
-            <label for="id_product_{{ product.id }}">Option</label>
             <select
                 {% comment %} name must be product id for api call - actual product_variant id {% endcomment %}
                 name="product_id" 
@@ -49,7 +48,6 @@
             </select>
         </div>
             
-        <label for="id_quantity">Quantity</label>
         <div class="input-group quantity mb-3">
             <div class="input-group-prepend">
                 <span 
@@ -72,16 +70,17 @@
                     hx-include="[id='id_quantity_{{ product.id }}']"  
                 >+</span>
             </div>
+            <input type="submit" 
+                class="btn basket-btn"
+                value="Add to basket"
+                hx-post="{% url 'shop:add_to_basket' product.id %}"
+                hx-trigger="click"
+                hx-target="#basket-icon"
+            >  
         </div>
         <input type="hidden" name="product_type" value="shop.ProductVariant">
 
-        <input type="submit" 
-            class="btn"
-            value="Add to basket"
-            hx-post="{% url 'shop:add_to_basket' product.id %}"
-            hx-trigger="click"
-            hx-target="#basket-icon"
-        >        
+              
     </form>
     <div id="added_{{ product.id }}"></div>
 
