@@ -1,0 +1,11 @@
+{% if extra_rows %}
+    <hr class="mt-2 mb-4"/>
+
+    {% for extra_row in extra_rows %}
+        <div class="row">
+            <div class="col">{{ extra_row.label}}</div>
+            <div class="col"></div>
+            <div class="col">£{{extra_row.amount}}</div> 
+        </div>    
+    {% endfor %}
+{% endif %}

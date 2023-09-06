@@ -104,10 +104,16 @@ def update_quantity(request, ref):
             result_html = f"<div id='updated_{product_id}' class='alert-danger' hx-swap-oob='true'>Error</div>"
         else:
             new_basket_total = get_basket_total(request)
+            basket_extra_html = render_to_string(
+                "shop/includes/basket_extra.html",
+                {"extra_rows": resp.data["extra_rows"]},
+                request,
+            )
             result_html = f"""
                 <span id='quantity_{product_id}' hx-swap-oob='true'>{resp.data['quantity']}</span>
                 <span id='total' hx-swap-oob='true'>{new_basket_total}</span>
                 <div id='updated_{product_id}' class='alert-success' hx-swap-oob='true'>Basket updated</div>
+                <div id='basket-extra' class='col-md-12' hx-swap-oob='true'>{basket_extra_html}/div>
             """
     return HttpResponse(result_html)
 
@@ -143,6 +149,12 @@ def delete_basket_item(request, ref):
         else:
             resp_str += f"<span id='total' hx-swap-oob='true'>{basket['total']}</span>"
 
+        basket_extra_html = render_to_string(
+            "shop/includes/basket_extra.html",
+            {"extra_rows": basket["extra_rows"]},
+            request,
+        )
+        resp_str += f"<div id='basket-extra' class='col-md-12' hx-swap-oob='true'>{basket_extra_html}</div>"
     return HttpResponse(resp_str)
 
 

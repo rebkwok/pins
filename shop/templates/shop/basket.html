@@ -68,12 +68,13 @@
                         </div>
                     {% endfor %}
                 </div>
+                <div class="col-md-12" id="basket-extra">
+                {% include "shop/includes/basket_extra.html" with extra_rows=basket.extra_rows %}
+                </div>
                 <div class="col-md-12">
                     <hr class="mt-4 mb-4">
                     <div id="basket-total-and-payment">
-                        <div class="row">
-                            <h4>Total: £<span id="total">{{ basket.total }}</span></h4>
-                        </div>
+                        <h4>Total: £<span id="total">{{ basket.total }}</span></h4>
                     <hr class="mt-2 mb-4">
                     <div class="col-md-12">
                     <div class="row">

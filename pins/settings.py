@@ -455,6 +455,9 @@ SALESMAN_PRODUCT_TYPES = {
 SALESMAN_PAYMENT_METHODS = [
     "shop.payment.PayInAdvance",
 ]
+SALESMAN_BASKET_MODIFIERS = [
+    "shop.modifiers.ShippingCostModifier",
+]
 
 # for crispy forms
 CRISPY_TEMPLATE_PACK = "bootstrap4"
