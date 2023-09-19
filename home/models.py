@@ -13,6 +13,7 @@ from wagtail.admin.panels import (
     PublishingPanel,
 )
 from wagtail.contrib.forms.models import AbstractEmailForm, AbstractFormField
+from wagtail.contrib.forms.views import SubmissionsListView
 from wagtail.fields import RichTextField
 from wagtail.models import (
     DraftStateMixin,
@@ -313,7 +314,41 @@ class ProductVariant(Orderable):
         super().save(*args, **kwargs)
 
 
+class OrderFormSubmissionsListView(SubmissionsListView):
+
+    def stream_csv(self, queryset):
+        self.list_export += ["total"]
+        self.export_headings.update({"total": "Total (£)"})
+        return super().stream_csv(queryset)
+
+    def write_xlsx(self, queryset, output):
+        self.list_export += ["total"]
+        self.export_headings.update({"total": "Total (£)"})
+        return super().write_xlsx(queryset, output)
+
+    def to_row_dict(self, item):
+        """Orders the submission dictionary for spreadsheet writing"""
+        row_dict = super().to_row_dict(item)
+        _, total = self.form_page.get_variant_quantities_and_total(row_dict)
+        row_dict["total"] = total
+        return row_dict
+
+    def get_context_data(self, **kwargs):
+        context_data = super().get_context_data(**kwargs)
+        if not self.is_export:
+            context_data["data_headings"].append({'name': 'total', 'label': 'Total (£)', 'order': None})
+            fields = self.form_page.get_data_fields()
+            for row in context_data["data_rows"]:
+                form_data = row["fields"]
+                form_data_dict = {field[0]: form_data[i] for i, field in enumerate(fields)}
+                _, total = self.form_page.get_variant_quantities_and_total(form_data_dict)
+                form_data.append(total)
+        return context_data
+
+
 class OrderFormPage(AbstractEmailForm):
+
+    submissions_list_view_class = OrderFormSubmissionsListView
 
     body = RichTextField(blank=True)
     image = models.ForeignKey(
