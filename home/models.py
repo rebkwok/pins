@@ -92,6 +92,9 @@ class HomePage(Page):
     featured_section_title = models.CharField(
         blank=True, max_length=255, help_text="Title to display above the promo copy"
     )
+    featured_section_body = RichTextField(
+        null=True, blank=True, max_length=1000, help_text="Optional description for the featured section"
+    )
     featured_section = models.ForeignKey(
         "wagtailcore.Page",
         null=True,
@@ -189,6 +192,7 @@ class HomePage(Page):
                 MultiFieldPanel(
                     [
                         FieldPanel("featured_section_title"),
+                        FieldPanel("featured_section_body"),
                         FieldPanel("featured_section"),
                         FieldPanel("featured_section_show_more_text")
                     ]

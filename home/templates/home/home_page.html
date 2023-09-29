@@ -31,6 +31,7 @@
                 <div class="featured-cards col-sm-6 col-sm-offset-1">
                     {% if page.featured_section %}
                         <h2 class="featured-cards__title">{{ page.featured_section_title }}</h2>
+                        {{ page.featured_section_body|richtext }}
                         <ul class="featured-cards__list">
                             {% for childpage in page.featured_section.specific.children|slice:"3" %}
                                 <li>
