@@ -30,6 +30,7 @@ class DogsIndexPage(Page):
     subpage_types = ["DogStatusPage"]
 
     content_panels = Page.content_panels + [
+        FieldPanel('body'),
         HelpPanel(
             """This is the index page for all dogs. It will display links to each of the
             chosen dog status categories.<br>
