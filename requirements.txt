@@ -248,6 +248,8 @@ websockets==11.0.3
     # via uvicorn
 wheel==0.41.0
     # via pip-tools
+whitenoise==6.5.0
+    # via -r requirements.in
 willow==1.5.1
     # via wagtail
 yarl==1.9.2
