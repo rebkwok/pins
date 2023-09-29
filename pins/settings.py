@@ -51,24 +51,28 @@ if str(DEBUG).lower() in ['true', 'on']:  # pragma: no cover
 else:  # pragma: no cover
     DEBUG = False
 
+DOMAIN = "podencosinneed.org"
 ALLOWED_HOSTS = [
-    'pins.scot', 
-    'www.pins.scot', 
+    DOMAIN, 
+    f'www.{DOMAIN}', 
+    f"vagrant.{DOMAIN}",
+    f"www.vagrant.{DOMAIN}",
     'pins.rebkwok.co.uk', 
     'www.pins.rebkwok.co.uk',
     'pins-orders.rebkwok.co.uk', 
     'www.pins-orders.rebkwok.co.uk', 
-    'vagrant.pins.scot',
-    'vagrant.pins-orders.scot'
-
+    'vagrant.podencosinneed.org',
 ]
 # https://docs.djangoproject.com/en/4.0/ref/settings/#std:setting-CSRF_TRUSTED_ORIGINS
 CSRF_TRUSTED_ORIGINS = [
-    'https://pins.scot', 
-    'https://*.pins.scot', 
+    f'https://{DOMAIN}', 
+    f'https://*.{DOMAIN}', 
+    f'https://vagrant.{DOMAIN}',
+    f'https://*.vagrant.{DOMAIN}',
     'https://pins.rebkwok.co.uk',
     'https://*.pins.rebkwok.co.uk', 
-    'https://vagrant.pins.scot'
+    'https://pins-orders.rebkwok.co.uk', 
+    'https://pins-orders.rebkwok.co.uk',
 ]
 
 
