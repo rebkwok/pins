@@ -18,9 +18,11 @@
         <meta name="description" content="{% if page.search_description %}{{ page.search_description }}{% endif %}">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
-        <meta property="og:title" content="{% if page.seo_title %}{{ page.seo_title }}{% else %}{{ page.title }}" />
+
+        <meta property="og:url" content="{{ request.build_absolute_uri }}" />
+        <meta property="og:title" content="{% if page.seo_title %}{{ page.seo_title }}{% else %}{{ page.title }}{% endif %}" />
         <meta property="og:description" content="{% if page.search_description %}{{ page.search_description }}{% endif %}" />
-        <meta property="og:image" content="{% static 'images/favicon.png' %}" />
+        <meta property="og:image" content="{% static 'images/logo.png' %}" />
 
         {# Force all links in the live preview panel to be opened in a new tab #}
         {% if request.in_preview_panel %}
@@ -37,7 +39,6 @@
 
     <body class="{% block body_class %}template-{{ self.get_verbose_name|slugify }}{% endblock %}">
         {% wagtailuserbar %}
-
         {% block header %}
             {% include "includes/header.html" with parent=site_root calling_page=self %}
         {% endblock header %}
