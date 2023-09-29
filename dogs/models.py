@@ -24,6 +24,8 @@ class DogIndexPageStatuses(Orderable):
 
 
 class DogsIndexPage(Page):
+
+    body = RichTextField(blank=True)
     parent_page_types = ["home.HomePage"]
     subpage_types = ["DogStatusPage"]
 
