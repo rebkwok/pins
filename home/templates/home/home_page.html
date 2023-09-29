@@ -39,10 +39,12 @@
                                 </li>
                             {% endfor %}
                         </ul>
-                        <a class="featured-cards__link" href="{% pageurl page.featured_section %}">
-                            <span>{{ page.featured_section_show_more_text }}</span>
-                            {% include "includes/chevron-icon.html" with class="featured-cards__chevron-icon" %}
-                        </a>
+                        {% if page.featured_section_show_more_text %}
+                            <a class="featured-cards__link" href="{% pageurl page.featured_section %}">
+                                <span>{{ page.featured_section_show_more_text }}</span>
+                                {% include "includes/chevron-icon.html" with class="featured-cards__chevron-icon" %}
+                            </a>
+                        {% endif %}
                     {% endif %}
                 </div>
 
