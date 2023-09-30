@@ -25,17 +25,26 @@ class DogIndexPageStatuses(Orderable):
 
 class DogsIndexPage(Page):
 
+    image = models.ForeignKey(
+        "wagtailimages.Image",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="Header image",
+    )
     body = RichTextField(blank=True)
     parent_page_types = ["home.HomePage"]
     subpage_types = ["DogStatusPage"]
 
     content_panels = Page.content_panels + [
-        FieldPanel('body'),
         HelpPanel(
             """This is the index page for all dogs. It will display links to each of the
             chosen dog status categories.<br>
             A status can be hidden by removing it from this page."""
         ),
+        FieldPanel("image"),
+        FieldPanel('body'),
         InlinePanel(
             "dog_status_pages", label="Displayed statuses",
             help_text=mark_safe("""
@@ -56,6 +65,14 @@ class DogsIndexPage(Page):
 
 class DogStatusPage(Page):
 
+    image = models.ForeignKey(
+        "wagtailimages.Image",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="Header image",
+    )
     short_description = models.CharField(
         max_length=255, null=True, blank=True,
         help_text="A one-line description of this status"
@@ -73,6 +90,7 @@ class DogStatusPage(Page):
                 """
             )
         ),
+        FieldPanel("image"),
         FieldPanel('short_description'),
         FieldPanel('intro'),
     ]

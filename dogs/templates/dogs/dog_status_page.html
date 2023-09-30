@@ -5,16 +5,22 @@
 
 
 {% block content %}
-    {% include "dogs/includes/header-index.html" %}
+    {% include "dogs/includes/header-hero.html" %}
 
     <div class="container">
-        <ul class="dog-list">
-            {% for dog in dogs %}
-                <li>
-                    {% include "includes/card/listing-card.html" with page=dog %}
-                </li>
-            {% endfor %}
-        </ul>
+        {% if dogs %}
+            <ul class="dog-list">
+                {% for dog in dogs %}
+                    <li>
+                        {% include "includes/card/listing-card.html" with page=dog %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <ul class="dog-list">
+                <li>Coming soon</li>
+            </ul>
+        {% endif %}
     </div>
 
     {% if dogs.paginator.count > 12 %}

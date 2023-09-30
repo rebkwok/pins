@@ -5,8 +5,10 @@
 {% block body_class %}template-dogstatusindexpage{% endblock %}
 
 {% block content %}
+
+{% include "dogs/includes/header-hero.html" %}
+
 <div class="container dogs-index">
-    <h1>{{ page.title }}</h1>
     
     {{ page.body|richtext }}
     {% for dog_status_page in page.status_pages %}
