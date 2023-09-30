@@ -1,5 +1,6 @@
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import models
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 
@@ -187,3 +188,17 @@ class DogPage(Page):
     def image(self):
         if self.gallery_images.exists():
             return self.gallery_images.first().image
+
+    def category(self):
+       move_url = reverse(
+            f"wagtailadmin_pages:move",
+            args=[self.id],
+        )
+       return mark_safe(
+          f"{self.get_parent().specific.title} <a class='button button-secondary button-small' href='{move_url}'>Change</a>"
+        )
+    category.short_description = "Dog Status/Category"
+
+    def page_status(self):
+        return mark_safe(f"<span class='w-status w-status--primary'>{self.status_string.title()}</span>")
+
