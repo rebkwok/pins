@@ -121,6 +121,14 @@ class HomePage(Page):
         help_text="First page link for the homepage.",
         verbose_name="Page link 1",
     )
+    page_link_1_image = models.ForeignKey(
+        "wagtailimages.Image",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="Background image",
+    )
     page_link_1_btn_text = models.CharField(
         blank=True, max_length=255, help_text="Text to display on first page link button"
     )
@@ -136,6 +144,14 @@ class HomePage(Page):
         related_name="+",
         help_text="Second page link for the homepage.",
         verbose_name="Page link 2",
+    )
+    page_link_2_image = models.ForeignKey(
+        "wagtailimages.Image",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="Background image",
     )
     page_link_2_btn_text = models.CharField(
         blank=True, max_length=255, help_text="Text to display on second page link button"
@@ -201,6 +217,7 @@ class HomePage(Page):
                     [
                         FieldPanel("page_link_1_title"),
                         FieldPanel("page_link_1"),
+                        FieldPanel("page_link_1_image"),
                         FieldPanel("page_link_1_btn_text"),
                     ]
                 ),
@@ -208,6 +225,7 @@ class HomePage(Page):
                     [
                         FieldPanel("page_link_2_title"),
                         FieldPanel("page_link_2"),
+                        FieldPanel("page_link_2_image"),
                         FieldPanel("page_link_2_btn_text"),
                     ]
                 ),

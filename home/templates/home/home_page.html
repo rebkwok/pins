@@ -78,29 +78,53 @@
                 </div>
             </div>
         {% endif %}
-
-        <div class="container">
-            <div class="row">
-                <div class="col-md-12 locations-section">
-                    {% if page.page_link_1 %}
-                        <h2 class="locations-section__title">{{ page.page_link_1_title }}</h2>
-                        <a class="btn" href="{% pageurl page.page_link_1 %}">{{ page.page_link_1_btn_text }}</a>
-                    {% endif %}
+        
+        {% if page.page_link_1 %}
+            {% if page.page_link_1_image %}
+                <div class="container-fluid hero">
+                    {% image page.page_link_1_image fill-1920x600 class="hero-image" alt="" %}
+                    <div class="hero__container">
+                        <h1>{{ page.page_link_1_title.title }}</h1>
+                    </div>
+                    <div class="hero__container">
+                        <a class="btn hero__btn" href="{% pageurl page.page_link_1 %}">{{ page.page_link_1_btn_text }}</a>
+                    </div>
                 </div>
-            </div>
-        </div>
-
-        {% if page.page_link_2 %}
-            <div class="blog-section__background">
+            {% else %}
                 <div class="container">
                     <div class="row">
-                        <div class="col-md-12 blog-section">
-                            <h2 class="">{{ page.page_link_2_title }}</h2>
-                            <a class="btn" href="{% pageurl page.page_link_2 %}">{{ page.page_link_2_btn_text }}</a>
+                        <div class="col-md-12 locations-section">
+                                <h2 class="locations-section__title">{{ page.page_link_1_title }}</h2>
+                                <a class="btn" href="{% pageurl page.page_link_1 %}">{{ page.page_link_1_btn_text }}</a>
                         </div>
                     </div>
                 </div>
-            </div>
+            {% endif %}
+        {% endif%}
+
+        {% if page.page_link_2 %}
+            {% if page.page_link_2_image %}
+                <div class="container-fluid hero">
+                    {% image page.page_link_2_image fill-1920x600 class="hero-image" alt="" %}
+                    <div class="hero__container">
+                        <h1>{{ page.page_link_2_title.title }}</h1>
+                    </div>
+                    <div class="hero__container">
+                        <a class="btn hero__btn" href="{% pageurl page.page_link_2 %}">{{ page.page_link_2_btn_text }}</a>
+                    </div>
+                </div>
+            {% else %}
+                <div class="blog-section__background">
+                    <div class="container">
+                        <div class="row">
+                            <div class="col-md-12 blog-section">
+                                <h2 class="">{{ page.page_link_2_title }}</h2>
+                                <a class="btn" href="{% pageurl page.page_link_2 %}">{{ page.page_link_2_btn_text }}</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
         {% endif %}
         
         {% if page.hero_footer_text or page.hero_footer_link or page.hero_footer %}

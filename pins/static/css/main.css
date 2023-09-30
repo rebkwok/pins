@@ -373,6 +373,10 @@ figure img {
   width: 100%;
 }
 
+.hero__btn {
+  position: relative;
+}
+
   @media (min-width: 768px) {
     .hero__title {
       background-color: rgba(207,148,131, 0.7);
