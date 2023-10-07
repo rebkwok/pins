@@ -15,6 +15,9 @@ import environ
 import os
 import sys
 
+from pathlib import Path
+
+
 root = environ.Path(__file__) - 2  # two folders back (/a/b/ - 3 = /)
 
 # defaults
@@ -412,3 +415,10 @@ WAGTAILIMAGES_WEBP_QUALITY = 65
 # backup
 S3_LOG_BACKUP_PATH = "s3://backups.polefitstarlet.co.uk/pins_activitylogs"
 S3_LOG_BACKUP_ROOT_FILENAME = "pins_activity_logs_backup"
+
+# FACEBOOK
+FB_APP_ID = env.str("FB_APP_ID")
+FB_APP_SECRET = env.str("FB_APP_SECRET")
+FB_ACCESS_TOKEN = env.str("FB_ACCESS_TOKEN")
+FB_ACCESS_TOKEN_PATH = Path("pins/.fb_access_token")
+FB_PAGE_ID = env.str("FB_PAGE_ID")

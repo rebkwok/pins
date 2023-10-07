@@ -1,18 +1,24 @@
 {% load wagtailcore_tags wagtailimages_tags %}
 
-{% if page.image %}
-    <div class="container-fluid hero">
+<div class="container-fluid hero">
+    {% if page.cover_image %}
+        <img src="{{ page.cover_image.image_url }}" height=1920 width=600 class="hero-image" />
+        <div class="hero__container">
+            <h1 class="hero__title">{{ page.title }}</h1>
+        </div>
+    {% elif page.image %}
         {% image page.image fill-1920x600 class="hero-image" alt="" %}
         <div class="hero__container">
             <h1 class="hero__title">{{ page.title }}</h1>
         </div>
-    </div>
-{% else %}
+    {% else %}
     <div class="container">
         <div class="row">
             <div class="col-md-7">
                 <h1>{{ page.title }}</h1>
             </div>
         </div>
-    </div>
-{% endif %}
+    </div>    
+    {% endif %}
+    
+</div>

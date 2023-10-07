@@ -1,13 +1,24 @@
+from datetime import datetime, timedelta
+import logging
+import requests
+
+from django.conf import settings
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 
+from facebook import GraphAPI
+
 from modelcluster.fields import ParentalKey
 from wagtail.models import Orderable, Page
 from wagtail.fields import RichTextField
-from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, MultiFieldPanel, MultipleChooserPanel
+from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, Panel
+from wagtail.snippets.models import register_snippet
+
+
+logger = logging.getLogger(__name__)
 
 
 class DogIndexPageStatuses(Orderable):
@@ -155,39 +166,57 @@ class DogPageGalleryImage(Orderable):
     ]
 
 
+class FBDescriptionPanel(Panel):
+
+    class BoundPanel(Panel.BoundPanel):
+        def render_html(self, parent_context):
+            return mark_safe(
+                f'''
+                    <section class="w-panel">
+                    <div class="w-panel__header">
+                            <h2 class="w-panel__heading w-panel__heading--label" id="panel-child-content-fbdescription-heading" data-panel-heading="">
+                                Facebook Album Description
+                            </h2>
+                        <div class="w-panel__divider"></div>
+                    </div>
+                    <div id="panel-child-content-location-content" class="w-panel__content">
+
+                    <div class="w-field__wrapper " data-field-wrapper="">
+                        <p>{self.instance.fb_description}</p>
+                    </div>
+                    </section>
+                '''
+            )
+
 class DogPage(Page):
 
     date_posted = models.DateField(default=timezone.now)
     location = models.CharField(null=True, blank=True, max_length=255)
-    description = RichTextField(blank=True)
-    facebook_url = models.URLField(null=True, blank=True, help_text="Link to Facebook album page for this dog")
+    description = RichTextField(
+        blank=True, 
+        help_text=(
+            "Description to use instead of Facebook album description. Leave blank to use "
+            "descripton from album page."
+        )
+    )
+    facebook_album_id = models.CharField(null=True, blank=True)
+    cover_image_index = models.PositiveIntegerField(default=0)
 
     content_panels = Page.content_panels + [
         FieldPanel('date_posted'),
         FieldPanel('location'),
         FieldPanel('description'),
-        FieldPanel('facebook_url'),
-        MultipleChooserPanel(
-            'gallery_images',
-            label="Images",
-            chooser_field_name="image",
-            help_text=mark_safe(
-                "Select up to 6 images to display on the page. The first image will be used "
-                "as the banner image and preview image on the category list page.<br/><br/>"
-                "Use the arrows on the right of the images to change order.</br/><br/>"
-                "If you have multiple images to upload, you can upload them all at "
-                "once by going to Images in the main menu and return to this page to select them."
-            ),
-            max_num=6
-        )
+        FBDescriptionPanel(),
+        FieldPanel('facebook_album_id'),
+        FieldPanel('cover_image_index'),
     ]
 
     subpage_types = []
     parent_page_types = ["DogStatusPage"]
 
-    def image(self):
-        if self.gallery_images.exists():
-            return self.gallery_images.first().image
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._album_info = None
 
     def category(self):
        move_url = reverse(
@@ -201,4 +230,222 @@ class DogPage(Page):
 
     def page_status(self):
         return mark_safe(f"<span class='w-status w-status--primary'>{self.status_string.title()}</span>")
+
+    def update_facebook_info(self):
+        tracker = FacebookAlbumTracker()
+        tracker.create_or_update_album(self.facebook_album_id)
+
+    @property
+    def album_info(self):
+        if not self.id:
+            return {}
+        if self._album_info is None:
+            tracker = FacebookAlbumTracker()
+            self._album_info = tracker.albums_obj.get_album(self.facebook_album_id)
+        return self._album_info
+
+    def images(self):
+        return self.album_info["images"]
+
+    def cover_image(self):
+        index = self.cover_image_index if len(self.images()) >= self.cover_image_index + 1 else 0
+        return self.album_info["images"][index]
+
+    @property
+    def fb_description(self):
+        return self.album_info.get("description", "")
+
+    @property
+    def facebook_url(self):
+        return self.album_info.get("link")
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.facebook_album_id:
+            logger.info("Checking fb info for album id %s, dog %s", self.facebook_album_id, self.title)
+            self.update_facebook_info()
+
+
+
+class FacebookAlbums(models.Model):
+
+    # dict representing current state of albums for page
+    # {
+    #     "<album_id>": {
+    #         "name": "",
+    #         "count": 10, 
+    #         "description": "", 
+    #         "link": "",
+    #         "images": [<list of image urls>],
+    #         "updated_time": ""
+    #         }
+    #     },
+    # }
+    albums = models.JSONField()
+    date_updated = models.DateTimeField(default=timezone.now)
+
+    def get_album(self, album_id):
+        return self.albums.get(album_id, {})
+
+    def update_album(self, album_id, album_data):
+        self.albums[album_id] = album_data
+        self.save()
+
+    def update_all(self, all_album_data):
+        self.albums = all_album_data
+        self.date_updated = timezone.now()
+        self.save()
+
+
+class FacebookAlbumTracker:
+
+    albums_to_ignore = [
+        "Cover photos", "Profile pictures", "Timeline photos", "Mobile uploads"
+    ]
+
+    def __init__(self):
+        self._api = None
+        self.app_id = settings.FB_APP_ID # Obtained from https://developers.facebook.com/
+        self.app_secret = settings.FB_APP_SECRET # Obtained from https://developers.facebook.com/
+        self.albums_obj = self.get_albums_obj()
+    
+    @property
+    def api(self):
+        """Setup the fb graph api"""
+        if self._api is None:
+            # read the current access token
+            token = self.get_current_access_token()
+            self._api = GraphAPI(access_token=token) 
+            # make sure the token is up to date
+            if self.token_expires_soon(token):
+                # generate new token and write it to file
+                token = self.generate_new_token()
+                settings.FB_ACCESS_TOKEN_PATH.write_text(token)
+                # setup api with new token
+                self._api = GraphAPI(access_token=token)
+        return self._api
+
+    def get_current_access_token(self):
+        token_path = settings.FB_ACCESS_TOKEN_PATH
+        if not token_path.exists():
+            # if the path doesn't already exist, it's the first time we've
+            # accessed it, use the access token setting provided and
+            # write that to file. The access token setting won't be used
+            # again
+            token_path.parent.mkdir(parents=True, exist_ok=True)
+            token_path.write_text(settings.FB_ACCESS_TOKEN)
+        token = token_path.read_text()
+        return token
+
+    def token_expires_soon(self, token):
+        # check expiry; "soon" means it expired in the next day
+        url = (
+            f"https://graph.facebook.com/debug_token?input_token={token}"
+            f"&access_token={token}"
+        )
+        token_resp = requests.get(url).json()
+        expiry = datetime.fromtimestamp(token_resp["data"]["expires_at"])
+        return expiry < datetime.now() + timedelta(days=1)
+            
+    def generate_new_token(self):
+        # Extend the expiration time of a valid OAuth access token.
+        return self.api.extend_access_token(self.app_id, self.app_secret)["access_token"]
+
+    def get_albums_obj(self):
+        if FacebookAlbums.objects.exists():
+            return FacebookAlbums.objects.last()
+        return FacebookAlbums.objects.create(albums={})
+
+    def create_or_update_album(self, album_id):
+        metadata = self.get_album_metadata(album_id)
+        if self.albums_obj.get_album(album_id).get("updated_time") != metadata.get("updated_time"):
+            logger.info("Updating album %s", album_id)
+            album_data = self.get_album_data(album_id, metadata)
+            if album_data:
+                self.albums_obj.update_album(album_id, album_data)
+        else:
+            logger.info("Album %s is up to date", album_id)
+    
+    def get_album_metadata(self, album_id):
+        return self.api.get_object(album_id, fields="name,link,description,updated_time,count")
+
+    def get_album_data(self, album_id, album_metadata=None):
+        album_data = album_metadata or self.get_album_metadata(album_id)
+        if self.albums_obj.get_album(album_id).get("updated_time") == album_data.get("updated_time"):
+            return self.albums_obj.get_album(album_id)
+        
+        if album_data["name"] in self.albums_to_ignore:
+            logger.info("Ignoring album '%s'", album_data["name"])
+            return
+
+        del album_data["id"]
+        
+        # Get photo data and urls for album photos
+        photos = self.api.get_object(id=album_id, fields="photos").get("photos")
+        
+        if not photos:
+            return None
+        
+        album_data["images"] = []
+
+        def _add_images(photos):
+            for photo in photos["data"]:
+                photo = self.api.get_object(id=photo["id"], fields="alt_text,alt_text_custom,name,link,images")
+                images = photo.pop("images")
+                photo["image_url"] = images[0]["source"]
+                album_data["images"].append(photo)
+
+        _add_images(photos)
+        while photos["paging"].get("next"):
+            photos =requests.get(photos["paging"]["next"]).json()
+            _add_images(photos)
+        
+        return album_data
+
+    def fetch_all(self):
+        """Retrieve and all album data from facebook"""
+        # get all albums for page
+        albums = self.api.get_connections(
+            id=settings.FB_PAGE_ID, connection_name="albums", 
+            fields="name,link,description,updated_time,count"
+        )["data"]
+        
+        total = len(albums)
+        albums_data = {}
+        for i, album_metadata in enumerate(albums, start=1):
+            album_id = album_metadata["id"]
+            logger.info("Fetching album %d of %d", i, total)
+            album_data = self.get_album_data(album_metadata["id"], album_metadata)
+            if album_data is not None:      
+                albums_data[album_id] = album_data
+        return albums_data
+
+    def update_all(self, new_data=None):
+        new_data = new_data or self.fetch_all()
+        self.report_changes(new_data)
+        self.albums_obj.update_all(new_data)
+        logger.info("All album data updated")
+
+    def report_changes(self, new_data):
+        saved_data = self.albums_obj.albums
+        changes = {"added": {}, "removed": {}, "changed": {}}
+        if new_data != saved_data:
+            # new items
+            new_albums = set(new_data) - set(saved_data)
+            removed_albums = set(saved_data) - set(new_data)
+
+            changes["added"] = {
+                album_id: new_data[album_id]["name"] for album_id in new_albums
+            }
+            changes["removed"] = {
+                album_id: saved_data[album_id]["name"] for album_id in removed_albums
+            }
+            
+            same_albums = set(new_data) & set(saved_data) 
+            changes["changed"] = {
+                album_id: new_data[album_id]["name"] for album_id in same_albums
+                if new_data[album_id]["updated_time"] != saved_data[album_id]["updated_time"]
+            }
+
+        return changes
 

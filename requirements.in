@@ -9,3 +9,4 @@ django_ses[events]
 htmx
 pymemcache
 whitenoise
+facebook-sdk

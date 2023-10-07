@@ -18,7 +18,7 @@ class DogPageViewSet(SnippetViewSet):
     list_display = ("title", "page_status", "category")
     menu_order = 150
     help_text = "Help"
-    
+
 
 class FooterTextViewSet(SnippetViewSet):
     model = FooterText
