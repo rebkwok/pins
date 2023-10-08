@@ -297,6 +297,16 @@ class FormPage(AbstractEmailForm):
 
     subpage_types = []
 
+    def serve(self, request, *args, **kwargs):
+        self.ref = request.GET.get("ref")
+        return super().serve(request, *args, **kwargs)
+
+    def get_form(self, *args, **kwargs):
+        form = super().get_form(*args, **kwargs)
+        if self.ref and "subject" in form.fields:
+            form.fields["subject"].initial = f"Enquiry about {self.ref}"
+        return form
+
     def save(self, *args, **kwargs):
         self.from_address = settings.DEFAULT_FROM_EMAIL
         super().save(*args, **kwargs)
