@@ -335,6 +335,8 @@ class FormPage(AbstractEmailForm):
 
             if field.name == "message":
                 content.append(f"{field.label}:\n{value}")
+            elif field.name == "email_address":
+                content.append(f"From: {value}")
             else:
                 content.append(f"{field.label}: {value}")
 
