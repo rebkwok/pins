@@ -29,13 +29,18 @@
                             </p>
                         </div>
                     </div>
-
-                <div class="container gallery__container">
-                    <div class="gallery__grid">
-                        {% gallery page.images %}
-                    </div>
-                </div>
                 
+                <div class=" row image-gallery-container">
+                    <ul class="image-gallery">
+                        {% for image in page.images %}
+                            <li>
+                                <a href="{{ image.image_url }}">
+                                    <img src="{{ image.image_url }}" alt="" />
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
