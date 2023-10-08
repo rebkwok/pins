@@ -148,27 +148,21 @@ class DogStatusPage(Page):
         context["dogs"] = dogs
 
         return context
-    
-
-class DogPageGalleryImage(Orderable):
-    """
-    Example related image
-    """
-    page = ParentalKey("DogPage", on_delete=models.CASCADE, related_name='gallery_images')
-    image = models.ForeignKey(
-        'wagtailimages.Image', on_delete=models.CASCADE, related_name='+'
-    )
-    caption = models.CharField(blank=True, max_length=250)
-
-    panels = [
-        FieldPanel('image'),
-        FieldPanel('caption'),
-    ]
 
 
-class FBDescriptionPanel(Panel):
+class FBPanel(Panel):
 
     class BoundPanel(Panel.BoundPanel):
+
+        def __init__(self, field_name, *args, **kwargs):
+            self.field_name = field_name
+            super().__init__(*args, **kwargs)
+
+        def clone(self):
+            return self.__class__(
+                field_name =self.field_name,
+            )
+
         def render_html(self, parent_context):
             return mark_safe(
                 f'''
@@ -182,7 +176,7 @@ class FBDescriptionPanel(Panel):
                     <div id="panel-child-content-location-content" class="w-panel__content">
 
                     <div class="w-field__wrapper " data-field-wrapper="">
-                        <p>{self.instance.fb_description}</p>
+                        <p>{self.instance.getattr(self.field_name)}</p>
                     </div>
                     </section>
                 '''
@@ -199,6 +193,13 @@ class DogPage(Page):
             "descripton from album page."
         )
     )
+    caption = models.CharField(
+        null=True, blank=True, max_length=255,
+        help_text=(
+            "Short caption to be used on status page. Defaults to first sentence of "
+            "facebook album description."
+        )
+    )
     facebook_album_id = models.CharField(null=True, blank=True)
     cover_image_index = models.PositiveIntegerField(default=0)
 
@@ -206,7 +207,9 @@ class DogPage(Page):
         FieldPanel('date_posted'),
         FieldPanel('location'),
         FieldPanel('description'),
-        FBDescriptionPanel(),
+        FBPanel("fb_description"),
+        FieldPanel('caption'),
+        FBPanel("fb_caption"),
         FieldPanel('facebook_album_id'),
         FieldPanel('cover_image_index'),
     ]
@@ -254,6 +257,10 @@ class DogPage(Page):
     @property
     def fb_description(self):
         return self.album_info.get("description", "")
+    
+    @property
+    def fb_caption(self):
+        return self.album_info.get("description", "").split(".")[0]
 
     @property
     def facebook_url(self):

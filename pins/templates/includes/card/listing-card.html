@@ -8,12 +8,12 @@
             </figure>
         {% elif page.cover_image %}
             <figure class="listing-card__image">
-                <img src="{{ page.cover_image.image_url }}" height=180 width=180 loading="lazy" />
+                <img src="{{ page.cover_image.image_url }}" height="180" width="180" loading="lazy" />
             </figure>
         {% endif %}
         <div class="listing-card__contents">
             <h3 class="listing-card__title">{{ page.title }}</h3>
-            {% if page.location or page.description %}
+            {% if page.location or page.description or page.caption%}
                 <table class="listing-card__meta">
                     {% if page.location %}
                         <tr>
@@ -21,7 +21,14 @@
                             <td class="listing-card__meta-content">{{ page.location }}</td>
                         </tr>
                     {% endif %}
-                </table>
+                        <tr>
+                            {% if page.caption %}
+                                <td class="listing-card__meta-content" colspan=2>{{ page.caption }}</td>
+                            {% else %}
+                                <td class="listing-card__meta-content" colspan=2>{{ page.fb_caption }}</td>
+                            {% endif %}
+                        </tr>
+               </table>
             {% endif %}
         </div>
     </a>
