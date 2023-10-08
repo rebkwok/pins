@@ -50,6 +50,10 @@ click==8.1.6
     # via
     #   pip-tools
     #   uvicorn
+coverage[toml]==7.3.2
+    # via
+    #   -r requirements.in
+    #   pytest-cov
 cryptography==41.0.2
     # via django-ses
 defusedxml==0.7.1
@@ -89,9 +93,17 @@ draftjs-exporter==2.1.7
 et-xmlfile==1.1.0
     # via openpyxl
 exceptiongroup==1.1.3
-    # via anyio
+    # via
+    #   anyio
+    #   pytest
+execnet==2.0.2
+    # via pytest-xdist
 facebook-sdk==3.1.0
     # via -r requirements.in
+factory-boy==3.3.0
+    # via wagtail-factories
+faker==19.6.2
+    # via factory-boy
 fastapi==0.103.0
     # via
     #   fastapi-socketio
@@ -100,6 +112,8 @@ fastapi-socketio==0.0.10
     # via nicegui
 filetype==1.2.0
     # via willow
+freezegun==1.2.2
+    # via pytest-freezegun
 frozenlist==1.4.0
     # via
     #   aiohttp
@@ -126,6 +140,8 @@ idna==3.4
     #   httpx
     #   requests
     #   yarl
+iniconfig==2.0.0
+    # via pytest
 itsdangerous==2.1.2
     # via nicegui
 jinja2==3.1.2
@@ -154,10 +170,13 @@ packaging==23.1
     # via
     #   build
     #   gunicorn
+    #   pytest
 pillow==9.5.0
     # via wagtail
 pip-tools==7.1.0
     # via -r requirements.in
+pluggy==1.3.0
+    # via pytest
 pscript==0.7.7
     # via vbuild
 psycopg2==2.9.6
@@ -174,8 +193,29 @@ pymemcache==4.0.0
     # via -r requirements.in
 pyproject-hooks==1.0.0
     # via build
+pytest==7.4.2
+    # via
+    #   -r requirements.in
+    #   pytest-cov
+    #   pytest-django
+    #   pytest-env
+    #   pytest-freezegun
+    #   pytest-xdist
+pytest-cov==4.1.0
+    # via -r requirements.in
+pytest-django==4.5.2
+    # via -r requirements.in
+pytest-env==1.0.1
+    # via -r requirements.in
+pytest-freezegun==0.4.2
+    # via -r requirements.in
+pytest-xdist==3.3.1
+    # via -r requirements.in
 python-dateutil==2.8.2
-    # via botocore
+    # via
+    #   botocore
+    #   faker
+    #   freezegun
 python-dotenv==1.0.0
     # via uvicorn
 python-engineio==4.6.1
@@ -220,8 +260,10 @@ telepath==0.3.1
 tomli==2.0.1
     # via
     #   build
+    #   coverage
     #   pip-tools
     #   pyproject-hooks
+    #   pytest
 typing-extensions==4.7.1
     # via
     #   asgiref
@@ -240,6 +282,10 @@ uvloop==0.17.0
 vbuild==0.8.2
     # via nicegui
 wagtail==5.0.2
+    # via
+    #   -r requirements.in
+    #   wagtail-factories
+wagtail-factories==4.1.0
     # via -r requirements.in
 watchfiles==0.20.0
     # via

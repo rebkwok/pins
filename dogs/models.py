@@ -182,6 +182,7 @@ class FBPanel(Panel):
                 '''
             )
 
+
 class DogPage(Page):
 
     date_posted = models.DateField(default=timezone.now)
@@ -295,6 +296,8 @@ class FacebookAlbums(models.Model):
         return self.albums.get(album_id, {})
 
     def update_album(self, album_id, album_data):
+        if self.albums is None:
+            self.albums = {}
         self.albums[album_id] = album_data
         self.save()
 

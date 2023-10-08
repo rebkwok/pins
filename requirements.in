@@ -10,3 +10,12 @@ htmx
 pymemcache
 whitenoise
 facebook-sdk
+
+pytest
+coverage
+pytest-django
+pytest-cov
+pytest-env
+pytest-freezegun
+pytest-xdist
+wagtail-factories
