@@ -1,9 +1,13 @@
+import datetime
+
 from django.conf import settings
 from django.db import models
 from django.template.response import TemplateResponse
+from django.utils.formats import date_format
 
 from modelcluster.fields import ParentalKey
 
+from wagtail.admin.mail import send_mail
 from wagtail.admin.panels import (
     FieldPanel,
     FieldRowPanel,
@@ -296,6 +300,45 @@ class FormPage(AbstractEmailForm):
     def save(self, *args, **kwargs):
         self.from_address = settings.DEFAULT_FROM_EMAIL
         super().save(*args, **kwargs)
+
+    def send_mail(self, form):
+        addresses = [x.strip() for x in self.to_address.split(",")]
+        reply_to = form.data.get("email_address")
+        subject = form.data.get("subject", self.subject)
+        send_mail(
+            subject,
+            self.render_email(form),
+            addresses,
+            self.from_address,
+            reply_to=[reply_to]
+        )
+
+    def render_email(self, form):
+        skip_fields = ["subject"]
+        content = []
+
+        cleaned_data = form.cleaned_data
+        for field in form:
+            if field.name not in cleaned_data or field.name in skip_fields:
+                continue
+
+            value = cleaned_data.get(field.name)
+
+            if isinstance(value, list):
+                value = ", ".join(value)
+
+            # Format dates and datetime(s) with SHORT_DATE(TIME)_FORMAT
+            if isinstance(value, datetime.datetime):
+                value = date_format(value, settings.SHORT_DATETIME_FORMAT)
+            elif isinstance(value, datetime.date):
+                value = date_format(value, settings.SHORT_DATE_FORMAT)
+
+            if field.name == "message":
+                content.append(f"{field.label}:\n{value}")
+            else:
+                content.append(f"{field.label}: {value}")
+
+        return "\n\n".join(content)
 
 
 class OrderFormField(AbstractFormField):
