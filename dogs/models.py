@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 
-from facebook import GraphAPI
+from facebook import GraphAPI, GraphAPIError
 
 from modelcluster.fields import ParentalKey
 from wagtail.models import Orderable, Page
@@ -150,18 +150,9 @@ class DogStatusPage(Page):
         return context
 
 
-class FBPanel(Panel):
+class FBDescPanel(Panel):
 
     class BoundPanel(Panel.BoundPanel):
-
-        def __init__(self, field_name, *args, **kwargs):
-            self.field_name = field_name
-            super().__init__(*args, **kwargs)
-
-        def clone(self):
-            return self.__class__(
-                field_name =self.field_name,
-            )
 
         def render_html(self, parent_context):
             return mark_safe(
@@ -176,12 +167,36 @@ class FBPanel(Panel):
                     <div id="panel-child-content-location-content" class="w-panel__content">
 
                     <div class="w-field__wrapper " data-field-wrapper="">
-                        <p>{self.instance.getattr(self.field_name)}</p>
+                        <p>{self.instance.fb_description}</p>
                     </div>
                     </section>
                 '''
             )
 
+
+class FBCaptionPanel(Panel):
+
+    class BoundPanel(Panel.BoundPanel):
+
+        def render_html(self, parent_context):
+            return mark_safe(
+                f'''
+                    <section class="w-panel">
+                    <div class="w-panel__header">
+                            <h2 class="w-panel__heading w-panel__heading--label" id="panel-child-content-fbdescription-heading" data-panel-heading="">
+                                Facebook Album Description
+                            </h2>
+                        <div class="w-panel__divider"></div>
+                    </div>
+                    <div id="panel-child-content-location-content" class="w-panel__content">
+
+                    <div class="w-field__wrapper " data-field-wrapper="">
+                        <p>{self.instance.fb_caption}</p>
+                    </div>
+                    </section>
+                '''
+            )
+        
 
 class DogPage(Page):
 
@@ -208,9 +223,9 @@ class DogPage(Page):
         FieldPanel('date_posted'),
         FieldPanel('location'),
         FieldPanel('description'),
-        FBPanel("fb_description"),
+        FBDescPanel(),
         FieldPanel('caption'),
-        FBPanel("fb_caption"),
+        FBCaptionPanel(),
         FieldPanel('facebook_album_id'),
         FieldPanel('cover_image_index'),
     ]
@@ -249,11 +264,12 @@ class DogPage(Page):
         return self._album_info
 
     def images(self):
-        return self.album_info["images"]
+        return self.album_info.get("images")
 
     def cover_image(self):
-        index = self.cover_image_index if len(self.images()) >= self.cover_image_index + 1 else 0
-        return self.album_info["images"][index]
+        if self.images():
+            index = self.cover_image_index if len(self.images()) >= self.cover_image_index + 1 else 0
+            return self.album_info["images"][index]
 
     @property
     def fb_description(self):
@@ -313,6 +329,7 @@ class FacebookAlbumTracker:
         "Cover photos", "Profile pictures", "Timeline photos", "Mobile uploads"
     ]
 
+
     def __init__(self):
         self._api = None
         self.app_id = settings.FB_APP_ID # Obtained from https://developers.facebook.com/
@@ -334,6 +351,22 @@ class FacebookAlbumTracker:
                 # setup api with new token
                 self._api = GraphAPI(access_token=token)
         return self._api
+
+    def get_all_albums(self):
+        """
+        Get all albums for existing DogPages
+        """
+        album_ids = DogPage.objects.values_list("facebook_album_id", flat=True)
+        try:
+            return self.api.get_objects(album_ids, fields="name,link,description,updated_time,count")
+        except GraphAPIError:
+            results = {}
+            for album_id in album_ids:
+                try:
+                    results[album_id] = self.api.get_object(album_id, fields="name,link,description,updated_time,count")
+                except GraphAPIError:
+                    logger.error("Album id %s not found", album_id)
+            return results
 
     def get_current_access_token(self):
         token_path = settings.FB_ACCESS_TOKEN_PATH
@@ -415,11 +448,13 @@ class FacebookAlbumTracker:
     def fetch_all(self):
         """Retrieve and all album data from facebook"""
         # get all albums for page
-        albums = self.api.get_connections(
-            id=settings.FB_PAGE_ID, connection_name="albums", 
-            fields="name,link,description,updated_time,count"
-        )["data"]
-        
+        # albums = self.api.get_connections(
+        #     id=settings.FB_PAGE_ID, connection_name="albums", 
+        #     fields="name,link,description,updated_time,count"
+        # )["data"]
+
+        # get all albums for current dogs
+        albums = self.get_all_albums().values()
         total = len(albums)
         albums_data = {}
         for i, album_metadata in enumerate(albums, start=1):
