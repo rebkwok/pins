@@ -10,6 +10,7 @@ htmx
 pymemcache
 whitenoise
 facebook-sdk
+wagtail-json-widget
 
 pytest
 coverage

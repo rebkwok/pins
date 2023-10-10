@@ -285,7 +285,10 @@ wagtail==5.0.2
     # via
     #   -r requirements.in
     #   wagtail-factories
+    #   wagtail-json-widget
 wagtail-factories==4.1.0
+    # via -r requirements.in
+wagtail-json-widget==0.0.7
     # via -r requirements.in
 watchfiles==0.20.0
     # via

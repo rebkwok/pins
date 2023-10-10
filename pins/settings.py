@@ -116,6 +116,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "wagtail_json_widget",
     "dogs",
 ]
 

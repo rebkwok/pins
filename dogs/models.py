@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 import logging
 import requests
 
+from django import forms
 from django.conf import settings
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import models
@@ -14,8 +15,11 @@ from facebook import GraphAPI, GraphAPIError
 from modelcluster.fields import ParentalKey
 from wagtail.models import Orderable, Page
 from wagtail.fields import RichTextField
+from wagtail.admin.forms import WagtailAdminPageForm
 from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, Panel
 from wagtail.snippets.models import register_snippet
+
+from wagtail_json_widget.widgets import JSONEditorWidget
 
 
 logger = logging.getLogger(__name__)
@@ -184,7 +188,7 @@ class FBCaptionPanel(Panel):
                     <section class="w-panel">
                     <div class="w-panel__header">
                             <h2 class="w-panel__heading w-panel__heading--label" id="panel-child-content-fbdescription-heading" data-panel-heading="">
-                                Facebook Album Description
+                                Facebook Album Caption
                             </h2>
                         <div class="w-panel__divider"></div>
                     </div>
@@ -197,99 +201,6 @@ class FBCaptionPanel(Panel):
                 '''
             )
         
-
-class DogPage(Page):
-
-    date_posted = models.DateField(default=timezone.now)
-    location = models.CharField(null=True, blank=True, max_length=255)
-    description = RichTextField(
-        blank=True, 
-        help_text=(
-            "Description to use instead of Facebook album description. Leave blank to use "
-            "descripton from album page."
-        )
-    )
-    caption = models.CharField(
-        null=True, blank=True, max_length=255,
-        help_text=(
-            "Short caption to be used on status page. Defaults to first sentence of "
-            "facebook album description."
-        )
-    )
-    facebook_album_id = models.CharField(null=True, blank=True)
-    cover_image_index = models.PositiveIntegerField(default=0)
-
-    content_panels = Page.content_panels + [
-        FieldPanel('date_posted'),
-        FieldPanel('location'),
-        FieldPanel('description'),
-        FBDescPanel(),
-        FieldPanel('caption'),
-        FBCaptionPanel(),
-        FieldPanel('facebook_album_id'),
-        FieldPanel('cover_image_index'),
-    ]
-
-    subpage_types = []
-    parent_page_types = ["DogStatusPage"]
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._album_info = None
-
-    def category(self):
-       move_url = reverse(
-            f"wagtailadmin_pages:move",
-            args=[self.id],
-        )
-       return mark_safe(
-          f"{self.get_parent().specific.title} <a class='button button-secondary button-small' href='{move_url}'>Change</a>"
-        )
-    category.short_description = "Dog Status/Category"
-
-    def page_status(self):
-        return mark_safe(f"<span class='w-status w-status--primary'>{self.status_string.title()}</span>")
-
-    def update_facebook_info(self):
-        tracker = FacebookAlbumTracker()
-        tracker.create_or_update_album(self.facebook_album_id)
-
-    @property
-    def album_info(self):
-        if not self.id:
-            return {}
-        if self._album_info is None:
-            tracker = FacebookAlbumTracker()
-            self._album_info = tracker.albums_obj.get_album(self.facebook_album_id)
-        return self._album_info
-
-    def images(self):
-        return self.album_info.get("images")
-
-    def cover_image(self):
-        if self.images():
-            index = self.cover_image_index if len(self.images()) >= self.cover_image_index + 1 else 0
-            return self.album_info["images"][index]
-
-    @property
-    def fb_description(self):
-        return self.album_info.get("description", "")
-    
-    @property
-    def fb_caption(self):
-        return self.album_info.get("description", "").split(".")[0]
-
-    @property
-    def facebook_url(self):
-        return self.album_info.get("link")
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        if self.facebook_album_id:
-            logger.info("Checking fb info for album id %s, dog %s", self.facebook_album_id, self.title)
-            self.update_facebook_info()
-
-
 
 class FacebookAlbums(models.Model):
 
@@ -307,6 +218,33 @@ class FacebookAlbums(models.Model):
     # }
     albums = models.JSONField()
     date_updated = models.DateTimeField(default=timezone.now)
+    rate_limited_at = models.DateTimeField(null=True)
+
+    @classmethod
+    def instance(cls):
+        if cls.objects.exists():
+            return cls.objects.last()
+        return cls.objects.create(albums={})
+
+    @property
+    def is_rate_limited(self):
+        is_limited = self.rate_limited_at is not None
+        if not is_limited:
+            return False
+        
+        is_limited = timezone.now() <= self.rate_limited_at + timedelta(minutes=60)
+        if not is_limited:
+            self.clear_rate_limit()
+
+        return is_limited 
+
+    def set_rate_limit(self):
+        self.rate_limited_at = timezone.now()
+        self.save()
+    
+    def clear_rate_limit(self):
+        self.rate_limited_at = None
+        self.save()
 
     def get_album(self, album_id):
         return self.albums.get(album_id, {})
@@ -334,7 +272,7 @@ class FacebookAlbumTracker:
         self._api = None
         self.app_id = settings.FB_APP_ID # Obtained from https://developers.facebook.com/
         self.app_secret = settings.FB_APP_SECRET # Obtained from https://developers.facebook.com/
-        self.albums_obj = self.get_albums_obj()
+        self.albums_obj = FacebookAlbums.instance()
     
     @property
     def api(self):
@@ -359,7 +297,10 @@ class FacebookAlbumTracker:
         album_ids = DogPage.objects.values_list("facebook_album_id", flat=True)
         try:
             return self.api.get_objects(album_ids, fields="name,link,description,updated_time,count")
-        except GraphAPIError:
+        except GraphAPIError as e:
+            if "limit" in str(e):
+                self.albums_obj.set_rate_limit()
+                logger.error(e)
             results = {}
             for album_id in album_ids:
                 try:
@@ -387,17 +328,16 @@ class FacebookAlbumTracker:
             f"&access_token={token}"
         )
         token_resp = requests.get(url).json()
+        # error if rate limited
+        if token_resp.get("error"):
+            self.albums_obj.set_rate_limit()
+            return False
         expiry = datetime.fromtimestamp(token_resp["data"]["expires_at"])
         return expiry < datetime.now() + timedelta(days=1)
             
     def generate_new_token(self):
         # Extend the expiration time of a valid OAuth access token.
         return self.api.extend_access_token(self.app_id, self.app_secret)["access_token"]
-
-    def get_albums_obj(self):
-        if FacebookAlbums.objects.exists():
-            return FacebookAlbums.objects.last()
-        return FacebookAlbums.objects.create(albums={})
 
     def create_or_update_album(self, album_id):
         metadata = self.get_album_metadata(album_id)
@@ -494,3 +434,136 @@ class FacebookAlbumTracker:
 
         return changes
 
+
+class DogPageForm(WagtailAdminPageForm):
+    custom_album_data = forms.JSONField(
+        widget=JSONEditorWidget, required=False,
+        help_text=(
+            "Custom album data to use if FB album can't be retrieved."
+            "Format: {'link': '<link to fb album>', 'images': [{'image_url': <url>}]}"
+        )
+    )
+
+
+class DogPage(Page):
+
+    date_posted = models.DateField(default=timezone.now)
+    location = models.CharField(null=True, blank=True, max_length=255)
+    description = RichTextField(
+        blank=True, 
+        help_text=(
+            "Description to use instead of Facebook album description. Leave blank to use "
+            "descripton from album page."
+        )
+    )
+    caption = models.CharField(
+        null=True, blank=True, max_length=255,
+        help_text=(
+            "Short caption to be used on status page. Defaults to first sentence of "
+            "facebook album description."
+        )
+    )
+    facebook_album_id = models.CharField(null=True, blank=True)
+
+    custom_album_data = models.JSONField(
+        null=True, blank=True,
+        help_text=(
+            "Custom album data to use if FB album can't be retrieved."
+            "Format: {'link': '<link to fb album>', 'images': [{'image_url': <url>}]}"
+        )
+    )
+    cover_image_index = models.PositiveIntegerField(default=0)
+
+    base_form_class = DogPageForm
+
+    if FacebookAlbums.instance().is_rate_limited:
+        ratelimited_panel = [
+            HelpPanel("Facebook API is currently rate limited, try updating later")
+        ]
+    else:
+        ratelimited_panel = []
+    content_panels = Page.content_panels + ratelimited_panel + [
+        FieldPanel('date_posted'),
+        FieldPanel('location'),
+        FieldPanel('description'),
+        FBDescPanel(),
+        FieldPanel('caption'),
+        FBCaptionPanel(),
+        FieldPanel('facebook_album_id'),
+        FieldPanel('custom_album_data'),
+        FieldPanel('cover_image_index'),
+    ]
+
+    subpage_types = []
+    parent_page_types = ["DogStatusPage"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._album_info = None
+
+    def category(self):
+       move_url = reverse(
+            f"wagtailadmin_pages:move",
+            args=[self.id],
+        )
+       return mark_safe(
+          f"{self.get_parent().specific.title} <a class='button button-secondary button-small' href='{move_url}'>Change</a>"
+        )
+    category.short_description = "Dog Status/Category"
+
+    def page_status(self):
+        return mark_safe(f"<span class='w-status w-status--primary'>{self.status_string.title()}</span>")
+
+    def update_facebook_info(self):
+        if self.custom_album_data:
+            logger.info("Custom album data provided, nothing to update")
+            return
+        tracker = FacebookAlbumTracker()
+        tracker.create_or_update_album(self.facebook_album_id)
+
+    @property
+    def album_info(self):
+        if not self.id:
+            return {}
+        if self._album_info is None:
+            if self.custom_album_data:
+                return self.custom_album_data
+            albums_obj = FacebookAlbums.instance()
+            self._album_info = albums_obj.get_album(self.facebook_album_id)
+        return self._album_info
+
+    def images(self):
+        return self.album_info.get("images")
+
+    def cover_image(self):
+        if self.images():
+            index = self.cover_image_index if len(self.images()) >= self.cover_image_index + 1 else 0
+            return self.album_info["images"][index]
+
+    @property
+    def fb_description(self):
+        return self.album_info.get("description", "")
+    
+    @property
+    def fb_caption(self):
+        return self.album_info.get("description", "").split(".")[0]
+
+    @property
+    def facebook_url(self):
+        return self.album_info.get("link")
+
+    @property
+    def is_rate_limited(self):
+        return FacebookAlbums.instance().is_rate_limited
+
+    def save(self, *args, **kwargs):
+        albums_obj = FacebookAlbums.instance()
+        if self.facebook_album_id and not albums_obj.is_rate_limited:
+            try:
+                logger.info("Checking fb info for album id %s, dog %s", self.facebook_album_id, self.title)
+                self.update_facebook_info()
+            except GraphAPIError as e:
+                logger.error(e)
+                albums_obj = FacebookAlbums.instance()
+                albums_obj.set_rate_limit()
+        super().save(*args, **kwargs)
