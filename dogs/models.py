@@ -311,9 +311,13 @@ class FacebookAlbumTracker:
 
     def get_all_albums(self):
         """
-        Get all albums for existing DogPages
+        Get all albums for existing DogPages except those with custom album data
         """
-        album_ids = DogPage.objects.values_list("facebook_album_id", flat=True)
+        album_ids = DogPage.objects.filter(
+            custom_album_data__isnull=True
+        ).values_list("facebook_album_id", flat=True)
+        # filter None and empty strings
+        album_ids = [albid for albid in album_ids if albid]
         try:
             return self.api.get_objects(album_ids, fields="name,link,description,updated_time,count")
         except GraphAPIError as e:
@@ -450,6 +454,11 @@ class FacebookAlbumTracker:
                 album_id: new_data[album_id]["name"] for album_id in same_albums
                 if new_data[album_id]["updated_time"] != saved_data[album_id]["updated_time"]
             }
+        
+        changes["custom_albums"] = {
+            f"{page.title} ({page.get_parent().title})": page.custom_album_data
+            for page in DogPage.objects.filter(custom_album_data__isnull=False)
+        }
 
         return changes
 
