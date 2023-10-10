@@ -8,6 +8,10 @@
     {% include "dogs/includes/header-hero.html" %}
 
     <div class="container">
+        {% if page.intro %}
+        {{ page.intro|richtext }}
+        {% endif %}
+
         {% if dogs %}
             <ul class="dog-list">
                 {% for dog in dogs %}
@@ -23,7 +27,7 @@
         {% endif %}
     </div>
 
-    {% if dogs.paginator.count > 12 %}
+    {% if dogs.paginator.count > 20 %}
         <div class="container">
             <div class="row">
                 <div class="col-sm-12">
