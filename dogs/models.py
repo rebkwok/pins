@@ -200,6 +200,25 @@ class FBCaptionPanel(Panel):
                     </section>
                 '''
             )
+
+
+class RateLimitedPanel(Panel):
+
+    class BoundPanel(Panel.BoundPanel):
+
+        def render_html(self, parent_context):
+            if FacebookAlbums.instance().is_rate_limited:
+                return mark_safe(f'''
+                    <section class="w-panel">
+                    <div class="w-panel__header">
+                            <p class="w-panel__heading w-panel__heading--label" id="panel-child-content-fbdescription-heading" data-panel-heading="">
+                                "Facebook API is currently rate limited, try updating later"
+                            </p>
+                        <div class="w-panel__divider"></div>
+                    </div>
+                    </section>
+                ''')
+            return ""
         
 
 class FacebookAlbums(models.Model):
@@ -476,13 +495,9 @@ class DogPage(Page):
 
     base_form_class = DogPageForm
 
-    if FacebookAlbums.instance().is_rate_limited:
-        ratelimited_panel = [
-            HelpPanel("Facebook API is currently rate limited, try updating later")
-        ]
-    else:
-        ratelimited_panel = []
-    content_panels = Page.content_panels + ratelimited_panel + [
+    
+    content_panels = Page.content_panels + [
+        RateLimitedPanel(),
         FieldPanel('date_posted'),
         FieldPanel('location'),
         FieldPanel('description'),
