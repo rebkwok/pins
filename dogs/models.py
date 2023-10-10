@@ -132,7 +132,7 @@ class DogStatusPage(Page):
     # method on the model rather than within a view function
     def paginate(self, request, *args):
         page = request.GET.get("page")
-        paginator = Paginator(self.get_dogs(), 12)
+        paginator = Paginator(self.get_dogs(), 20)
         try:
             pages = paginator.page(page)
         except PageNotAnInteger:
