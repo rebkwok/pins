@@ -10,9 +10,8 @@ media/
 
 .env
 
-pins.log
-*/pins.log
+*.log
 
-pins/.fb_access_token
-
+pins/.fb_*
+pins/.scraped_album_data*
 .coverage

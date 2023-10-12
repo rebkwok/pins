@@ -20,3 +20,7 @@ pytest-env
 pytest-freezegun
 pytest-xdist
 wagtail-factories
+ipython
+
+playwright
+tqdm
