@@ -14,7 +14,6 @@ class Command(BaseCommand):
             "--email",
             action="store_true",
             help="Send to support email",
-            default=False,
         )
         return super().add_arguments(parser)
 
