@@ -21,6 +21,9 @@ pytest-freezegun
 pytest-xdist
 wagtail-factories
 ipython
+ruff
+black
+model_bakery
 
 playwright
 tqdm
