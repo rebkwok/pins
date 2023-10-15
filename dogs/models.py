@@ -375,9 +375,12 @@ class FacebookAlbumTracker:
     def get_album_metadata(self, album_id):
         return self.api.get_object(album_id, fields="name,link,description,updated_time,count")
 
-    def get_album_data(self, album_id, album_metadata=None):
+    def get_album_data(self, album_id, album_metadata=None, force_update=False):
         album_data = album_metadata or self.get_album_metadata(album_id)
-        if self.albums_obj.get_album(album_id).get("updated_time") == album_data.get("updated_time"):
+        if (
+            not force_update 
+            and self.albums_obj.get_album(album_id).get("updated_time") == album_data.get("updated_time")
+        ):
             return self.albums_obj.get_album(album_id)
         
         if album_data["name"] in self.albums_to_ignore:
@@ -408,7 +411,7 @@ class FacebookAlbumTracker:
         
         return album_data
 
-    def fetch_all(self):
+    def fetch_all(self, force_update=False):
         """Retrieve and all album data from facebook"""
         # get all albums for page
         # albums = self.api.get_connections(
@@ -423,13 +426,13 @@ class FacebookAlbumTracker:
         for i, album_metadata in enumerate(albums, start=1):
             album_id = album_metadata["id"]
             logger.info("Fetching album %d of %d", i, total)
-            album_data = self.get_album_data(album_metadata["id"], album_metadata)
+            album_data = self.get_album_data(album_metadata["id"], album_metadata, force_update)
             if album_data is not None:      
                 albums_data[album_id] = album_data
         return albums_data
 
-    def update_all(self, new_data=None):
-        new_data = new_data or self.fetch_all()
+    def update_all(self, new_data=None, force_update=False):
+        new_data = new_data or self.fetch_all(force_update)
         self.report_changes(new_data)
         self.albums_obj.update_all(new_data)
         logger.info("All album data updated")
