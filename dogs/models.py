@@ -362,11 +362,13 @@ class FacebookAlbumTracker:
         # Extend the expiration time of a valid OAuth access token.
         return self.api.extend_access_token(self.app_id, self.app_secret)["access_token"]
 
-    def create_or_update_album(self, album_id):
+    def create_or_update_album(self, album_id, force_update=False):
         metadata = self.get_album_metadata(album_id)
-        if self.albums_obj.get_album(album_id).get("updated_time") != metadata.get("updated_time"):
+        if force_update or (
+            self.albums_obj.get_album(album_id).get("updated_time") != metadata.get("updated_time")
+        ):
             logger.info("Updating album %s", album_id)
-            album_data = self.get_album_data(album_id, metadata)
+            album_data = self.get_album_data(album_id, metadata, force_update=force_update)
             if album_data:
                 self.albums_obj.update_album(album_id, album_data)
         else:
@@ -431,11 +433,16 @@ class FacebookAlbumTracker:
                 albums_data[album_id] = album_data
         return albums_data
 
-    def update_all(self, new_data=None, force_update=False):
+    def update_all(self, new_data=None, force_update=False):        
         new_data = new_data or self.fetch_all(force_update)
         self.report_changes(new_data)
         self.albums_obj.update_all(new_data)
         logger.info("All album data updated")
+
+    def update_albums(self, album_ids, force_update=False):
+        for i, album_id in enumerate(album_ids):
+            logger.info("Updating album %d of %d", i, len(album_ids))
+            self.create_or_update_album(album_id, force_update=force_update)
 
     def report_changes(self, new_data):
         saved_data = self.albums_obj.albums
