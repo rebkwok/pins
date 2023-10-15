@@ -335,6 +335,11 @@ if not TESTING:  # pragma: no cover
                 'level': 'INFO',
                 'propagate': False,
             },
+            "shop": {
+                "handlers": ["console", "file_app", "mail_admins"],
+                "level": "INFO",
+                "propagate": False,
+            },
         },
     }
 else:
@@ -422,4 +427,3 @@ FB_APP_ID = env.str("FB_APP_ID")
 FB_APP_SECRET = env.str("FB_APP_SECRET")
 FB_ACCESS_TOKEN = env.str("FB_ACCESS_TOKEN")
 FB_ACCESS_TOKEN_PATH = Path("pins/.fb_access_token")
-FB_PAGE_ID = env.str("FB_PAGE_ID")
