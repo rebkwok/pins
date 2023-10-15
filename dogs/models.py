@@ -371,6 +371,7 @@ class FacebookAlbumTracker:
             album_data = self.get_album_data(album_id, metadata, force_update=force_update)
             if album_data:
                 self.albums_obj.update_album(album_id, album_data)
+            logger.info("Album %s updated", album_id)
         else:
             logger.info("Album %s is up to date", album_id)
     
