@@ -113,7 +113,6 @@ def load_existing_data():
 def fetch_non_api_data(page, new_album_data, existing_album_data=None):
     existing_album_data = existing_album_data or load_existing_data()
     new_albums = new_album_data["albums"]
-    old_albums = existing_album_data.get("non_api_albums", {})
 
     print("Fetching data not available by API")
     full_album_data = {}
@@ -142,33 +141,29 @@ def fetch_non_api_data(page, new_album_data, existing_album_data=None):
     
         this_album_data["description"] = description.strip(" See less")
         
-        if this_album_data["count"] != old_albums.get(album_id, {}).get("count", 0):
-            last_photo = page.get_by_label("Photo album photo").all()[-1]
+        last_photo = page.get_by_label("Photo album photo").all()[-1]
 
-            photos = None
-            while True:
-                print("\tScrolling...")
-                last_photo.hover()
-                photos = page.get_by_label("Photo album photo")
-                # scroll last photo into view if nexessary
-                photos.element_handles()[-1].scroll_into_view_if_needed()
-                # Scroll and wait for items to load
-                page.mouse.wheel(0, 5000)
-                page.wait_for_timeout(1_000)
-                photos = page.get_by_label("Photo album photo")
-                last_photo = photos.element_handles()[-1]
-                items_on_page_after_scroll = len(photos.element_handles())
-                # Stop if we've reached the total items, or the max (~50)
-                if (items_on_page_after_scroll >= this_album_data["count" ])  or items_on_page_after_scroll > 50:
-                    print(f"{items_on_page_after_scroll}/{this_album_data['count']} photos loaded")
-                    break
+        photos = None
+        while True:
+            print("\tScrolling...")
+            last_photo.hover()
+            photos = page.get_by_label("Photo album photo")
+            # scroll last photo into view if nexessary
+            photos.element_handles()[-1].scroll_into_view_if_needed()
+            # Scroll and wait for items to load
+            page.mouse.wheel(0, 5000)
+            page.wait_for_timeout(1_000)
+            photos = page.get_by_label("Photo album photo")
+            last_photo = photos.element_handles()[-1]
+            items_on_page_after_scroll = len(photos.element_handles())
+            # Stop if we've reached the total items, or the max (~50)
+            if (items_on_page_after_scroll >= this_album_data["count" ])  or items_on_page_after_scroll > 50:
+                print(f"{items_on_page_after_scroll}/{this_album_data['count']} photos loaded")
+                break
 
-            for photo in tqdm(photos.all(), "Parsing image links"):
-                link = photo.get_by_role("img").get_attribute("src")
-                this_album_data.setdefault("images", []).append({"image_url": link})
-        else:
-            print("\tNo change to image count")
-            this_album_data["images"] = old_albums.get(album_id, {}).get("images", [])
+        for photo in tqdm(photos.all(), "Parsing image links"):
+            link = photo.get_by_role("img").get_attribute("src")
+            this_album_data.setdefault("images", []).append({"image_url": link})
 
         full_album_data[album_id] = this_album_data
 
@@ -245,7 +240,7 @@ def diff(all_album_data, all_existing_data=None):
 
 def main():
     with sync_playwright() as pw:
-        browser = pw.firefox.launch(headless=False)
+        browser = pw.firefox.launch(headless=True)
         context = browser.new_context()
         page = context.new_page()
         dismiss_login(page)
