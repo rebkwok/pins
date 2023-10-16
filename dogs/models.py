@@ -441,7 +441,7 @@ class FacebookAlbumTracker:
         logger.info("All album data updated")
 
     def update_albums(self, album_ids, force_update=False):
-        for i, album_id in enumerate(album_ids):
+        for i, album_id in enumerate(album_ids, start=1):
             logger.info("Updating album %d of %d", i, len(album_ids))
             self.create_or_update_album(album_id, force_update=force_update)
 
