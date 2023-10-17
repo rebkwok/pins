@@ -1345,11 +1345,12 @@ select {
   color: var(--white);
   background-color: rgba(207,148,131);
   font-weight: 700;
-  padding: 15px 25px;
+  padding: 10px 20px;
   display: inline-block;
   vertical-align: middle;
   transition-duration: 0.1s;
   width: max-content;
+  font-size: var(--font-md);
 }
 
 .form-page input[type='submit'].order-btn-sm {

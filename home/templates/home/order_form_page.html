@@ -40,6 +40,9 @@
     <div class="container">
         <div class="row">
             <div class="col-md-8 form-page">
+            {% if page.sold_out %}
+                <div class="text-danger lead">SOLD OUT</div>
+            {% else %}
                 {% comment %}
         You could render your form using a Django rendering shortcut such as `{{ form.as_p }}` but that will tend towards unsemantic code, and make it difficult to style. You can read more on Django form at:
         https://docs.djangoproject.com/en/3.2/topics/forms/#form-rendering-options
@@ -73,30 +76,34 @@
                         {% if page|is_order_quantity:field.name %}
                             <div class="form-page__field" aria-required={% if field.field.required %}"true"{% else %}"false"{% endif %}>
                                 {% get_product_variant page=page field_name=field.name as variant %}
-                                <strong>{{ variant.name }} (£{{ variant.cost }})</strong><br/>
                                 
-                                {% if variant.description %}
-                                    <p class="help">{{ variant.description }}</p>
-                                {% endif %}
-                                
-                                <label for={{ field.id }}>Quantity</label>
-                                {% if field.field.required %}<span class="required">*</span>{% endif %}
-
-                
-                                <select 
-                                    name="{{ field.name }}" 
-                                    required="" 
-                                    id="id_{{ field.name }}"
-                                    {% if page.id %}
-                                    hx-post="{% url 'orders:calculate_order_total' page.id %}"
-                                    hx-trigger="change"
-                                    hx-target="#order-total"
+                                    <strong>{{ variant.name }} (£{{ variant.cost }})</strong><br/>
+                                    
+                                    {% if variant.description %}
+                                        <p class="help">{{ variant.description }}</p>
                                     {% endif %}
-                                >
-                                    {% for choice, _ in field.field.choices %}
-                                    <option value="{{ choice }}" {% if choice == field.field.initial %}selected{% endif %}>{{ choice }}</option>
-                                    {% endfor %}
-                                </select>
+
+                                    {% if variant in page.disallowed_variants %}
+                                        <span class="text-danger">SOLD OUT</span> 
+                                    {% else %}
+                                        <label for={{ field.id }}>Quantity</label>
+                                        {% if field.field.required %}<span class="required">*</span>{% endif %}
+
+                                        <select 
+                                            name="{{ field.name }}" 
+                                            required="" 
+                                            id="id_{{ field.name }}"
+                                            {% if page.id %}
+                                            hx-post="{% url 'orders:calculate_order_total' page.id %}"
+                                            hx-trigger="change"
+                                            hx-target="#order-total"
+                                            {% endif %}
+                                        >
+                                            {% for choice, _ in field.field.choices %}
+                                            <option value="{{ choice }}" {% if choice == field.field.initial %}selected{% endif %}>{{ choice }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    {% endif %}
                             </div>
                         {% endif %}
                     {% endfor %}
@@ -110,20 +117,17 @@
                                 hx-trigger="click"
                                 hx-target="#order-total"
                             ></span> 
-                            
-                            {% for choice, _ in field.field.choices %}
-                            <option value="{{ choice }}" {% if choice == field.field.initial %}selected{% endif %}>{{ choice }}</option>
-                            {% endfor %}
-                          </select>
                         </strong></p>
 
+                        <div id="not-allowed"></div>
                         <div>
                             {{ page.form_footer_text|richtext }}
                         </div> 
                     </div>
                     
-                    <input type="submit">
+                    <input id="submit-btn" type="submit" class="btn"/>
                 </form>
+            {% endif %}
             </div>
         </div>
     </div>

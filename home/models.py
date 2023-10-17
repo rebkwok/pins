@@ -372,6 +372,11 @@ class ProductVariant(Orderable):
     name = models.CharField(max_length=50)
     description = models.CharField(blank=True, max_length=250)
     cost = models.DecimalField(max_digits=10, decimal_places=2)
+    item_count = models.PositiveIntegerField(
+        default=1, 
+        help_text="The number of individual items represented by this variant, used for "
+                   "stock checking. i.e. A pack of 5 = 5 items"
+    )
     quantity_choices = models.CharField(
         max_length=255, 
         default="0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20",
@@ -439,7 +444,9 @@ class OrderFormPage(AbstractEmailForm):
     product_name = models.CharField(blank=True, max_length=250)
     product_description = models.CharField(blank=True, max_length=250)
     shipping_cost = models.DecimalField(max_digits=10, decimal_places=2)
-
+    total_available = models.PositiveIntegerField(
+        null=True, blank=True, help_text="Max total number available (optional)"
+    )
     form_footer_text = RichTextField(blank=True)
     thank_you_text = RichTextField(blank=True)
     
@@ -455,12 +462,14 @@ class OrderFormPage(AbstractEmailForm):
                 FieldPanel("product_name"),
                 FieldPanel("product_description"),
                 FieldPanel("shipping_cost"),
+                FieldPanel("total_available"),
                 InlinePanel(
                     "product_variants", label="Product Variants", 
                     panels=[
                         FieldPanel("name"),
                         FieldPanel("description"),
                         FieldPanel("cost"),
+                        FieldPanel("item_count"),
                         FieldPanel("quantity_choices"),
                     ]
                 ),
@@ -535,14 +544,17 @@ class OrderFormPage(AbstractEmailForm):
     def get_form_fields(self):
         return self.order_form_fields.all()
     
-    def get_variant_quantities_and_total(self, data):
+    def _get_quantities(self, data):
         def get_item(v):
             if isinstance(v, list):
                 return int(v[0])
             return int(v)     
-        quantities = {
+        return {
             k: get_item(v) for k, v in data.items() if k in self.product_variant_slugs
         }
+
+    def get_variant_quantities_and_total(self, data):
+        quantities = self._get_quantities(data)
         total = 0
         variant_quantities = {}
         for key, quantity in quantities.items():
@@ -553,6 +565,42 @@ class OrderFormPage(AbstractEmailForm):
             total += self.shipping_cost
 
         return variant_quantities, total
+
+    def _item_counts_per_variant(self):
+        return dict(self.product_variants.values_list("slug", "item_count"))
+
+    def sold_out(self):
+        if self.total_available is None:
+            return False
+        return self.get_total_quantity_ordered() >= self.total_available
+
+    def disallowed_variants(self):
+        if self.total_available is None:
+            return []
+        quantity_ordered_so_far = self.get_total_quantity_ordered()
+        remaining_stock = self.total_available - quantity_ordered_so_far 
+        item_counts_per_variant = self._item_counts_per_variant()
+        return [
+            variant for variant in self.product_variants.all()
+            if item_counts_per_variant[variant.slug] > remaining_stock
+        ]
+
+    def get_total_quantity_ordered(self):
+        submissions = self.formsubmission_set.all()
+        item_counts_per_variant = self._item_counts_per_variant()
+        total = 0
+        for submission in submissions:
+            total += self.quantity_ordered_by_submission(submission.form_data, item_counts_per_variant)
+        return total
+
+    def quantity_ordered_by_submission(self, form_data, item_counts_per_variant=None):
+        if item_counts_per_variant is None:
+            item_counts_per_variant = self._item_counts_per_variant()
+        quantities = self._get_quantities(form_data)
+        number_of_items = 0
+        for key, quantity in quantities.items():
+            number_of_items += item_counts_per_variant[key] * quantity
+        return number_of_items
 
     def render_email(self, form):
         content = super().render_email(form)
