@@ -227,16 +227,17 @@ def diff(all_album_data, all_existing_data=None):
                 changed = True
                 print(
                     f"{album_id}:\n\t"
-                    f"Old title: {existing_data[album_id]['title']}\n\t"
-                    f"New title: {album_data[album_id]['title']}"
+                    f"Old: {existing_data[album_id]}\n\t"
+                    f"New: {album_data[album_id]}"
                 )
         if not changed:
             print("No changes to existing albums")
     
-    new_path = DATA_PATH.parent / f"{DATA_PATH}_new"
-    print(f"\nSaved new file to {new_path}")
-    new_path.write_text(json.dumps(all_album_data, indent=2))
-
+    bu_path = DATA_PATH.parent / f"{DATA_PATH}_bu"
+    print(f"\nOld file backed up to {bu_path}")
+    DATA_PATH.rename(bu_path)
+    DATA_PATH.write_text(json.dumps(all_album_data, indent=2))
+    print(f"\nNew written to {DATA_PATH}")
 
 def main():
     with sync_playwright() as pw:
