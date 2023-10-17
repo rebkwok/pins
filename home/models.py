@@ -605,6 +605,7 @@ class OrderFormPage(AbstractEmailForm):
     def render_email(self, form):
         content = super().render_email(form)
         _, total = self.get_variant_quantities_and_total(form.cleaned_data)
+        content += f"\nTotal items ordered: {self.quantity_ordered_by_submission(form.cleaned_data)}"
         content += f"\nTotal amount due: £{total}"
         return content
     
