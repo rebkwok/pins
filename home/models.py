@@ -429,9 +429,13 @@ class OrderFormPage(AbstractEmailForm):
 
     body = RichTextField(blank=True)
     image = models.ForeignKey(
-        'wagtailimages.Image', on_delete=models.SET_NULL, related_name='+', blank=True, null=True
+        'wagtailimages.Image', on_delete=models.SET_NULL, related_name='+', blank=True, null=True,
+        help_text="Used for the hero image",
     )
-
+    inline_image = models.ForeignKey(
+        'wagtailimages.Image', on_delete=models.SET_NULL, related_name='+', blank=True, null=True,
+        help_text="Displayed before the body"
+    )
     product_name = models.CharField(blank=True, max_length=250)
     product_description = models.CharField(blank=True, max_length=250)
     shipping_cost = models.DecimalField(max_digits=10, decimal_places=2)
@@ -443,10 +447,11 @@ class OrderFormPage(AbstractEmailForm):
     # Note how we include the FormField object via an InlinePanel using the
     # related_name value
     content_panels = AbstractEmailForm.content_panels + [
+        FieldPanel("image"),
+        FieldPanel("inline_image"),
         FieldPanel("body"),
         MultiFieldPanel(
             [
-                FieldPanel("image"),
                 FieldPanel("product_name"),
                 FieldPanel("product_description"),
                 FieldPanel("shipping_cost"),
@@ -576,7 +581,11 @@ class StandardPage(Page):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
-        help_text="Landscape mode only; horizontal width between 1000px and 3000px.",
+        help_text="Displayed as the hero image. Landscape mode only; horizontal width between 1000px and 3000px.",
+    )
+    inline_image = models.ForeignKey(
+        'wagtailimages.Image', on_delete=models.SET_NULL, related_name='+', blank=True, null=True,
+        help_text="Displayed afer the introduction"
     )
     body = RichTextField(verbose_name="Page body", blank=True)
 

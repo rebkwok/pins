@@ -7,13 +7,18 @@
 
     <div class="container">
         <div class="row">
+            {% if page.inline_image %}
+                <figure>{% image page.inline_image width-600 loading="lazy" %}</figure>
+            {% endif %}
+            
             <div class="col-md-8 index-header__body-introduction">
-                {% if page.intro %}
-                    <p class="intro">{{ page.intro|richtext }}</p>
-                {% endif %}
                 {% if page.body %}
                     {{ page.body|richtext }}
                 {% endif %}
+            </div>
+            
+            <div class="col-md-8">
+
             </div>
             <div class="col-md-8 index-header__body-introduction">
                 {% if page.product_description %}
@@ -75,14 +80,16 @@
                                 <label for={{ field.id }}>Quantity</label>
                                 {% if field.field.required %}<span class="required">*</span>{% endif %}
 
-
+                
                                 <select 
                                     name="{{ field.name }}" 
                                     required="" 
                                     id="id_{{ field.name }}"
+                                    {% if page.id %}
                                     hx-post="{% url 'orders:calculate_order_total' page.id %}"
                                     hx-trigger="change"
                                     hx-target="#order-total"
+                                    {% endif %}
                                 >
                                     {% for choice, _ in field.field.choices %}
                                     <option value="{{ choice }}" {% if choice == field.field.initial %}selected{% endif %}>{{ choice }}</option>

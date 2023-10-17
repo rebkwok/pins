@@ -13,6 +13,9 @@
                             {{ page.introduction }}
                         </p>
                     {% endif %}
+                    {% if page.inline_image %}
+                        <figure>{% image page.inline_image width-600 loading="lazy" %}</figure>
+                    {% endif %}
                     {{ page.body|richtext }}
                 </div>
             </div>
