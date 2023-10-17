@@ -8,9 +8,11 @@
     <div class="container">
         <div class="row">
             {% if page.inline_image %}
-                <figure>{% image page.inline_image width-600 loading="lazy" %}</figure>
-            {% endif %}
-            
+            <div class="col-md-8">
+                <figure>{% image page.inline_image scale-100 loading="lazy" %}</figure>
+            </div>
+                {% endif %}
+
             <div class="col-md-8 index-header__body-introduction">
                 {% if page.body %}
                     {{ page.body|richtext }}
