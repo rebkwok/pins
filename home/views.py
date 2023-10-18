@@ -1,5 +1,6 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import get_object_or_404
 from django.http import HttpResponse
+from django.utils.safestring import mark_safe
 from .models import OrderFormPage
 
 
@@ -22,8 +23,7 @@ def calculate_order_total_view(request, order_page_id):
             Quantity selected is unavailable; please select a maximum of {remaining_stock} total items.
             </div>
         """
-        resp_str += "<input id='submit-btn' type='submit' hx-swap-oob='true' disabled='disabled' class='btn disabled' />" 
     else:
-        resp_str += "<input id='submit-btn' type='submit' hx-swap-oob='true' class='btn'>"
+        resp_str += "<div id='not-allowed' hx-swap-oob='true'></div>"
 
-    return HttpResponse(resp_str)
+    return HttpResponse(mark_safe(resp_str))

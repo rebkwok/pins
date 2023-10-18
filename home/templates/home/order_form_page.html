@@ -83,9 +83,6 @@
                                         <p class="help">{{ variant.description }}</p>
                                     {% endif %}
 
-                                    {% if variant in page.disallowed_variants %}
-                                        <span class="text-danger">SOLD OUT</span> 
-                                    {% else %}
                                         <label for={{ field.id }}>Quantity</label>
                                         {% if field.field.required %}<span class="required">*</span>{% endif %}
 
@@ -103,7 +100,10 @@
                                             <option value="{{ choice }}" {% if choice == field.field.initial %}selected{% endif %}>{{ choice }}</option>
                                             {% endfor %}
                                         </select>
+                                    {% if variant in page.disallowed_variants %}
+                                        <span class="text-danger">SOLD OUT</span> 
                                     {% endif %}
+                                    
                             </div>
                         {% endif %}
                     {% endfor %}
