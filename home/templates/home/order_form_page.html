@@ -50,7 +50,7 @@
                 {% if form.errors %}
                     <div class="text-danger">Please correct the errors below:
                     <ul>    
-                    {% for error in form.non_field_errors %}:
+                    {% for error in form.non_field_errors %}
                         <li>{{ error }}</li>
                     {% endfor %}
                     </ul>

@@ -10,17 +10,12 @@ def calculate_order_total_view(request, order_page_id):
     
     resp_str = f"<span id='order-total'>{total}</span>"
     # check quantities are allowed
-    allowed = True
-    if order_page.total_available:
-        total_ordered_so_far = order_page.get_total_quantity_ordered()
-        total_for_this_order = order_page.quantity_ordered_by_submission(dict(request.POST))
-        remaining_stock = order_page.total_available - total_ordered_so_far
-        allowed = total_for_this_order <= remaining_stock
+    allowed, validation_error_msg = order_page.quantity_submitted_is_valid(dict(request.POST))
     
     if not allowed:
         resp_str += f"""
             <div id='not-allowed' hx-swap-oob='true' class='text-danger'>
-            Quantity selected is unavailable; please select a maximum of {remaining_stock} total items.
+            {validation_error_msg}
             </div>
         """
     else:

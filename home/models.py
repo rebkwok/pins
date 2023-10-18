@@ -16,6 +16,7 @@ from wagtail.admin.panels import (
     MultiFieldPanel,
     PublishingPanel,
 )
+from wagtail.contrib.forms.forms import FormBuilder, BaseForm
 from wagtail.contrib.forms.models import AbstractEmailForm, AbstractFormField
 from wagtail.contrib.forms.views import SubmissionsListView
 from wagtail.fields import RichTextField
@@ -428,8 +429,21 @@ class OrderFormSubmissionsListView(SubmissionsListView):
         return context_data
 
 
-class OrderFormPage(AbstractEmailForm):
+class OrderBaseForm(BaseForm):
+    def clean(self):
+        super().clean()
+        allowed, validation_error_msg = self.page.quantity_submitted_is_valid(self.cleaned_data)
+        if not allowed:
+            self.add_error("__all__", validation_error_msg)
 
+
+class OrderFormBuilder(FormBuilder):
+    def get_form_class(self):
+        return type("WagtailForm", (OrderBaseForm,), self.formfields)
+
+
+class OrderFormPage(AbstractEmailForm):
+    form_builder = OrderFormBuilder
     submissions_list_view_class = OrderFormSubmissionsListView
 
     body = RichTextField(blank=True)
@@ -502,7 +516,7 @@ class OrderFormPage(AbstractEmailForm):
     ]
 
     subpage_types = []
-
+    
     def save(self, *args, **kwargs):
         self.from_address = settings.DEFAULT_FROM_EMAIL
         super().save(*args, **kwargs)
@@ -601,6 +615,18 @@ class OrderFormPage(AbstractEmailForm):
         for key, quantity in quantities.items():
             number_of_items += item_counts_per_variant[key] * quantity
         return number_of_items
+
+    def quantity_submitted_is_valid(self, form_data):
+        validation_error_msg = ""
+        if self.total_available is None:
+            return True, validation_error_msg
+        total_ordered_so_far = self.get_total_quantity_ordered()
+        total_for_this_order = self.quantity_ordered_by_submission(form_data)
+        remaining_stock = self.total_available - total_ordered_so_far
+        valid = total_for_this_order <= remaining_stock
+        if not valid:
+            validation_error_msg  = f"Quantity selected is unavailable; select a maximum of {remaining_stock} total items."
+        return valid, validation_error_msg
 
     def render_email(self, form):
         content = super().render_email(form)
