@@ -21,6 +21,8 @@ from wagtail.snippets.models import register_snippet
 
 from wagtail_json_widget.widgets import JSONEditorWidget
 
+from scrape_albums import ALBUMS_NOT_ACCESSIBLE_VIA_API
+
 
 logger = logging.getLogger(__name__)
 
@@ -317,7 +319,7 @@ class FacebookAlbumTracker:
             custom_album_data__isnull=True
         ).values_list("facebook_album_id", flat=True)
         # filter None and empty strings
-        album_ids = [albid for albid in album_ids if albid]
+        album_ids = [albid for albid in album_ids if albid and albid not in ALBUMS_NOT_ACCESSIBLE_VIA_API]
         try:
             return self.api.get_objects(album_ids, fields="name,link,description,updated_time,count")
         except GraphAPIError as e:
@@ -363,6 +365,8 @@ class FacebookAlbumTracker:
         return self.api.extend_access_token(self.app_id, self.app_secret)["access_token"]
 
     def create_or_update_album(self, album_id, force_update=False):
+        if album_id in ALBUMS_NOT_ACCESSIBLE_VIA_API:
+            logger.info("Album %s can't be fetched from API, use scraper", album_id)
         metadata = self.get_album_metadata(album_id)
         if force_update or (
             self.albums_obj.get_album(album_id).get("updated_time") != metadata.get("updated_time")

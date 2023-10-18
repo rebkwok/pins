@@ -1,12 +1,9 @@
-from datetime import datetime
 import json
 from pathlib import Path
 
-from django.conf import settings
-from django.core.management.base import BaseCommand, CommandParser
-from django.core.mail import send_mail
+from django.core.management.base import BaseCommand
 
-from dogs.models import FacebookAlbumTracker, DogPage
+from dogs.models import FacebookAlbumTracker
 
 
 class Command(BaseCommand):
@@ -24,7 +21,8 @@ class Command(BaseCommand):
     def handle(self, path, **kwargs):
         data = json.loads(Path(path).read_text())
         albums = data["non_api_albums"]
-        pages = DogPage.objects.filter(facebook_album_id__in=albums)
-        for page in pages:
-            page.custom_album_data["images"] = albums[page.facebook_album_id]["images"]
-            page.save()
+        tracker = FacebookAlbumTracker()
+
+        for album_id, data in albums.items():
+            tracker.albums_obj.update_album(album_id, data)
+

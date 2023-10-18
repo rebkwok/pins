@@ -97,7 +97,7 @@ def get_albums_data(album_links):
 
             album_data["albums"][album_id] = {
                 "link": album.get_attribute("href"),
-                "title": album_title,
+                "name": album_title,
                 "count": count,
             }
     album_data["relevant_album_count"] = len(album_data["albums"])
@@ -123,7 +123,7 @@ def fetch_non_api_data(page, new_album_data, existing_album_data=None):
 
         this_album_data = dict(new_albums[album_id])
         page.goto(this_album_data["link"])
-        print(f"\tLoading album for {album_id} - {this_album_data['title']}")
+        print(f"\tLoading album for {album_id} - {this_album_data['name']}")
 
         print("\tFinding description")
         see_more_btn = page.get_by_text("See more")
@@ -210,14 +210,14 @@ def diff(all_album_data, all_existing_data=None):
             print("NEW ALBUMS")
             print("==========")
             for album_id in new_albums:
-                print(f"{album_id}: {album_data[album_id]['title']}")
+                print(f"{album_id}: {album_data[album_id]['name']}")
 
         removed_albums = set(existing_data) - set(album_data)
         if removed_albums:
             print("REMOVED ALBUMS")
             print("==============")
             for album_id in removed_albums:
-                print(f"{album_id}: {existing_data[album_id]['title']}")
+                print(f"{album_id}: {existing_data[album_id]['name']}")
 
         print("\nCHANGED")
         print("=======")
