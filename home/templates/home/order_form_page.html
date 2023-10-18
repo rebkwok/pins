@@ -47,6 +47,15 @@
         You could render your form using a Django rendering shortcut such as `{{ form.as_p }}` but that will tend towards unsemantic code, and make it difficult to style. You can read more on Django form at:
         https://docs.djangoproject.com/en/3.2/topics/forms/#form-rendering-options
         {% endcomment %}
+                {% if form.errors %}
+                    <div class="text-danger">Please correct the errors below:
+                    <ul>    
+                    {% for error in form.non_field_errors %}:
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                    </ul>
+                    </div>
+                {% endif %}
                 <form action="{% pageurl page %}" method="POST">
                     {% csrf_token %}
                     {% if form.subject.errors %}
@@ -82,7 +91,10 @@
                                     {% if variant.description %}
                                         <p class="help">{{ variant.description }}</p>
                                     {% endif %}
-
+                                    {% if variant in page.disallowed_variants %}
+                                        <span class="text-danger">SOLD OUT</span> 
+                                        <input type="hidden" id="id_{{ field.name }}" name="{{ field.name }}"  value="0" />
+                                    {% else %}
                                         <label for={{ field.id }}>Quantity</label>
                                         {% if field.field.required %}<span class="required">*</span>{% endif %}
 
@@ -100,8 +112,7 @@
                                             <option value="{{ choice }}" {% if choice == field.field.initial %}selected{% endif %}>{{ choice }}</option>
                                             {% endfor %}
                                         </select>
-                                    {% if variant in page.disallowed_variants %}
-                                        <span class="text-danger">SOLD OUT</span> 
+                                    
                                     {% endif %}
                                     
                             </div>
