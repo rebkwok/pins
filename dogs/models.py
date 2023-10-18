@@ -367,6 +367,7 @@ class FacebookAlbumTracker:
     def create_or_update_album(self, album_id, force_update=False):
         if album_id in ALBUMS_NOT_ACCESSIBLE_VIA_API:
             logger.info("Album %s can't be fetched from API, use scraper", album_id)
+            return
         metadata = self.get_album_metadata(album_id)
         if force_update or (
             self.albums_obj.get_album(album_id).get("updated_time") != metadata.get("updated_time")
@@ -597,7 +598,9 @@ class DogPage(Page):
 
     def save(self, *args, **kwargs):
         albums_obj = FacebookAlbums.instance()
-        if self.facebook_album_id and not albums_obj.is_rate_limited:
+        if self.facebook_album_id in ALBUMS_NOT_ACCESSIBLE_VIA_API:
+            logger.info("Album %s can't be fetched from API, use scraper", self.facebook_album_id)
+        elif self.facebook_album_id and not albums_obj.is_rate_limited:
             try:
                 logger.info("Checking fb info for album id %s, dog %s", self.facebook_album_id, self.title)
                 self.update_facebook_info()
