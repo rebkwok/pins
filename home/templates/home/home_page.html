@@ -15,7 +15,7 @@
                         <h1>{{ page.title }}</h1>
                         <p class="lead">{{ page.hero_text }}</p>
                         {% if page.hero_cta_link %}
-                            <a href="{% pageurl page.hero_cta_link %}" class="hero-cta-link">
+                            <a href="{% slugurl page.hero_cta_link.slug %}" class="hero-cta-link">
                                 {{ page.hero_cta }}
                             </a>
                         {% else %}
@@ -40,7 +40,7 @@
                             {% endfor %}
                         </ul>
                         {% if page.featured_section_show_more_text %}
-                            <a class="featured-cards__link" href="{% pageurl page.featured_section %}">
+                            <a class="featured-cards__link" href="{% slugurl page.featured_section.slug %}">
                                 <span>{{ page.featured_section_show_more_text }}</span>
                                 {% include "includes/chevron-icon.html" with class="featured-cards__chevron-icon" %}
                             </a>
@@ -87,7 +87,7 @@
                         <h1>{{ page.page_link_1_title.title }}</h1>
                     </div>
                     <div class="hero__container">
-                        <a class="btn hero__btn" href="{% pageurl page.page_link_1 %}">{{ page.page_link_1_btn_text }}</a>
+                        <a class="btn hero__btn" href="{% slugurl page.page_link_1.slug %}">{{ page.page_link_1_btn_text }}</a>
                     </div>
                 </div>
             {% else %}
@@ -95,7 +95,7 @@
                     <div class="row">
                         <div class="col-md-12 locations-section">
                                 <h2 class="locations-section__title">{{ page.page_link_1_title }}</h2>
-                                <a class="btn" href="{% pageurl page.page_link_1 %}">{{ page.page_link_1_btn_text }}</a>
+                                <a class="btn" href="{% slugurl page.page_link_1.slug %}">{{ page.page_link_1_btn_text }}</a>
                         </div>
                     </div>
                 </div>
@@ -110,7 +110,7 @@
                         <h1>{{ page.page_link_2_title.title }}</h1>
                     </div>
                     <div class="hero__container">
-                        <a class="btn hero__btn" href="{% pageurl page.page_link_2 %}">{{ page.page_link_2_btn_text }}</a>
+                        <a class="btn hero__btn" href="{% slugurl page.page_link_2.slug %}">{{ page.page_link_2_btn_text }}</a>
                     </div>
                 </div>
             {% else %}
@@ -119,7 +119,7 @@
                         <div class="row">
                             <div class="col-md-12 blog-section">
                                 <h2 class="">{{ page.page_link_2_title }}</h2>
-                                <a class="btn" href="{% pageurl page.page_link_2 %}">{{ page.page_link_2_btn_text }}</a>
+                                <a class="btn" href="{% slugurl page.page_link_2.slug %}">{{ page.page_link_2_btn_text }}</a>
                             </div>
                         </div>
                     </div>
@@ -135,7 +135,7 @@
                     <div class="col-md-10 col-md-offset-1 home-hero">
                         <p class="lead">{{ page.hero_footer_text }}</p>
                         {% if page.hero_footer_link %}
-                            <a href="{% pageurl page.hero_footer_link %}" class="hero-cta-link">
+                            <a href="{% slugurl page.hero_footer_link.slug %}" class="hero-cta-link">
                                 {{ page.hero_footer }}
                             </a>
                         {% else %}
