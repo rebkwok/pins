@@ -419,6 +419,12 @@ class OrderFormSubmissionsListView(SubmissionsListView):
     def get_context_data(self, **kwargs):
         context_data = super().get_context_data(**kwargs)
         if not self.is_export:
+            total_ordered_so_far = self.form_page.get_total_quantity_ordered()
+            if self.form_page.total_available:
+                remaining_stock = self.form_page.total_available - total_ordered_so_far
+            else:
+                remaining_stock = "N/A"
+            context_data["description"] = f"Total sold: {total_ordered_so_far} | Remaining stock: {remaining_stock}"
             context_data["data_headings"].append({'name': 'total', 'label': 'Total (£)', 'order': None})
             fields = self.form_page.get_data_fields()
             for row in context_data["data_rows"]:
