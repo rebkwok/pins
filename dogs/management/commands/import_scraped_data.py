@@ -23,6 +23,7 @@ class Command(BaseCommand):
         albums = data["non_api_albums"]
         tracker = FacebookAlbumTracker()
 
-        for album_id, data in albums.items():
+        total = len(albums)
+        for i, (album_id, data) in enumerate(albums.items(), start=1):
+            self.stdout.write(f"Updating non-api album {i} of {total}")
             tracker.albums_obj.update_album(album_id, data)
-
