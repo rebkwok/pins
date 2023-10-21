@@ -18,11 +18,14 @@
                                         <figure class="listing-card__image">
                                             {% image result.specific.image fill-180x180-c100 loading="lazy" %}
                                         </figure>
+                                    {% elif result.specific.cover_image %}
+                                        <figure class="listing-card__image">
+                                            <img src="{{ result.specific.cover_image.image_url }}" height="180" width="180" loading="lazy" />
+                                        </figure>
                                     {% endif %}
                                     <div class="listing-card__contents">
                                         <h3 class="listing-card__title">{{ result.specific }}</h3>
                                         <p class="listing-card__content-type">
-                                            {{ result.specific.content_type.model }}
                                             {% if result.specific.content_type.model == "dogpage" %}
                                                 Dog
                                             {% elif result.specific.content_type.model == "dogstatuspage" %}
