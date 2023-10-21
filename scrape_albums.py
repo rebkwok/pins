@@ -9,10 +9,9 @@ import time
 from tqdm import tqdm
 from playwright.sync_api import sync_playwright
 
-DATA_PATH = Path(__file__).parent / "pins" / ".scraped_album_data"
-CRED_PATH = Path(__file__).parent / "pins" / ".fb_credentials"
+DATA_PATH = Path(__file__).parent / ".scraped_album_data"
 ALBUM_ID_REGEX = re.compile(r"https:\/\/www\.facebook\.com\/media\/set\/\?set=a\.(\d+)&type=3")
-ALBUM_NAME_REGEX = re.compile(r"(?P<title>.+)\n(?P<count>\d+)\sitems*")
+ALBUM_NAME_REGEX = re.compile(r"(?P<title>.+)\n(?P<count>\d+)\sitems*", flags=re.I)
 
 IDS_TO_IGNORE = [
     "489076346765992",  # Mobile uploads
