@@ -1,10 +1,7 @@
 """
-pip install playwright
-playwright install firefox
-playwright install-deps firefox
+playwright install --with-deps firefox
 """
-
-from os import environ
+from argparse import ArgumentParser
 import json
 from pathlib import Path
 import re
@@ -172,7 +169,7 @@ def fetch_non_api_data(page, new_album_data, existing_album_data=None):
     return full_album_data
 
 
-def diff(all_album_data, all_existing_data=None):
+def diff(all_album_data, all_existing_data=None, report_only=False):
     print("\nCalculating diff")
     if not DATA_PATH.exists():
         DATA_PATH.write_text(json.dumps(all_album_data, indent=2))
@@ -232,14 +229,16 @@ def diff(all_album_data, all_existing_data=None):
                 )
         if not changed:
             print("No changes to existing albums")
-    
-    bu_path = DATA_PATH.parent / f"{DATA_PATH}_bu"
-    print(f"\nOld file backed up to {bu_path}")
-    DATA_PATH.rename(bu_path)
-    DATA_PATH.write_text(json.dumps(all_album_data, indent=2))
-    print(f"\nNew written to {DATA_PATH}")
+    if not report_only:
+        bu_path = DATA_PATH.parent / f"{DATA_PATH}_bu"
+        print(f"\nOld file backed up to {bu_path}")
+        DATA_PATH.rename(bu_path)
+        DATA_PATH.write_text(json.dumps(all_album_data, indent=2))
+        print(f"\nNew written to {DATA_PATH}")
+    else:
+        print("Reporting diff only, no file written")
 
-def main():
+def main(report_only=False):
     with sync_playwright() as pw:
         browser = pw.firefox.launch(headless=True)
         context = browser.new_context()
@@ -248,9 +247,13 @@ def main():
         album_links = get_album_link_elements(page)
         old_album_data = load_existing_data()
         new_album_data = get_albums_data(album_links)
-        fetch_non_api_data(page, new_album_data, old_album_data)
+        if not report_only:
+            fetch_non_api_data(page, new_album_data, old_album_data)
         browser.close()
-        diff(new_album_data, old_album_data)
+        diff(new_album_data, old_album_data, report_only)
 
 if __name__ == "__main__":
-    main()    
+    parser = ArgumentParser()
+    parser.add_argument("--report-only", action="store_true", help="Report on diff only")
+    args = parser.parse_args()
+    main(args.report_only)    
