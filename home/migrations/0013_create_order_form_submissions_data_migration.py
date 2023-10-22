@@ -21,6 +21,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("home", "0012_orderformsubmission"),
+        ("wagtailforms", "0005_alter_formsubmission_form_data"),
     ]
 
     operations = [
