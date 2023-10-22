@@ -28,4 +28,4 @@ class Command(BaseCommand):
                     # accessible at all
                     ...
             albums_container.albums[album_id]["images"] = new_images
-        albums_container.save()
+            albums_container.save()
