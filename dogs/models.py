@@ -406,14 +406,16 @@ class FacebookAlbumTracker:
         album_data["images"] = []
 
         def _add_images(photos):
-            for photo in photos["data"]:
+            for i, photo in enumerate(photos["data"], start=1):
+                if len(album_data["images"]) >= 50:
+                    break
                 photo = self.api.get_object(id=photo["id"], fields="alt_text,alt_text_custom,name,link,images")
                 images = photo.pop("images")
                 photo["image_url"] = images[0]["source"]
                 album_data["images"].append(photo)
 
         _add_images(photos)
-        while photos["paging"].get("next"):
+        while photos["paging"].get("next") and len(album_data["images"]) < 50:
             photos =requests.get(photos["paging"]["next"]).json()
             _add_images(photos)
         
