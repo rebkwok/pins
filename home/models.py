@@ -17,8 +17,9 @@ from wagtail.admin.panels import (
     PublishingPanel,
 )
 from wagtail.contrib.forms.forms import FormBuilder, BaseForm
-from wagtail.contrib.forms.models import AbstractEmailForm, AbstractFormField
+from wagtail.contrib.forms.models import AbstractEmailForm, AbstractFormField, AbstractFormSubmission
 from wagtail.contrib.forms.views import SubmissionsListView
+
 from wagtail.fields import RichTextField
 from wagtail.models import (
     DraftStateMixin,
@@ -399,14 +400,20 @@ class ProductVariant(Orderable):
 
 class OrderFormSubmissionsListView(SubmissionsListView):
 
+    template_name = "home/order_list_submissions_index.html"
+
     def stream_csv(self, queryset):
-        self.list_export += ["total"]
-        self.export_headings.update({"total": "Total (£)"})
+        self.list_export += ["total", "total_items", "paid", "shipped"]
+        self.export_headings.update(
+            {"total": "Total (£)", "total_items": "Total items", "paid": "Paid", "shipped": "Shipped"}
+        )
         return super().stream_csv(queryset)
 
     def write_xlsx(self, queryset, output):
-        self.list_export += ["total"]
-        self.export_headings.update({"total": "Total (£)"})
+        self.list_export += ["total", "total_items", "paid", "shipped"]
+        self.export_headings.update(
+            {"total": "Total (£)", "total_items": "Total items", "paid": "Paid", "shipped": "Shipped"}
+        )
         return super().write_xlsx(queryset, output)
 
     def to_row_dict(self, item):
@@ -414,6 +421,9 @@ class OrderFormSubmissionsListView(SubmissionsListView):
         row_dict = super().to_row_dict(item)
         _, total = self.form_page.get_variant_quantities_and_total(row_dict)
         row_dict["total"] = total
+        row_dict["total_items"] = self.form_page.quantity_ordered_by_submission(row_dict)
+        row_dict["paid"] = "Y" if item.paid else "-"
+        row_dict["shipped"] = "Y" if item.shipped else "-"
         return row_dict
 
     def get_context_data(self, **kwargs):
@@ -425,13 +435,33 @@ class OrderFormSubmissionsListView(SubmissionsListView):
             else:
                 remaining_stock = "N/A"
             context_data["description"] = f"Total sold: {total_ordered_so_far} | Remaining stock: {remaining_stock}"
-            context_data["data_headings"].append({'name': 'total', 'label': 'Total (£)', 'order': None})
+            extra_cols = [
+                {'name': 'total', 'label': 'Total (£)', 'order': None},
+                {'name': 'total_items', 'label': 'Total items', 'order': None},
+                {'name': 'paid', 'label': 'Paid', 'order': None},
+                {'name': 'shipped', 'label': 'Shipped', 'order': None},
+            ]
+            context_data["data_headings"].extend(extra_cols)
             fields = self.form_page.get_data_fields()
+
+            submissions = OrderFormSubmission.objects.filter(
+                id__in=[row["model_id"] for row in context_data["data_rows"]]
+            )
+            submission_paid_shipped = {
+                sub.id: ("Y" if sub.paid else "-", "Y" if sub.shipped else "-") 
+                for sub in submissions
+            }
+
             for row in context_data["data_rows"]:
                 form_data = row["fields"]
                 form_data_dict = {field[0]: form_data[i] for i, field in enumerate(fields)}
                 _, total = self.form_page.get_variant_quantities_and_total(form_data_dict)
-                form_data.append(total)
+                total_items = self.form_page.quantity_ordered_by_submission(form_data_dict)
+                extra_form_data = [
+                    total, total_items, *submission_paid_shipped[row["model_id"]]
+                ]
+                form_data.extend(extra_form_data)
+
         return context_data
 
 
@@ -649,6 +679,32 @@ class OrderFormPage(AbstractEmailForm):
         return TemplateResponse(
             request, self.get_landing_page_template(request), context
         )
+
+    def get_submission_class(self):
+        return OrderFormSubmission
+
+
+class OrderFormSubmission(AbstractFormSubmission):
+    paid = models.BooleanField(default=False)
+    shipped = models.BooleanField(default=False)
+
+    def mark_paid(self):
+        self.paid = True
+        self.save()
+    
+    def mark_shipped(self):
+        self.shipped = True
+        self.save()
+    
+    def mark_paid_and_shipped(self):
+        self.paid = True
+        self.shipped = True
+        self.save()
+
+    def reset(self):
+        self.paid = False
+        self.shipped = False
+        self.save()
 
 
 class StandardPage(Page):

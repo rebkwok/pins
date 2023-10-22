@@ -54,7 +54,7 @@ jobs:
           DATABASE_URL: postgres://postgres:postgres@localhost/ci_test
         run: |
           source ${{ github.workspace }}/venv/bin/activate
-          pytest --cov-config=.coveragerc --cov=. -n auto
+          pytest --cov-config=. coveragerc --cov=. -n auto
 
       - name: Coveralls
         uses: AndreMiras/coveralls-python-action@develop

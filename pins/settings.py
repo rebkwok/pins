@@ -273,7 +273,7 @@ if env('USE_MAILCATCHER'):  # pragma: no cover
 
 
 # #####LOGGING######
-if not TESTING:  # pragma: no cover
+if not TESTING and not env("LOCAL"):  # pragma: no cover
     LOG_FOLDER = env('LOG_FOLDER')
 
     LOGGING = {
