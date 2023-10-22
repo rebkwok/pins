@@ -13,5 +13,5 @@ media/
 *.log
 
 pins/.fb_*
-pins/.scraped_album_data*
+.scraped_album_data*
 .coverage
