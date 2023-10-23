@@ -310,13 +310,13 @@ class FacebookAlbumTracker:
                 # setup api with new token
                 self._api = GraphAPI(access_token=token)
         return self._api
-
+                               
     def get_all_albums(self):
         """
         Get all albums for existing DogPages
         """
         album_ids = DogPage.objects.values_list("facebook_album_id", flat=True)
-        # filter None and empty strings
+        # filter None, empty strings, and non-accessible albums
         album_ids = [albid for albid in album_ids if albid and albid not in ALBUMS_NOT_ACCESSIBLE_VIA_API]
         try:
             return self.api.get_objects(album_ids, fields="name,link,description,updated_time,count")
@@ -379,7 +379,12 @@ class FacebookAlbumTracker:
             logger.info("Album %s is up to date", album_id)
     
     def get_album_metadata(self, album_id):
-        return self.api.get_object(album_id, fields="name,link,description,updated_time,count")
+        return self.api.get_object(album_id, fields="name,link,description,updated_time,count,photos")
+
+    def get_album_images(self, album_id):
+        # get images (max 50) for album
+        url = f"https://graph.facebook.com/v18.0/{album_id}/photos/?fields=images&access_token={self.api.access_token}&limit=50"
+        return requests.get(url).json()["data"]
 
     def get_album_data(self, album_id, album_metadata=None, force_update=False):
         album_data = album_metadata or self.get_album_metadata(album_id)
@@ -396,26 +401,16 @@ class FacebookAlbumTracker:
         del album_data["id"]
         
         # Get photo data and urls for album photos
-        photos = self.api.get_object(id=album_id, fields="photos").get("photos")
+        album_data["images"] = []
+        photos = self.get_album_images(album_id)
         
         if not photos:
-            return None
+            return album_data
         
-        album_data["images"] = []
-
-        def _add_images(photos):
-            for i, photo in enumerate(photos["data"], start=1):
-                if len(album_data["images"]) >= 50:
-                    break
-                photo = self.api.get_object(id=photo["id"], fields="alt_text,alt_text_custom,name,link,images")
-                images = photo.pop("images")
-                photo["image_url"] = images[0]["source"]
-                album_data["images"].append(photo)
-
-        _add_images(photos)
-        while photos["paging"].get("next") and len(album_data["images"]) < 50:
-            photos =requests.get(photos["paging"]["next"]).json()
-            _add_images(photos)
+        for photo in photos:
+            images = photo.pop("images")
+            photo["image_url"] = images[0]["source"]
+            album_data["images"].append(photo)
         
         return album_data
 
