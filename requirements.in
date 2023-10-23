@@ -11,6 +11,7 @@ pymemcache
 whitenoise
 facebook-sdk
 wagtail-json-widget
+django-storages[boto3]
 
 pytest
 coverage

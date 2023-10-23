@@ -32,7 +32,9 @@ beautifulsoup4==4.11.2
 bidict==0.22.1
     # via python-socketio
 boto3==1.28.15
-    # via django-ses
+    # via
+    #   django-ses
+    #   django-storages
 botocore==1.31.15
     # via
     #   boto3
@@ -72,6 +74,7 @@ django==4.2.3
     #   django-modelcluster
     #   django-permissionedforms
     #   django-ses
+    #   django-storages
     #   django-taggit
     #   django-treebeard
     #   djangorestframework
@@ -87,6 +90,8 @@ django-modelcluster==6.0
 django-permissionedforms==0.1
     # via wagtail
 django-ses[events]==3.5.0
+    # via -r requirements.in
+django-storages[boto3]==1.14.2
     # via -r requirements.in
 django-taggit==3.1.0
     # via wagtail

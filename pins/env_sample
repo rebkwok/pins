@@ -13,3 +13,8 @@ FB_APP_SECRET='dummy_secret'
 # is first used 
 FB_ACCESS_TOKEN ='dummy_acccess_token'
 FB_PAGE_ID='page_id'
+
+# local only, prod uses IAM role
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+LOCAL_S3=False
