@@ -474,6 +474,7 @@ class DogPageGalleryImage(Orderable):
     Related images for DogPage; hidden on admin
     """
     page = ParentalKey("DogPage", on_delete=models.CASCADE, related_name='gallery_images')
+    fb_image_id = models.CharField(null=True, blank=True, max_length=255)
     image = models.ForeignKey(
         'wagtailimages.Image', on_delete=models.CASCADE, related_name='+'
     )
