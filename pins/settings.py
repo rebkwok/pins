@@ -271,8 +271,8 @@ AWS_S3_FILE_OVERWRITE = False
 # where the documents should use wagtail-storages.
 AWS_DEFAULT_ACL = "private"
 
-# drop the .s3.amazonaws.com if using cloudfront
-AWS_S3_CUSTOM_DOMAIN =f"media.{DOMAIN}.s3.amazonaws.com"
+# only if using cloudfront
+# AWS_S3_CUSTOM_DOMAIN =f"media.{DOMAIN}"
 AWS_S3_REGION_NAME = "eu-west-1"
 
 
