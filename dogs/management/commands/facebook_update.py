@@ -30,7 +30,7 @@ class Command(BaseCommand):
 
     def handle(self, from_ix, to_ix, album_ids, **kwargs):
         if not album_ids:
-            album_ids = list(DogPage.objects.filter(custom_album_data__isnull=True).values_list("facebook_album_id", flat=True))        
+            album_ids = list(DogPage.objects.filter().values_list("facebook_album_id", flat=True))        
             if to_ix is None or to_ix > len(album_ids):
                 to_ix = len(album_ids)
             album_ids = album_ids[from_ix:to_ix]
