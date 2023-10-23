@@ -567,18 +567,13 @@ class DogPage(Page):
         return self.album_info.get("images")
 
     def cover_image(self):
-        if self.images():
-            index = self.cover_image_index if len(self.images()) >= self.cover_image_index + 1 else 0
-            return self.album_info["images"][index]
-
-    # def cover_image(self):
-    #     if self.gallery_images.exists():
-    #         index = self.cover_image_index if self.gallery_images.count() >= self.cover_image_index + 1 else 0
-    #         if index == 0:
-    #             gallery_image = self.gallery_images.first()
-    #         else:
-    #             gallery_image = self.gallery_images.all()[index]
-    #         return gallery_image.image
+        if self.gallery_images.exists():
+            index = self.cover_image_index if self.gallery_images.count() >= self.cover_image_index + 1 else 0
+            if index == 0:
+                gallery_image = self.gallery_images.first()
+            else:
+                gallery_image = self.gallery_images.all()[index]
+            return gallery_image.image
 
     @property
     def fb_description(self):

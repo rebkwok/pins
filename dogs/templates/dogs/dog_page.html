@@ -33,23 +33,17 @@
                             </p>
                         </div>
                     </div>
-                
+
                 <div class=" row image-gallery-container">
                     <ul class="image-gallery">
-                        {% for image in page.images %}
+                        {% for image in page.gallery_images.all %}
                             <li>
-                                <a href="{{ image.image_url }}">
-                                    <img src="{{ image.image_url }}" alt="" />
-                                </a>
+                                {% image image.image original loading="lazy" %}
                             </li>
                         {% endfor %}
-                        {% comment %} {% for gallery_image in page.gallery_images.all %}
-                            <li>
-                                {% image gallery_image.image fill-645x480-c100 loading="lazy" %}
-                            </li>
-                        {% endfor %} {% endcomment %}
                     </ul>
                 </div>
+
             </div>
         </div>
     </div>
