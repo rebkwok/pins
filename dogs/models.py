@@ -474,6 +474,16 @@ class FacebookAlbumTracker:
         return changes
 
 
+class DogPageGalleryImage(Orderable):
+    """
+    Related images for DogPage; hidden on admin
+    """
+    page = ParentalKey("DogPage", on_delete=models.CASCADE, related_name='gallery_images')
+    image = models.ForeignKey(
+        'wagtailimages.Image', on_delete=models.CASCADE, related_name='+'
+    )
+
+
 class DogPage(Page):
 
     date_posted = models.DateField(default=timezone.now)
@@ -496,7 +506,6 @@ class DogPage(Page):
 
     cover_image_index = models.PositiveIntegerField(default=0)
 
-    
     content_panels = Page.content_panels + [
         RateLimitedPanel(),
         FieldPanel('date_posted'),
@@ -549,6 +558,13 @@ class DogPage(Page):
         if self.images():
             index = self.cover_image_index if len(self.images()) >= self.cover_image_index + 1 else 0
             return self.album_info["images"][index]
+
+    # def cover_image(self):
+    #     if self.gallery_images.exists():
+    #         index = self.cover_image_index if self.gallery_images.count() >= self.cover_image_index + 1 else 0
+    #         if index == 0:
+    #             return self.gallery_images.first()
+    #         return self.gallery_images.all()[index]
 
     @property
     def fb_description(self):
