@@ -43,6 +43,11 @@
                                 </a>
                             </li>
                         {% endfor %}
+                        {% comment %} {% for gallery_image in page.gallery_images.all %}
+                            <li>
+                                {% image gallery_image.image fill-645x480-c100 loading="lazy" %}
+                            </li>
+                        {% endfor %} {% endcomment %}
                     </ul>
                 </div>
             </div>

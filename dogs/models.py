@@ -574,8 +574,10 @@ class DogPage(Page):
     #     if self.gallery_images.exists():
     #         index = self.cover_image_index if self.gallery_images.count() >= self.cover_image_index + 1 else 0
     #         if index == 0:
-    #             return self.gallery_images.first()
-    #         return self.gallery_images.all()[index]
+    #             gallery_image = self.gallery_images.first()
+    #         else:
+    #             gallery_image = self.gallery_images.all()[index]
+    #         return gallery_image.image
 
     @property
     def fb_description(self):

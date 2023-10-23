@@ -3,6 +3,7 @@
 <div class="container-fluid hero">
     {% if page.cover_image %}
         <img src="{{ page.cover_image.image_url }}" height=1920 width=600 class="hero-image" />
+        {% comment %} {% image page.cover_image fill-1920x600 class="hero-image" alt="" %} {% endcomment %}
         <div class="hero__container">
             <h1 class="hero__title">{{ page.title }}</h1>
         </div>
