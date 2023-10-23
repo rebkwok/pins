@@ -17,11 +17,8 @@ from facebook import GraphAPI, GraphAPIError
 from modelcluster.fields import ParentalKey
 from wagtail.models import Orderable, Page
 from wagtail.fields import RichTextField
-from wagtail.admin.forms import WagtailAdminPageForm
 from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, Panel
-from wagtail.snippets.models import register_snippet
 from wagtail.images.models import Image
-from wagtail_json_widget.widgets import JSONEditorWidget
 
 from scrape_albums import ALBUMS_NOT_ACCESSIBLE_VIA_API
 
@@ -388,6 +385,18 @@ class FacebookAlbumTracker:
         url = f"https://graph.facebook.com/v18.0/{album_id}/photos/?fields=images&access_token={self.api.access_token}&limit=50"
         return requests.get(url).json()["data"]
 
+    def create_gallery_image(self, page, image_id, image_url):
+        # create the gallery image
+        # image id is the facebook image id
+        image_resp = requests.get(image_url, allow_redirects=True)
+        photo_name = f"{page.slug}_{image_id}"
+        image = Image(
+            title=photo_name,
+            file=ImageFile(BytesIO(image_resp.content), name=f"{photo_name}.jpg"),
+        )
+        image.save()
+        DogPageGalleryImage.objects.create(page=page, image=image, fb_image_id=image_id)
+
     def get_album_data(self, album_id, album_metadata=None, force_update=False):
         page = DogPage.objects.get(facebook_album_id=album_id)
         page_image_ids = page.gallery_images.values_list("fb_image_id", flat=True)
@@ -417,16 +426,8 @@ class FacebookAlbumTracker:
             album_data["images"].append(photo)
 
             if photo["id"] not in page_image_ids:
-                # create the gallery image
-                image_resp = requests.get(photo["image_url"], allow_redirects=True)
-                photo_name = f"{page.slug}_{photo['id']}"
-                image = Image(
-                    title=photo_name,
-                    file=ImageFile(BytesIO(image_resp.content), name=f"{photo_name}.jpg"),
-                )
-                image.save()
-                DogPageGalleryImage.objects.create(page=page, image=image, fb_image_id=photo["id"])
-
+                self.create_gallery_image(page, photo["id"], photo["image_url"])
+                
         return album_data
 
     def fetch_all(self, force_update=False):

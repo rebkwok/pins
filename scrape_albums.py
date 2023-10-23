@@ -12,6 +12,8 @@ from playwright.sync_api import sync_playwright
 DATA_PATH = Path(__file__).parent / ".scraped_album_data"
 ALBUM_ID_REGEX = re.compile(r"https:\/\/www\.facebook\.com\/media\/set\/\?set=a\.(\d+)&type=3")
 ALBUM_NAME_REGEX = re.compile(r"(?P<title>.+)\n(?P<count>\d+)\sitems*", flags=re.I)
+PHOTO_ID_REGEX = re.compile(r".+fbid=(?P<fbid>.+)&.+")
+
 
 IDS_TO_IGNORE = [
     "489076346765992",  # Mobile uploads
@@ -158,8 +160,11 @@ def fetch_non_api_data(page, new_album_data, existing_album_data=None):
                 break
 
         for photo in tqdm(photos.all(), "Parsing image links"):
+            photo_href = photo.get_attribute("href")
+            match = PHOTO_ID_REGEX.match(photo_href)
+            image_id = match.group("fbid")
             link = photo.get_by_role("img").get_attribute("src")
-            this_album_data.setdefault("images", []).append({"image_url": link})
+            this_album_data.setdefault("images", []).append({"image_url": link, "id": image_id})
 
         full_album_data[album_id] = this_album_data
 
