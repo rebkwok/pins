@@ -313,11 +313,9 @@ class FacebookAlbumTracker:
 
     def get_all_albums(self):
         """
-        Get all albums for existing DogPages except those with custom album data
+        Get all albums for existing DogPages
         """
-        album_ids = DogPage.objects.filter(
-            custom_album_data__isnull=True
-        ).values_list("facebook_album_id", flat=True)
+        album_ids = DogPage.objects.values_list("facebook_album_id", flat=True)
         # filter None and empty strings
         album_ids = [albid for albid in album_ids if albid and albid not in ALBUMS_NOT_ACCESSIBLE_VIA_API]
         try:
@@ -472,23 +470,8 @@ class FacebookAlbumTracker:
                 album_id: new_data[album_id]["name"] for album_id in same_albums
                 if new_data[album_id]["updated_time"] != saved_data[album_id]["updated_time"]
             }
-        
-        changes["custom_albums"] = {
-            f"{page.title} ({page.get_parent().title})": page.custom_album_data
-            for page in DogPage.objects.filter(custom_album_data__isnull=False)
-        }
 
         return changes
-
-
-class DogPageForm(WagtailAdminPageForm):
-    custom_album_data = forms.JSONField(
-        widget=JSONEditorWidget, required=False,
-        help_text=(
-            "Custom album data to use if FB album can't be retrieved."
-            "Format: {'link': '<link to fb album>', 'images': [{'image_url': <url>}]}"
-        )
-    )
 
 
 class DogPage(Page):
@@ -511,16 +494,7 @@ class DogPage(Page):
     )
     facebook_album_id = models.CharField(null=True, blank=True)
 
-    custom_album_data = models.JSONField(
-        null=True, blank=True,
-        help_text=(
-            "Custom album data to use if FB album can't be retrieved."
-            "Format: {'link': '<link to fb album>', 'images': [{'image_url': <url>}]}"
-        )
-    )
     cover_image_index = models.PositiveIntegerField(default=0)
-
-    base_form_class = DogPageForm
 
     
     content_panels = Page.content_panels + [
@@ -532,7 +506,6 @@ class DogPage(Page):
         FieldPanel('caption'),
         FBCaptionPanel(),
         FieldPanel('facebook_album_id'),
-        FieldPanel('custom_album_data'),
         FieldPanel('cover_image_index'),
     ]
 
@@ -557,9 +530,6 @@ class DogPage(Page):
         return mark_safe(f"<span class='w-status w-status--primary'>{self.status_string.title()}</span>")
 
     def update_facebook_info(self):
-        if self.custom_album_data:
-            logger.info("Custom album data provided, nothing to update")
-            return
         tracker = FacebookAlbumTracker()
         tracker.create_or_update_album(self.facebook_album_id)
 
@@ -568,8 +538,6 @@ class DogPage(Page):
         if not self.id:
             return {}
         if self._album_info is None:
-            if self.custom_album_data:
-                return self.custom_album_data
             albums_obj = FacebookAlbums.instance()
             self._album_info = albums_obj.get_album(self.facebook_album_id)
         return self._album_info
