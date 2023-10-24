@@ -147,7 +147,7 @@ class DogStatusPage(Page):
     def get_context(self, request):
         context = super().get_context(request)
 
-        # BreadPage objects (get_breads) are passed through pagination
+        # DogPage objects (get_dogs) are passed through pagination
         dogs = self.paginate(request, self.get_dogs())
 
         context["dogs"] = dogs
@@ -590,6 +590,30 @@ class DogPage(Page):
     @property
     def is_rate_limited(self):
         return FacebookAlbums.instance().is_rate_limited
+
+    # Pagination for the dog page. We use the `django.core.paginator` as any
+    # standard Django app would, but the difference here being we have it as a
+    # method on the model rather than within a view function
+    def paginate(self, request, *args):
+        page = request.GET.get("page")
+        paginator = Paginator(self.gallery_images.all(), 10)
+        try:
+            pages = paginator.page(page)
+        except PageNotAnInteger:
+            pages = paginator.page(1)
+        except EmptyPage:
+            pages = paginator.page(paginator.num_pages)
+        return pages
+
+    # Returns the above to the get_context method that is used to populate the
+    # template
+    def get_context(self, request):
+        context = super().get_context(request)
+        gallery_images = self.paginate(request, self. gallery_images.all())
+
+        context["gallery_images"] = gallery_images
+
+        return context
 
     def save(self, *args, **kwargs):
         albums_obj = FacebookAlbums.instance()

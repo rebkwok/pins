@@ -36,7 +36,7 @@
 
                 <div class=" row image-gallery-container">
                     <ul class="image-gallery">
-                        {% for image in page.gallery_images.all %}
+                        {% for image in gallery_images %}
                             <li>
                                 {% image image.image original loading="lazy" %}
                             </li>
@@ -44,6 +44,15 @@
                     </ul>
                 </div>
 
+                {% if gallery_images.paginator.count > 10 %}
+                    <div class="container">
+                        <div class="row">
+                            <div class="col-sm-12">
+                                {% include "includes/pagination.html" with subpages=gallery_images %}
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>
