@@ -24,11 +24,6 @@ class DogPageFactory(wagtail_factories.PageFactory):
 
 
 @pytest.fixture
-def root_page():
-    yield wagtail_factories.PageFactory(parent=None)
-
-
-@pytest.fixture
 def dog_index_page(root_page):
     yield DogsIndexPageFactory(parent=root_page)
 

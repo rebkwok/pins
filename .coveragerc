@@ -1,2 +1,6 @@
 [run]
-omit=venv/*,.venv/*,*/migrations/*,*/tests/*,*wsgi*,*__init__*,manage.py
+omit=venv/*,.venv/*,*/migrations/*,*/tests/*,*wsgi*,manage.py,scrape_albums.py
+
+[coverage:report]
+skip_empty = true
+skip_covered = true
