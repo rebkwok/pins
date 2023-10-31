@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 import time
 from tqdm import tqdm
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, TimeoutError
 
 DATA_PATH = Path(__file__).parent / ".scraped_album_data"
 ALBUM_ID_REGEX = re.compile(r"https:\/\/www\.facebook\.com\/media\/set\/\?set=a\.(\d+)&type=3")
@@ -52,9 +52,16 @@ ALBUMS_NOT_ACCESSIBLE_VIA_API = [
 ]
 
 
+def dismiss_cookies(page):
+    try:
+        page.get_by_role("button", name="Decline optional cookies").click(timeout=500)
+    except TimeoutError:
+        ...
+
+
 def dismiss_login(page):
     page.goto("http://facebook.com/podencosinneedscotland/photos_albums")
-    page.get_by_role("button", name="Decline optional cookies").click()
+    dismiss_cookies(page)
     page.get_by_label("Close").click()
 
 
@@ -121,6 +128,7 @@ def fetch_non_api_data(page, new_album_data, existing_album_data=None):
 
         this_album_data = dict(new_albums[album_id])
         page.goto(this_album_data["link"])
+        dismiss_cookies(page)
         print(f"\tLoading album for {album_id} - {this_album_data['name']}")
 
         print("\tFinding description")
