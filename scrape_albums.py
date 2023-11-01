@@ -35,12 +35,15 @@ IDS_TO_IGNORE = [
     "819257798415599",  # Pal - a remarkable love story -saved from the brink of death
     "795739000767479",  # Nino - in memoriam see Nino's Tale for his story
     "177583412583044",  # Pacita The Pod who Started it All!
+    "1892887014386000", # Alicia, happily homed
+    "1892885781052790", # Paloma 3rd, home agreed
+    "531587159181577", # Shakira, happily homed
+    "557910736549219", # Braken, happily homed
 ]
 
 
 ALBUMS_NOT_ACCESSIBLE_VIA_API = [
     "1883457118662323",  # Puma
-    "1892887014386000",  # Alicia
     "1892885781052790",  # Paloma the third
     "1793339751007394",  # Ginger
     "1859859784355390",  # Murray
