@@ -274,7 +274,7 @@ AWS_S3_FILE_OVERWRITE = False
 AWS_DEFAULT_ACL = "private"
 
 # only if using cloudfront
-AWS_S3_CUSTOM_DOMAIN = env.str("AWS_S3_CUSTOM_DOMAIN")
+AWS_S3_CUSTOM_DOMAIN = env.str("AWS_S3_CUSTOM_DOMAIN", "")
 AWS_S3_REGION_NAME = "eu-west-1"
 
 
