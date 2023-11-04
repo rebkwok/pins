@@ -611,7 +611,7 @@ class DogPage(Page):
     # template
     def get_context(self, request):
         context = super().get_context(request)
-        gallery_images = self.paginate(request, self. gallery_images.all())
+        gallery_images = self.paginate(request, self.gallery_images.all())
 
         context["gallery_images"] = gallery_images
 
