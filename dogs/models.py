@@ -572,7 +572,7 @@ class DogPage(Page):
             if index == 0:
                 gallery_image = self.gallery_images.first()
             else:
-                gallery_image = self.gallery_images.all()[index]
+                gallery_image = list(self.gallery_images.all())[index]
             return gallery_image.image
 
     @property
