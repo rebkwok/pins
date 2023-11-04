@@ -625,6 +625,8 @@ class DogPage(Page):
                 self.update_facebook_info()
             except GraphAPIError as e:
                 logger.error(e)
+                if "Unsupported get request" in str(e):
+                    raise
                 albums_obj = FacebookAlbums.instance()
                 albums_obj.set_rate_limit()
         super().save(*args, **kwargs)
