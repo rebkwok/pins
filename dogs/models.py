@@ -616,6 +616,7 @@ class DogPage(Page):
         return context
 
     def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
         albums_obj = FacebookAlbums.instance()
         if self.facebook_album_id in ALBUMS_NOT_ACCESSIBLE_VIA_API:
             logger.info("Album %s can't be fetched from API, use scraper", self.facebook_album_id)
@@ -629,4 +630,3 @@ class DogPage(Page):
                     raise
                 albums_obj = FacebookAlbums.instance()
                 albums_obj.set_rate_limit()
-        super().save(*args, **kwargs)
