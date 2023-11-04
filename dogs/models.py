@@ -533,6 +533,8 @@ class DogPage(Page):
     subpage_types = []
     parent_page_types = ["DogStatusPage"]
 
+    paginate_by = 20
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._album_info = None
@@ -596,7 +598,7 @@ class DogPage(Page):
     # method on the model rather than within a view function
     def paginate(self, request, *args):
         page = request.GET.get("page")
-        paginator = Paginator(self.gallery_images.all(), 10)
+        paginator = Paginator(self.gallery_images.all(), self.paginate_by)
         try:
             pages = paginator.page(page)
         except PageNotAnInteger:
@@ -612,6 +614,8 @@ class DogPage(Page):
         gallery_images = self.paginate(request, self. gallery_images.all())
 
         context["gallery_images"] = gallery_images
+
+        context["paginate_by"] = self.paginate_by
 
         return context
 
