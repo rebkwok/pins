@@ -12,6 +12,7 @@ whitenoise
 facebook-sdk
 wagtail-json-widget
 django-storages[boto3]
+wagtail-django-recaptcha
 
 pytest
 coverage

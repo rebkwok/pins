@@ -31,6 +31,8 @@ from wagtail.models import (
 )
 from wagtail.contrib.forms.utils import get_field_clean_name
 
+from wagtailcaptcha.models import WagtailCaptchaEmailForm, WagtailCaptchaForm, WagtailCaptchaFormBuilder
+
 
 class HomePage(Page):
     """
@@ -265,7 +267,7 @@ class FormField(AbstractFormField):
     page = ParentalKey("FormPage", related_name="form_fields", on_delete=models.CASCADE)
 
 
-class FormPage(AbstractEmailForm):
+class FormPage(WagtailCaptchaEmailForm):
 
     image = models.ForeignKey(
         "wagtailimages.Image",
@@ -473,12 +475,12 @@ class OrderBaseForm(BaseForm):
             self.add_error("__all__", validation_error_msg)
 
 
-class OrderFormBuilder(FormBuilder):
+class OrderFormBuilder(WagtailCaptchaFormBuilder):
     def get_form_class(self):
         return type("WagtailForm", (OrderBaseForm,), self.formfields)
 
 
-class OrderFormPage(AbstractEmailForm):
+class OrderFormPage(WagtailCaptchaEmailForm):
     form_builder = OrderFormBuilder
     submissions_list_view_class = OrderFormSubmissionsListView
 

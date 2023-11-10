@@ -112,6 +112,8 @@ INSTALLED_APPS = [
     "modelcluster",
     "taggit",
     "storages",
+    "captcha",
+    "wagtailcaptcha",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -469,3 +471,9 @@ FB_APP_ID = env.str("FB_APP_ID")
 FB_APP_SECRET = env.str("FB_APP_SECRET")
 FB_ACCESS_TOKEN = env.str("FB_ACCESS_TOKEN")
 FB_ACCESS_TOKEN_PATH = Path("pins/.fb_access_token")
+
+
+# RECAPTCHA
+RECAPTCHA_PUBLIC_KEY = env.str("RECAPTCHA_PUBLIC_KEY", "")
+RECAPTCHA_PRIVATE_KEY = env.str("RECAPTCHA_PRIVATE_KEY", "")
+NOCAPTCHA = True
