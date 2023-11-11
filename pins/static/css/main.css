@@ -2221,3 +2221,20 @@ input[type='radio'] {
   content: "";
   flex-grow: 999;
 }
+
+.standard-page-button {
+  margin-top: 3rem;
+}
+
+
+.standard-page__introduction {
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+@media (min-width: 768px) {
+  .standard-page__introduction {
+    font-size: 2rem;
+    margin-top: 40px;
+  }
+}

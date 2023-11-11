@@ -1,0 +1,7 @@
+{% if show_button %}
+<div class="standard-page-button">
+<a href="{{ page.button_url }}" class="btn" {% if page.button_styling %}style="{{ page.button_styling }}"{% endif %}>
+    {{ page.button_text }}
+</a>
+</div>
+{% endif %}

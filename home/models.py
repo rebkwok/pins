@@ -728,10 +728,27 @@ class StandardPage(Page):
     )
     body = RichTextField(verbose_name="Page body", blank=True)
 
+    button_text = models.CharField(blank=True)
+    button_url = models.URLField(blank=True)
+    button_display = models.CharField(
+        choices=[("top", "Top of page"), ("bottom", "Bottom of page"), ("both", "Top and bottom of page")],
+        default="top"
+        )
+    button_styling = models.CharField(blank=True)
+
     content_panels = Page.content_panels + [
         FieldPanel("introduction"),
         FieldPanel("body"),
         FieldPanel("image"),
+        MultiFieldPanel(
+            [
+                FieldPanel("button_text"),
+                FieldPanel("button_url"),
+                FieldPanel("button_display"),
+                FieldPanel("button_styling"),
+            ],
+            heading="Button (optional)",
+        ),
     ]
 
     parent_page_types = ["HomePage", "OrderFormPage"]
