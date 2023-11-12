@@ -470,7 +470,7 @@ S3_LOG_BACKUP_ROOT_FILENAME = "pins_activity_logs_backup"
 FB_APP_ID = env.str("FB_APP_ID")
 FB_APP_SECRET = env.str("FB_APP_SECRET")
 FB_ACCESS_TOKEN = env.str("FB_ACCESS_TOKEN")
-FB_ACCESS_TOKEN_PATH = Path("pins/.fb_access_token")
+FB_ACCESS_TOKEN_PATH = Path(PROJECT_DIR) / ".fb_access_token"
 
 
 # RECAPTCHA

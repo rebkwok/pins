@@ -474,6 +474,7 @@ class FacebookAlbumTracker:
             }
             changes["removed"] = {
                 album_id: saved_data[album_id]["name"] for album_id in removed_albums
+                if album_id not in ALBUMS_NOT_ACCESSIBLE_VIA_API
             }
             
             same_albums = set(new_data) & set(saved_data) 
