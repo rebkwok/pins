@@ -469,9 +469,10 @@ class FacebookAlbumTracker:
 
     def update_all(self, new_data=None, force_update=False):  
         new_data = new_data or self.fetch_all(force_update)
-        self.report_changes(new_data)
+        changes = self.report_changes(new_data)
         self.albums_obj.update_all(new_data)
         logger.info("All album data updated")
+        return changes
 
     def update_albums(self, album_ids, force_update=False):
         for i, album_id in enumerate(album_ids, start=1):

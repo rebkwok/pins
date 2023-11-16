@@ -7,7 +7,7 @@ from dogs.models import FacebookAlbumTracker
 
 
 class Command(BaseCommand):
-    help = 'report Facebook changes'
+    help = 'Update facebook data and report changes'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -19,8 +19,7 @@ class Command(BaseCommand):
 
     def handle(self, email, **kwargs):
         tracker = FacebookAlbumTracker()
-        new_data = tracker.fetch_all()
-        changes = tracker.report_changes(new_data)
+        changes = tracker.update_all()
 
         mail_content = [f"Facebook album changes as of {datetime.utcnow()}"]
         for change, changed_data in changes.items():
