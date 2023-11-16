@@ -15,6 +15,7 @@ from django.utils.safestring import mark_safe
 from facebook import GraphAPI, GraphAPIError
 
 from modelcluster.fields import ParentalKey
+from wagtail.models.collections import Collection
 from wagtail.models import Orderable, Page
 from wagtail.fields import RichTextField
 from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, Panel
@@ -385,7 +386,7 @@ class FacebookAlbumTracker:
         url = f"https://graph.facebook.com/v18.0/{album_id}/photos/?fields=images&access_token={self.api.access_token}&limit=50"
         return requests.get(url).json()["data"]
 
-    def create_gallery_image(self, page, image_id, image_url):
+    def create_gallery_image(self, page, collection, image_id, image_url):
         # create the gallery image
         # image id is the facebook image id
         image_resp = requests.get(image_url, allow_redirects=True)
@@ -393,6 +394,7 @@ class FacebookAlbumTracker:
         image = Image(
             title=photo_name,
             file=ImageFile(BytesIO(image_resp.content), name=f"{photo_name}.jpg"),
+            collection=collection,
         )
         image.save()
         DogPageGalleryImage.objects.create(page=page, image=image, fb_image_id=image_id)
@@ -420,13 +422,20 @@ class FacebookAlbumTracker:
         if not photos:
             return album_data
         
+        collection_name = f"{page.slug}_{album_id}"
+        try:
+            collection = Collection.objects.get(name=collection_name )
+        except Collection.DoesNotExist:
+            root_collection = Collection.get_first_root_node()
+            collection = root_collection.add_child(name=collection_name)
+
         for photo in photos:
             images = photo.pop("images")
             photo["image_url"] = images[0]["source"]
             album_data["images"].append(photo)
 
             if photo["id"] not in page_image_ids:
-                self.create_gallery_image(page, photo["id"], photo["image_url"])
+                self.create_gallery_image(page, collection, photo["id"], photo["image_url"])
                 
         return album_data
 
