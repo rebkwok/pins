@@ -238,6 +238,7 @@ class FacebookAlbums(models.Model):
     #     },
     # }
     albums = models.JSONField()
+    previous_albums = models.JSONField(default=dict) # backup 
     date_updated = models.DateTimeField(default=timezone.now)
     rate_limited_at = models.DateTimeField(null=True)
 
@@ -277,6 +278,7 @@ class FacebookAlbums(models.Model):
         self.save()
 
     def update_all(self, all_album_data):
+        self.previous_albums = self.albums
         self.albums = all_album_data
         self.date_updated = timezone.now()
         self.save()
@@ -457,9 +459,15 @@ class FacebookAlbumTracker:
             album_data = self.get_album_data(album_metadata["id"], album_metadata, force_update)
             if album_data is not None:      
                 albums_data[album_id] = album_data
+        logger.info("Adding existing non-api albums")
+        non_api_albums = {
+            album_id: data for album_id, data in self.albums_obj.albums.items()
+            if album_id in ALBUMS_NOT_ACCESSIBLE_VIA_API
+        }
+        albums_data.update(non_api_albums)
         return albums_data
 
-    def update_all(self, new_data=None, force_update=False):        
+    def update_all(self, new_data=None, force_update=False):  
         new_data = new_data or self.fetch_all(force_update)
         self.report_changes(new_data)
         self.albums_obj.update_all(new_data)
@@ -483,7 +491,6 @@ class FacebookAlbumTracker:
             }
             changes["removed"] = {
                 album_id: saved_data[album_id]["name"] for album_id in removed_albums
-                if album_id not in ALBUMS_NOT_ACCESSIBLE_VIA_API
             }
             
             same_albums = set(new_data) & set(saved_data) 

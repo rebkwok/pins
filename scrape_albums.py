@@ -43,7 +43,7 @@ IDS_TO_IGNORE = [
 
 
 ALBUMS_NOT_ACCESSIBLE_VIA_API = [
-    "1883457118662323",  # Puma
+    "1883457118662323",  # Puma/Norah
     "1892885781052790",  # Paloma the third
     "1793339751007394",  # Ginger
     "1859859784355390",  # Murray
