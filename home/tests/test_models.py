@@ -1,4 +1,6 @@
 import datetime
+import os
+from unittest.mock import patch
 
 from django.core import mail
 from django.test import RequestFactory
@@ -38,7 +40,10 @@ def test_form_page(contact_form_page, client):
     request = RequestFactory().get(contact_form_page.url)
     request.user = None
     resp = contact_form_page.serve(request)
-    assert list(resp.context_data["form"].fields.keys()) == ["subject", "email_address", "message"]
+    assert (
+        list(resp.context_data["form"].fields.keys()) == 
+        ["subject", "email_address", "message", "wagtailcaptcha"]
+    )
 
 
 def test_form_page_with_ref(contact_form_page):
@@ -54,10 +59,16 @@ def test_form_page_send_email(contact_form_page):
     
     form_class = contact_form_page.get_form_class()
     form = form_class(
-        {"subject": "enquiry", "email_address": "test@test.com", "message": "A message"}
+        {
+            "subject": "enquiry", 
+            "email_address": "test@test.com", 
+            "message": "A message",
+            "g-recaptcha-response": "PASSED"
+        }
     )
     assert form.is_valid()
-    contact_form_page.send_mail(form)
+    # process form submission removes the recaptcha fields and sends email
+    contact_form_page.process_form_submission(form)
 
     assert len(mail.outbox) == 1
     assert mail.outbox[0].to == ["admin@test.com"]
@@ -81,11 +92,16 @@ def test_form_page_send_email_other_fields(home_page):
 
     form_class = form_page.get_form_class()
     form = form_class(
-        {"date": datetime.date(2023, 12, 15), "datetime": datetime.datetime(2023, 8, 1, 12, 0), "list": ["a", "b"]}
+        {
+            "date": datetime.date(2023, 12, 15), 
+            "datetime": datetime.datetime(2023, 8, 1, 12, 0), 
+            "list": ["a", "b"],
+            "g-recaptcha-response": "PASSED"
+        }
     )
     assert form.is_valid()
     
-    form_page.send_mail(form)
+    form_page.process_form_submission(form)
     assert len(mail.outbox) == 1
     assert mail.outbox[0].to == ["admin@test.com"]
     assert mail.outbox[0].subject == "test"
