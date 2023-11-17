@@ -19,7 +19,7 @@ class Command(BaseCommand):
 
     def handle(self, email, **kwargs):
         tracker = FacebookAlbumTracker()
-        changes = tracker.update_all()
+        changes = tracker.update_all(force_update=True)
 
         mail_content = [f"Facebook album changes as of {datetime.utcnow()}"]
         for change, changed_data in changes.items():

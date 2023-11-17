@@ -373,7 +373,7 @@ class FacebookAlbumTracker:
             self.albums_obj.get_album(album_id).get("updated_time") != metadata.get("updated_time")
         ):
             logger.info("Updating album %s", album_id)
-            album_data = self.get_album_data(album_id, metadata, force_update=force_update)
+            album_data = self.get_album_data(album_id, album_metadata=metadata, force_update=force_update)
             if album_data:
                 self.albums_obj.update_album(album_id, album_data)
             logger.info("Album %s updated", album_id)
@@ -456,7 +456,7 @@ class FacebookAlbumTracker:
         for i, album_metadata in enumerate(albums, start=1):
             album_id = album_metadata["id"]
             logger.info("Fetching album %d of %d", i, total)
-            album_data = self.get_album_data(album_metadata["id"], album_metadata, force_update)
+            album_data = self.get_album_data(album_id, force_update=force_update)
             if album_data is not None:      
                 albums_data[album_id] = album_data
         logger.info("Adding existing non-api albums")
