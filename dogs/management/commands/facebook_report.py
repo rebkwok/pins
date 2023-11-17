@@ -23,16 +23,16 @@ class Command(BaseCommand):
 
         mail_content = [f"Facebook album changes as of {datetime.utcnow()}"]
         for change, changed_data in changes.items():
-            if changed_data:
-                mail_content.append("\n==============================================")
-                mail_content.append(change)
-                mail_content.append("==============================================")
+            mail_content.append("\n==============================================")
+            mail_content.append(change)
+            mail_content.append("==============================================")
+            if not changed_data:
+                mail_content.append("None")
             for key, val in changed_data.items():
                 if change != "custom_albums":
                     mail_content.append(f"{key}: {val}")
                 else:
                     mail_content.append(f"{key}: {val.get('link', '')}")
-        
         mail_content = "\n".join(mail_content)
         self.stdout.write(mail_content)
         if email:
