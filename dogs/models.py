@@ -303,14 +303,25 @@ class FacebookAlbumTracker:
         if self._api is None:
             # read the current access token
             token = self.get_current_access_token()
-            self._api = GraphAPI(access_token=token) 
             # make sure the token is up to date
-            if self.token_expires_soon(token):
-                # generate new token and write it to file
-                token = self.generate_new_token()
+            token_status = self.get_token_status(token)
+            if token_status == "expired":
+                # raise exception; generate a new token
+                # at https://developers.facebook.com/tools/explorer/
+                # try deleting path and getting token again, in case we're
+                # added a new starting short-lived token
+                settings.FB_ACCESS_TOKEN_PATH.unlink()
+                token = self.get_current_access_token()
+                token_status = self.get_token_status(token)
+                if token_status == "expired":
+                    # definitely expired; raise exception
+                    raise Exception("Access token session has expired.")
+            elif token_status == "expires_soon":
+                # extend token and write it to file
+                token = self.extend_token()
                 settings.FB_ACCESS_TOKEN_PATH.write_text(token)
-                # setup api with new token
-                self._api = GraphAPI(access_token=token)
+            # setup api with  token
+            self._api = GraphAPI(access_token=token)
         return self._api
                                
     def get_all_albums(self):
@@ -346,7 +357,7 @@ class FacebookAlbumTracker:
         token = token_path.read_text()
         return token
 
-    def token_expires_soon(self, token):
+    def get_token_status(self, token):
         # check expiry; "soon" means it expired in the next day
         url = (
             f"https://graph.facebook.com/debug_token?input_token={token}"
@@ -355,12 +366,23 @@ class FacebookAlbumTracker:
         token_resp = requests.get(url).json()
         # error if rate limited
         if token_resp.get("error"):
-            self.albums_obj.set_rate_limit()
-            return False
+            if "Session has expired" in token_resp["error"].get("message", ""):
+                return "expired"    
+            else:
+                self.albums_obj.set_rate_limit()
+                return "rate_limited"
+
         expiry = datetime.fromtimestamp(token_resp["data"]["expires_at"])
-        return expiry < datetime.now() + timedelta(days=1)
+        if expiry < datetime.now() + timedelta(days=1):
+            return "expires_soon"
+    
+        session_expiry = datetime.fromtimestamp(token_resp["data"]["data_access_expires_at"])
+        if session_expiry < datetime.now() + timedelta(days=7):
+            return "session_expires_soon"
+
+        return "ok"
             
-    def generate_new_token(self):
+    def extend_token(self):
         # Extend the expiration time of a valid OAuth access token.
         return self.api.extend_access_token(self.app_id, self.app_secret)["access_token"]
 
@@ -468,7 +490,7 @@ class FacebookAlbumTracker:
         return albums_data
 
     def update_all(self, new_data=None, force_update=False):  
-        new_data = new_data or self.fetch_all(force_update)
+        new_data = new_data or self.fetch_all(force_update=force_update)
         changes = self.report_changes(new_data)
         self.albums_obj.update_all(new_data)
         logger.info("All album data updated")

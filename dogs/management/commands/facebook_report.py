@@ -22,10 +22,15 @@ class Command(BaseCommand):
         changes = tracker.update_all(force_update=True)
 
         mail_content = [f"Facebook album changes as of {datetime.utcnow()}"]
+        
+        token = tracker.get_current_access_token()
+        if tracker.get_token_status(token) == "session_expires_soon":
+            mail_content.append("\nWARNING! Access token session expires in <7 days\n")
+        
         for change, changed_data in changes.items():
-            mail_content.append("\n==============================================")
+            mail_content.append("\n==================")
             mail_content.append(change)
-            mail_content.append("==============================================")
+            mail_content.append("==================")
             if not changed_data:
                 mail_content.append("None")
             for key, val in changed_data.items():

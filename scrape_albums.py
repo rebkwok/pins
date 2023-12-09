@@ -136,6 +136,8 @@ def fetch_non_api_data(page, new_album_data, existing_album_data=None):
 
         print("\tFinding description")
         see_more_btn = page.get_by_text("See more")
+        if see_more_btn.count() > 1:
+            see_more_btn = see_more_btn.all()[0]
         if see_more_btn.is_visible():
             see_more_btn.click()
         attempts = 0
