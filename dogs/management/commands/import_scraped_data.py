@@ -34,6 +34,7 @@ class Command(BaseCommand):
                 continue
             self.stdout.write(f"Creating gallery images for album id {album_id}")
             page_image_ids = page.gallery_images.values_list("fb_image_id", flat=True)
+            collection = tracker.get_collection(page, album_id)
             for image in data["images"]:
                 if image["id"] not in page_image_ids:
-                    tracker.create_gallery_image(page, image["id"], image["image_url"])
+                    tracker.create_gallery_image(page, collection, image["id"], image["image_url"])

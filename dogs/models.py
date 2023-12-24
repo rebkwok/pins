@@ -423,6 +423,14 @@ class FacebookAlbumTracker:
         image.save()
         DogPageGalleryImage.objects.create(page=page, image=image, fb_image_id=image_id)
 
+    def get_collection(self, page, album_id):
+        collection_name = f"{page.slug}_{album_id}"
+        try:
+            return Collection.objects.get(name=collection_name )
+        except Collection.DoesNotExist:
+            root_collection = Collection.get_first_root_node()
+            return root_collection.add_child(name=collection_name)
+        
     def get_album_data(self, album_id, album_metadata=None, force_update=False):
         page = DogPage.objects.get(facebook_album_id=album_id)
         page_image_ids = page.gallery_images.values_list("fb_image_id", flat=True)
@@ -446,12 +454,7 @@ class FacebookAlbumTracker:
         if not photos:
             return album_data
         
-        collection_name = f"{page.slug}_{album_id}"
-        try:
-            collection = Collection.objects.get(name=collection_name )
-        except Collection.DoesNotExist:
-            root_collection = Collection.get_first_root_node()
-            collection = root_collection.add_child(name=collection_name)
+        collection = self.get_collection(page, album_id)
 
         for photo in photos:
             images = photo.pop("images")

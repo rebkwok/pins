@@ -44,12 +44,9 @@ IDS_TO_IGNORE = [
 
 ALBUMS_NOT_ACCESSIBLE_VIA_API = [
     "1883457118662323",  # Puma/Norah
-    "1892885781052790",  # Paloma the third
     "1793339751007394",  # Ginger
     "1859859784355390",  # Murray
-    "1642143862793651",  # Santos
     "1814842875523748",  # India
-    "1839040019770700",  # Esperanza
     "1810360705971965",  # Lucky
     "1773803669627669",  # Bonnie
 ]
@@ -257,7 +254,7 @@ def diff(all_album_data, all_existing_data=None, report_only=False):
 
 def main(report_only=False):
     with sync_playwright() as pw:
-        browser = pw.firefox.launch(headless=True)
+        browser = pw.firefox.launch(headless=False)
         context = browser.new_context()
         page = context.new_page()
         dismiss_login(page)
