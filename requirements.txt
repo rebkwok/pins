@@ -64,6 +64,7 @@ django==5.0.1
     #   django-extensions
     #   django-filter
     #   django-modelcluster
+    #   django-paypal
     #   django-permissionedforms
     #   django-recaptcha
     #   django-ses
@@ -87,6 +88,8 @@ django-image-uploader-widget==0.4.1
     # via -r requirements.in
 django-modelcluster==6.2.1
     # via wagtail
+django-paypal==2.0
+    # via -r requirements.in
 django-permissionedforms==0.1
     # via wagtail
 django-recaptcha==3.0.0
@@ -260,6 +263,7 @@ python-socketio==5.11.0
 pytz==2023.3.post1
     # via
     #   django-modelcluster
+    #   django-paypal
     #   django-ses
     #   djangorestframework
     #   l18n
@@ -267,6 +271,7 @@ pyyaml==6.0.1
     # via uvicorn
 requests==2.31.0
     # via
+    #   django-paypal
     #   django-ses
     #   facebook-sdk
     #   wagtail

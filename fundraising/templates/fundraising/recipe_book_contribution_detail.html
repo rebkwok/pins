@@ -11,6 +11,11 @@
 
                 <div>
                     <label>STATUS</label>: {{ submission.status }}
+                    {% if not self.paid %}
+                        <div>Payment due: {{ submission.formatted_cost}}</div>
+                        {{ paypal_form.render }}
+                    {% endif %}
+                    <hr><br>
                     <p>
                         {% if submission.complete %}
                             Your contribution has been processed and can no longer be edited.<br>

@@ -110,3 +110,7 @@ class RecipeBookSubmission(models.Model):
     def get_absolute_url(self):
         return reverse("fundraising:recipe_book_contribution_detail", kwargs={"pk": self.reference})
     
+    def save(self, *args, **kwargs):
+        if self.paid and not self.date_paid:
+            self.date_paid = timezone.now()
+        super().save(*args, **kwargs)

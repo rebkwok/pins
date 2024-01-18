@@ -3,10 +3,14 @@ from django import http
 from django.conf import settings
 from django.core.mail import send_mail
 from django.shortcuts import render, redirect, HttpResponse
+from django.urls import reverse
 from django.template.context_processors import csrf
 from django.views.generic import CreateView, DetailView, UpdateView
 
 from crispy_forms.utils import render_crispy_form
+from paypal.standard.forms import PayPalPaymentsForm
+
+from payments.utils import signature
 
 from .forms import RecipeBookContrbutionForm, RecipeBookContrbutionEditForm
 from .models import RecipeBookSubmission
@@ -58,7 +62,31 @@ class RecipeBookSubmissionDetailView(DetailView):
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
-        # Add in paypal form if unpaid
+        submission = context["submission"]
+        if not submission.paid:
+            if settings.PAYPAL_TEST and settings.PAYPAL_TEST_CALLBACK_DOMAIN:
+                paypal_urls = {
+                    "notify_url": f"{settings.PAYPAL_TEST_CALLBACK_DOMAIN}{reverse('paypal-ipn')}",
+                    "return": f"{settings.PAYPAL_TEST_CALLBACK_DOMAIN}{reverse('payments:paypal_return')}",
+                    "cancel_return": f"{settings.PAYPAL_TEST_CALLBACK_DOMAIN}{reverse('payments:paypal_cancel')}",
+                }
+            else:
+                paypal_urls = {
+                    "notify_url": self.request.build_absolute_uri(reverse('paypal-ipn')),
+                    "return": self.request.build_absolute_uri(reverse('payments:paypal_return')),
+                    "cancel_return": self.request.build_absolute_uri(reverse('payments:paypal_cancel')),
+                }
+
+            paypal_dict = {
+                "business": settings.PAYPAL_EMAIL,
+                "amount": submission.cost,
+                "item_name": f"Recipe Book submission: {submission.page_type_verbose()}",
+                "invoice": submission.reference,
+                "currency_code": "GBP",
+                "custom": signature(submission.reference)
+                **paypal_urls
+            }
+            context["paypal_form"] = PayPalPaymentsForm(initial=paypal_dict)
         return context
 
 
