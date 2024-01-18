@@ -1,6 +1,8 @@
 Django
 wagtail
 pip-tools
+crispy-bootstrap3
+django-crispy-forms
 django-environ
 django-extensions
 psycopg2
@@ -12,6 +14,9 @@ whitenoise
 facebook-sdk
 wagtail-json-widget
 django-storages[boto3]
+# limited to 3.0.0 until wagtail-django-recaptcha support 4.0.0
+django-recaptcha==3.0.0
+django-image-uploader-widget
 wagtail-django-recaptcha
 
 pytest

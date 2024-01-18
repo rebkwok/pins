@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags navigation_tags wagtailimages_tags %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+
+    <div class="container">
+        <div class="row">
+            <div class="col">
+                {% if new %}
+                    <h1>Contribute to our Recipe Book!</h1>
+                {% else %}
+                    <h1>Update your Recipe Book Contribution</h1>
+                {% endif %}
+                <label>STATUS:</label> {{ submission.status }}
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="row">
+            <div class="col form-page" id="submission-form">
+                {% crispy form %}
+            </div>
+        </div>
+    </div>
+{% endblock content %}

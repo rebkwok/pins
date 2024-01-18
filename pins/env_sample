@@ -11,7 +11,7 @@ FB_APP_SECRET='dummy_secret'
 # This should be a starting short-lived page access token; it will be
 # exchanged for a long-lived one and kept updated after the fb api
 # is first used 
-FB_ACCESS_TOKEN ='dummy_acccess_token'
+FB_ACCESS_TOKEN='dummy_acccess_token'
 FB_PAGE_ID='page_id'
 
 # local only, prod uses IAM role

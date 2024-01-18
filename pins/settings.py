@@ -122,6 +122,10 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "wagtail_json_widget",
     "dogs",
+    "fundraising",
+    "crispy_forms",
+    "crispy_bootstrap3",
+    "image_uploader_widget",
 ]
 
 
@@ -304,6 +308,7 @@ else:  # pragma: no cover
 
 DEFAULT_FROM_EMAIL = 'pins.scot.web+no-reply@gmail.com'
 SUPPORT_EMAIL = 'rebkwok@gmail.com'
+CC_EMAIL = "pinscotland16@gmail.com"
 SERVER_EMAIL = SUPPORT_EMAIL
 
 # MAILCATCHER
@@ -478,3 +483,8 @@ if not TESTING:  # pragma: no cover
     RECAPTCHA_PUBLIC_KEY = env.str("RECAPTCHA_PUBLIC_KEY", "")
     RECAPTCHA_PRIVATE_KEY = env.str("RECAPTCHA_PRIVATE_KEY", "")
     NOCAPTCHA = True
+
+
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap3"
+
+CRISPY_TEMPLATE_PACK = "bootstrap3"
