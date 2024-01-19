@@ -59,6 +59,7 @@
                     <h2>Photo page</h2>
                     <label>Photo:</label> <img class="recipe-thumbnail" src="{{ submission.photo.url }}"> <br/>
                     {% if submission.page_type != "single_with_facing" %}
+                        <label>Title:</label> {{ submission.photo_title }}<br/>
                         <label>Photo Caption:</label> {{ submission.photo_caption | linebreaks }}
                     {% endif %}
                 {% endif %}

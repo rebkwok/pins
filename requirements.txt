@@ -84,8 +84,6 @@ django-extensions==3.2.3
     # via -r requirements.in
 django-filter==23.5
     # via wagtail
-django-image-uploader-widget==0.4.1
-    # via -r requirements.in
 django-modelcluster==6.2.1
     # via wagtail
 django-paypal==2.0
@@ -277,6 +275,8 @@ requests==2.31.0
     #   wagtail
 s3transfer==0.10.0
     # via boto3
+shortuuid==1.0.11
+    # via -r requirements.in
 simple-websocket==1.0.0
     # via python-engineio
 six==1.16.0
@@ -326,11 +326,14 @@ wagtail==5.2.2
     #   -r requirements.in
     #   wagtail-factories
     #   wagtail-json-widget
+    #   wagtail-modeladmin
 wagtail-django-recaptcha==1.0
     # via -r requirements.in
 wagtail-factories==4.1.0
     # via -r requirements.in
 wagtail-json-widget==0.0.7
+    # via -r requirements.in
+wagtail-modeladmin==1.0.0
     # via -r requirements.in
 watchfiles==0.21.0
     # via

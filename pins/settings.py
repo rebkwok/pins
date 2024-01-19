@@ -97,7 +97,6 @@ INSTALLED_APPS = [
     "django_extensions",
     "django_ses",
     "wagtail.contrib.forms",
-    "wagtail.contrib.modeladmin",
     "wagtail.contrib.redirects",
     "wagtail.contrib.settings",
     "wagtail.embeds",
@@ -108,6 +107,7 @@ INSTALLED_APPS = [
     "wagtail.images",
     "wagtail.search",
     "wagtail.admin",
+    "wagtail_modeladmin",
     "wagtail",
     "modelcluster",
     "taggit",
@@ -120,12 +120,12 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.forms",
     "wagtail_json_widget",
     "dogs",
     "fundraising",
     "crispy_forms",
     "crispy_bootstrap3",
-    "image_uploader_widget",
     "paypal.standard.ipn",
     "payments",
 ]
@@ -491,6 +491,7 @@ CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap3"
 
 CRISPY_TEMPLATE_PACK = "bootstrap3"
 
+FORM_RENDERER = 'django.forms.renderers.TemplatesSetting'
 
 # PAYPAL
 PAYPAL_TEST = env.bool("PAYPAL_TEST", True)

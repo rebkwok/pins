@@ -29,6 +29,11 @@ class RecipeBookSubmissionCreateView(CreateView):
         self.send_submission_email(submission)
         return redirect(submission)
 
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        context["new"] = True
+        return context
+    
     def send_submission_email(self, submission):
         send_mail(
             "Recipe book contribution received!",
@@ -83,7 +88,7 @@ class RecipeBookSubmissionDetailView(DetailView):
                 "item_name": f"Recipe Book submission: {submission.page_type_verbose()}",
                 "invoice": submission.reference,
                 "currency_code": "GBP",
-                "custom": signature(submission.reference)
+                "custom": signature(submission.reference),
                 **paypal_urls
             }
             context["paypal_form"] = PayPalPaymentsForm(initial=paypal_dict)
@@ -103,9 +108,32 @@ class RecipeBookSubmissionUpdateView(UpdateView):
             return redirect(obj)
         return super().dispatch(request, *args, **kwargs)
 
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        context["new"] = False
+        return context
+    
+    
 def update_form_fields(request):
     ctx = {}
     ctx.update(csrf(request))
     initial = {k: request.POST.get(k) for k in request.POST }
     form = RecipeBookContrbutionForm(initial=initial, page_type=request.POST.get("page_type"))
     return HttpResponse(render_crispy_form(form, context=ctx))
+
+
+def char_count(request, fieldname):
+    fieldcount = len(request.GET.get(fieldname))
+    max_count = int(request.GET.get("max"))
+    count_str = f"Character count: {str(fieldcount)}"
+    if fieldcount >= max_count:
+        count_str = f"<strong class='text-danger'>{count_str}</strong>"
+    return HttpResponse(count_str)
+
+
+def method_char_count(request):
+    return char_count(request, "method")
+
+
+def profile_caption_char_count(request):
+    return char_count(request, "profile_caption")

@@ -11,8 +11,9 @@
                     <h1>Contribute to our Recipe Book!</h1>
                 {% else %}
                     <h1>Update your Recipe Book Contribution</h1>
+                    <label>STATUS:</label> {{ submission.status }}
                 {% endif %}
-                <label>STATUS:</label> {{ submission.status }}
+                
             </div>
         </div>
     </div>
@@ -20,6 +21,9 @@
     <div class="container">
         <div class="row">
             <div class="col form-page" id="submission-form">
+                {% if form.errors %}
+                    <div class="message alert-danger">Please correct the errors below.</div>
+                {% endif %}
                 {% crispy form %}
             </div>
         </div>

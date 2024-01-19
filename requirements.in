@@ -16,9 +16,10 @@ wagtail-json-widget
 django-storages[boto3]
 # limited to 3.0.0 until wagtail-django-recaptcha support 4.0.0
 django-recaptcha==3.0.0
-django-image-uploader-widget
 wagtail-django-recaptcha
 django-paypal
+wagtail-modeladmin
+shortuuid
 
 pytest
 coverage

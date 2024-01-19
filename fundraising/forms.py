@@ -2,31 +2,52 @@ from django import forms
 from django.urls import reverse
 
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, Hidden, HTML, Row
-
-from image_uploader_widget.widgets import ImageUploaderWidget
+from crispy_forms.layout import Layout, Submit, Hidden, HTML, Div, MultiField
 
 from .models import RecipeBookSubmission
 
+
+class CustomFileInput(forms.widgets.ClearableFileInput):
+    input_text = "Choose another"
+    template_name = 'fundraising/widgets/image_file_input.html'
+
+
 class RecipeBookContrbutionForm(forms.ModelForm):
     recipe_fields = [
+        HTML("<h2>Recipe Details</h2><hr>"),
         "title", 
         "preparation_time", 
         "cook_time", 
         "servings", 
         "ingredients", 
-        "method",
+        Div("method", HTML("<span id='method_ch_count' class='help-block'>Character count: 0</span>")),
+        HTML("<h2>Profile</h2><hr>"),
         "submitted_by",
         "profile_image",
-        "profile_caption"
+        Div("profile_caption", HTML("<span id='profile_caption_ch_count' class='help-block'>Character count: 0</span>")),
     ]
+    photo_fields = ["photo", "photo_title", "photo_caption"]
     fields_by_page_type = {
         "single": recipe_fields,
-        "single_with_facing": recipe_fields + ["photo", "photo_caption"],
-        "double": recipe_fields + ["photo"],
-        "photo": ["photo", "photo_caption"],
+        "single_with_facing": [*recipe_fields, HTML("<h2>Facing Full-Page Photo</h2><hr>"), *photo_fields],
+        "double": recipe_fields + [
+            HTML("<h2>Additional Photo on second page (optional)</h2><hr>"),
+            "photo"
+        ],
+        "photo": [HTML("<h2>Full-Page Photo</h2><hr>"), *photo_fields],
     }
-    optional_fields = ["profile_caption", "photo_caption"]
+
+    recipe_required =[
+        "title", "preparation_time", "cook_time", "servings", "ingredients", "method",
+        "submitted_by", "profile_image"
+    ]
+
+    required_fields_by_page_type = {
+        "single": recipe_required,
+        "double": recipe_required,
+        "single_with_facing": [*recipe_required, "photo", "photo_title"],
+        "photo": ["photo", "photo_title"]
+    }
 
     def __init__(self, **kwargs):
         page_type = kwargs.pop("page_type", None)
@@ -34,23 +55,50 @@ class RecipeBookContrbutionForm(forms.ModelForm):
 
         self.fields["page_type"].widget.attrs = {
             "hx-post": reverse("fundraising:update_form_fields"),
-            "hx-target": "#submission-form"
+            "hx-target": "#submission-form",
         }
         # make all recipe and photo fields not required; validate later based on page_type
         # chosen
-        for field in [
-            "title", "preparation_time", "cook_time", "servings", "ingredients", "method",
-            "submitted_by", "profile_image", "profile_caption",
-            "photo", "photo_caption"
-            ]:
-            self.fields[field].required = False
+        required_fields = ["name", "email", "page_type", *self.required_fields_by_page_type.get(page_type, [])]
+        for field in required_fields:
+            self.fields[field].required = True
 
-        if self.instance.page_type:
-            layout_fields = self.fields_by_page_type[self.instance.page_type]
-        elif page_type is not None:
-            layout_fields = self.fields_by_page_type[page_type]
-        else:
-            layout_fields = []
+        page_type = self.instance.page_type or page_type
+        layout_fields = self.fields_by_page_type.get(
+            page_type, [
+                Hidden("profile_image", self.instance.name),
+                Hidden("photo", self.instance.name),
+            ]
+        )
+        
+        if page_type != "photo":
+            method_field = self.fields["method"]
+            max_method_count = 1200
+            if page_type in ["single", "single_with_facing"]:
+                method_field.help_text += (
+                    ". Enter a maximum of 1200 characters for a single-page recipe. "
+                    "If you need more space (up to 3000 characters), please choose "
+                    "the double page option."
+                )
+            elif page_type == "double":
+                max_method_count = 3000
+                method_field.help_text += ". Maximum of 3000 characters."
+
+            method_field.widget.attrs.update({
+                "maxlength": max_method_count,
+                "hx-get": reverse("fundraising:method_char_count") + f"?max={max_method_count}",
+                "hx-target": "#method_ch_count",
+                "hx-trigger": "keyup"
+            })
+
+            profile_caption = self.fields["profile_caption"]
+            profile_caption.widget.attrs.update({
+                "hx-get": reverse("fundraising:profile_caption_char_count") + f"?max=300",
+                "hx-target": "#profile_caption_ch_count",
+                "hx-trigger": "keyup"
+            })
+            profile_caption.help_text += ". Maximum of 300 characters."
+
 
         self.helper = FormHelper()
         self.helper.form_action = reverse("fundraising:recipe_book_contribution_add")
@@ -74,19 +122,12 @@ class RecipeBookContrbutionForm(forms.ModelForm):
             "page_type",
             "title", "preparation_time", "cook_time", "servings", "ingredients", "method",
             "submitted_by", "profile_image", "profile_caption",
-            "photo", "photo_caption"
+            "photo",  "photo_title", "photo_caption"
         ]
         widgets = {
-            'profile_image': ImageUploaderWidget(),
-            'photo': ImageUploaderWidget(),
+            'profile_image': CustomFileInput(),
+            'photo': CustomFileInput(),
         }
-    
-    def clean(self):
-        page_type = self.cleaned_data["page_type"]
-        fields = self.fields_by_page_type[page_type]
-        for field in fields:
-            if not self.cleaned_data.get(field) and field not in self.optional_fields:
-                self.add_error(field, "This field is required.")
 
 
 class RecipeBookContrbutionEditForm(RecipeBookContrbutionForm):

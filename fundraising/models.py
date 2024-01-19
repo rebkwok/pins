@@ -1,7 +1,12 @@
 import uuid
+from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
 from django.db import models
+from django.core.exceptions import ValidationError
 from django.urls import reverse
 from django.utils import timezone
+
+from shortuuid.django_fields import ShortUUIDField
 
 
 PAGE_TYPE_COSTS = {
@@ -17,6 +22,25 @@ def image_upload_path(instance, filename):
         return f"recipes/{instance.reference}/{filename}"
 
 
+def validate_image_size(image, width=None, height=None):
+    error = False
+    if width is not None and image.width < width:
+        error = True
+    if height is not None and image.height < height:
+        error = True
+    if error:
+        raise ValidationError(
+            [f'Size should be at least {width} x {height} pixels.']
+        )
+
+
+def validate_photo(image):
+    return validate_image_size(image, width=1500, height=2100)
+
+
+def validate_profile_image(image):
+    return validate_image_size(image, width=710, height=520)
+
 
 class RecipeBookSubmission(models.Model):
 
@@ -27,9 +51,8 @@ class RecipeBookSubmission(models.Model):
         ("photo", "Photo page only")
     )
     # fields that apply to all page types
-    reference = models.UUIDField(
+    reference = ShortUUIDField(
         primary_key=True,
-        default = uuid.uuid4, 
         editable = False
     )
 
@@ -39,13 +62,13 @@ class RecipeBookSubmission(models.Model):
     page_type = models.CharField(choices=page_types)
 
     # recipe fields, applies to all except photo page types
-    title = models.CharField(help_text="Title of recipe", blank=True)
-    preparation_time = models.CharField(help_text="Preparation time (please include units)", blank=True)
-    cook_time = models.CharField(help_text="Cook time (please include units)", blank=True)
+    title = models.CharField(blank=True, max_length=100, help_text="Title of recipe. Maximum 100 characters.")
+    preparation_time = models.CharField(help_text="Preparation time (please include units)", blank=True, max_length=50)
+    cook_time = models.CharField(help_text="Cook time (please include units)", blank=True, max_length=50)
 
-    servings = models.CharField(help_text="How many servings does the recipe make? e.g. serves 4, makes 16", blank=True)
-    ingredients = models.TextField(help_text="List ingredients as they should appear in the recipe (include subheadings if you want)", blank=True)
-    method = models.TextField(help_text="Method; please separate paragraphs with a blank line", blank=True)
+    servings = models.CharField(help_text="How many servings does the recipe make? e.g. serves 4, makes 16", blank=True,  max_length=50)
+    ingredients = models.TextField(help_text="List ingredients as they should appear in the recipe (include subheadings if you want)", blank=True, max_length=500)
+    method = models.TextField(help_text="Recipe instructions", blank=True)
 
     submitted_by = models.CharField(
         help_text=(
@@ -53,29 +76,48 @@ class RecipeBookSubmission(models.Model):
             "name, your dog's name - however you want it to appear e.g. 'Becky & Nala'. This will appear "
             "next to your profile image."
         ), 
-        blank=True
+        blank=True,
+        max_length=100,
     )
     profile_image = models.ImageField(
         null=True,
         blank=True,
-        upload_to=image_upload_path
+        upload_to=image_upload_path,
+        validators=[FileExtensionValidator(['jpg', 'jpeg']), validate_profile_image],
+        help_text="In order to print at good quality, we require photos at min 300dpi, width 710px, height 520px."
+
     )
     profile_caption = models.TextField(
         help_text=(
             "Optional caption to go with your profile image. E.g. Say something about the recipe, about why you "
             "chose it, or about your dog(s), when they were adopted etc."
         ), 
-        blank=True
+        blank=True,
+        max_length=300,
     )
 
     # Applies to double, single_with_facing and photo pages only
     photo = models.ImageField(
         null=True,
         blank=True,
-        upload_to=image_upload_path
+        upload_to=image_upload_path,
+        validators=[FileExtensionValidator(['jpg', 'jpeg']), validate_photo],
+        help_text=(
+            "In order to print at good quality (300dpi), we photos with min width 1500px, min height 2100px. "
+            "To print a full borderless page, photos need to be min width 2490px, height 3510px. "
+        )
+    )
+    photo_title = models.CharField(
+        max_length=50, 
+        null=True,
+        blank=True,
+        help_text="Title for photo (e.g. dog's name)"
     )
     # Applies to double and photo pages only
-    photo_caption = models.CharField(null=True, blank=True)
+    photo_caption = models.CharField(
+         null=True, blank=True, max_length=100, 
+         help_text="Optional: A short caption to print under photo title"
+    )
 
     # Admin and payments, applies to all
     date_submitted = models.DateTimeField(default=timezone.now)
@@ -109,8 +151,9 @@ class RecipeBookSubmission(models.Model):
 
     def get_absolute_url(self):
         return reverse("fundraising:recipe_book_contribution_detail", kwargs={"pk": self.reference})
-    
+
     def save(self, *args, **kwargs):
+        self.full_clean()
         if self.paid and not self.date_paid:
             self.date_paid = timezone.now()
         super().save(*args, **kwargs)
