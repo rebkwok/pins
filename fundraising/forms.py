@@ -1,10 +1,11 @@
+from typing import Any
 from django import forms
 from django.urls import reverse
 
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, Hidden, HTML, Div, MultiField
+from crispy_forms.layout import Layout, Submit, Hidden, HTML, Div
 
-from .models import RecipeBookSubmission
+from .models import RecipeBookSubmission, PAGE_TYPE_COSTS
 
 
 class CustomFileInput(forms.widgets.ClearableFileInput):
@@ -57,6 +58,11 @@ class RecipeBookContrbutionForm(forms.ModelForm):
             "hx-post": reverse("fundraising:update_form_fields"),
             "hx-target": "#submission-form",
         }
+        page_type_choices = [
+            (choice_k, f"{choice_v} - £{PAGE_TYPE_COSTS[choice_k]}") 
+            for (choice_k, choice_v) in RecipeBookSubmission.page_types
+        ]
+        self.fields["page_type"].choices = tuple([("", "---"), *page_type_choices])
         # make all recipe and photo fields not required; validate later based on page_type
         # chosen
         required_fields = ["name", "email", "page_type", *self.required_fields_by_page_type.get(page_type, [])]
@@ -64,12 +70,7 @@ class RecipeBookContrbutionForm(forms.ModelForm):
             self.fields[field].required = True
 
         page_type = self.instance.page_type or page_type
-        layout_fields = self.fields_by_page_type.get(
-            page_type, [
-                Hidden("profile_image", self.instance.name),
-                Hidden("photo", self.instance.name),
-            ]
-        )
+        layout_fields = self.fields_by_page_type.get(page_type, [])
         
         if page_type != "photo":
             method_field = self.fields["method"]
@@ -105,7 +106,7 @@ class RecipeBookContrbutionForm(forms.ModelForm):
         self.helper.layout = Layout(
             *self.get_base_layout_fields(),
             *layout_fields,
-            Submit('submit', 'Submit')
+            *self.get_final_fields()
         )
 
     def get_base_layout_fields(self):
@@ -113,6 +114,11 @@ class RecipeBookContrbutionForm(forms.ModelForm):
             "name",
             "email",
             "page_type"
+        ]
+
+    def get_final_fields(self):
+        return [
+            Submit('submit', 'Submit')
         ]
 
     class Meta:
@@ -131,6 +137,8 @@ class RecipeBookContrbutionForm(forms.ModelForm):
 
 
 class RecipeBookContrbutionEditForm(RecipeBookContrbutionForm):
+
+    code_check = forms.IntegerField(label="Passcode", help_text="Enter the passcode provided in your confirmation email.")
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -152,3 +160,11 @@ class RecipeBookContrbutionEditForm(RecipeBookContrbutionForm):
                 f"<span class='help-block'>Contact us if you want to change the page type for this submission.</span>"
             )
         ]
+    
+    def clean_code_check(self):
+        if self.cleaned_data.get("code_check") != self.instance.code:
+            self.add_error("code_check", "Code is invalid")
+    
+    def get_final_fields(self):
+        final_fields = super().get_final_fields()
+        return ["code_check", *final_fields]

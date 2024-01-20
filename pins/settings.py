@@ -494,7 +494,7 @@ CRISPY_TEMPLATE_PACK = "bootstrap3"
 FORM_RENDERER = 'django.forms.renderers.TemplatesSetting'
 
 # PAYPAL
-PAYPAL_TEST = env.bool("PAYPAL_TEST", True)
+PAYPAL_TEST = env.bool("PAYPAL_TEST", False)
 # In paypal test mode, this can be optionally set to an ngrok-type domain
 # e.g.  https://d45c-81-187-158-175.ngrok-free.app for testing paypal callbacks
 PAYPAL_TEST_CALLBACK_DOMAIN = env.str("PAYPAL_TEST_CALLBACK_DOMAIN", "")

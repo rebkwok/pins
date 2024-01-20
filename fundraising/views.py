@@ -39,9 +39,10 @@ class RecipeBookSubmissionCreateView(CreateView):
         send_mail(
             "Recipe book contribution received!",
             (
-                "Thank you for your contribution\n"
-                f"You can view your submission at https://{self.request.get_host()}{submission.get_absolute_url()}.\n"
-                f"If you have not already made your payment, you can find a PayPal link there too.\n"
+                "Thank you for your contribution.\n"
+                f"You can view/edit your submission at https://{self.request.get_host()}{submission.get_absolute_url()}.\n"
+                f"To edit your submission details you will need your passcode: {submission.code}\n"
+                "If you have not already made your payment, you can find a PayPal link there too.\n"
                 "Thank you for supporting Podencos In Need (PINS) <3."
             ),
             settings.DEFAULT_FROM_EMAIL,

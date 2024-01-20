@@ -1,4 +1,4 @@
-import uuid
+import random
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator
 from django.db import models
@@ -104,7 +104,7 @@ class RecipeBookSubmission(models.Model):
         validators=[FileExtensionValidator(['jpg', 'jpeg']), validate_photo],
         help_text=(
             "In order to print at good quality (300dpi), we photos with min width 1500px, min height 2100px. "
-            "To print a full borderless page, photos need to be min width 2490px, height 3510px. "
+            "To print a full borderless page, photos need to be min width 2490px, min height 3510px. "
         )
     )
     photo_title = models.CharField(
@@ -125,6 +125,8 @@ class RecipeBookSubmission(models.Model):
     date_paid = models.DateTimeField(null=True, blank=True)
     processing = models.BooleanField(default=False)
     complete = models.BooleanField(default=False)
+
+    code = models.PositiveIntegerField(default=random.randint(1000, 9999))
 
     @property
     def cost(self):
