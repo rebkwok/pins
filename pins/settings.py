@@ -501,3 +501,4 @@ PAYPAL_TEST_CALLBACK_DOMAIN = env.str("PAYPAL_TEST_CALLBACK_DOMAIN", "")
 PAYPAL_EMAIL = env.str("PAYPAL_EMAIL")
 # A key we define ourselves, to verify paypal return items
 PAYPAL_CUSTOM_KEY = env.str("PAYPAL_CUSTOM_KEY")
+PAYPAL_BUY_BUTTON_IMAGE = "/static/images/paypal-button.png"

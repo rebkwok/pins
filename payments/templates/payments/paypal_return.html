@@ -7,7 +7,12 @@
         <div class="row">
             <div class="col">            
                 <h1>Thank you for your payment!</h1>
-                <p>We will send you an email when your payment has been processed.</p> 
+                {% if not submission.paid %}
+                <p>We will send you an email when your payment has been processed.</p>
+                {% endif %}
+                {% if submission %}
+                    <p><a href={% url 'fundraising:recipe_book_contribution_detail' submission.pk %}>View your submission</a></p>
+                {% endif %}
             </div>
         </div>
     </div>

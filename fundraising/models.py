@@ -141,6 +141,16 @@ class RecipeBookSubmission(models.Model):
         else:
             return "Payment pending"
 
+    def status_colour(self):
+        if self.paid:
+            if self.complete:
+                return "success"
+            elif self.processing:
+                return "primary"
+            else:
+                return "info"
+        return "danger"
+
     def page_type_verbose(self):
          return dict(self.page_types)[self.page_type]
     page_type_verbose.short_description = "Page type"

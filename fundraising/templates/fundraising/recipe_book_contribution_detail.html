@@ -10,9 +10,15 @@
                 <h1>Recipe Book Contribution</h1>
 
                 <div>
-                    <label>STATUS</label>: {{ submission.status }}
-                    {% if not self.paid %}
-                        <div>Payment due: {{ submission.formatted_cost}}</div>
+                    <div>
+                    <label>STATUS</label>: <span class="label label-{{ submission.status_colour }}">{{ submission.status }}</span>
+                    </div>
+                    {% if not submission.paid %}
+                        <div>
+                            <p>Payment due: {{ submission.formatted_cost}}</p>
+                            <p>Click the button below to go to PayPal to make your payment.</p>
+                        </div>
+                        
                         {{ paypal_form.render }}
                     {% endif %}
                     <hr><br>

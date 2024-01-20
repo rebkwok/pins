@@ -49,10 +49,13 @@ def process_paypal(sender, **kwargs):
         if ipn_obj.mc_gross != obj.cost:
             raise(PayPalError(f"invalid amount (mc_gross) {ipn_obj.mc_gross}; ipn {ipn_obj.id}"))
 
-        # Undertake some action depending upon `ipn_obj`.
+        # Check the signature in the custom field
         if ipn_obj.custom != signature(obj.reference):
             raise(PayPalError(f"invalid signature; ipn {ipn_obj.id}"))
         
+        if ipn_obj.flag_info:
+            logger.warn("Payal ipn %s has completed status and flag info %s", ipn_obj.id, ipn_obj.flag_status)
+
         obj.paid = True
         obj.save()
 

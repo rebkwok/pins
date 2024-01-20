@@ -6,7 +6,10 @@
     <div class="container">
         <div class="row">
             <div class="col">            
-                <p>Your payment has been cancelled.</p> 
+                <p>Your payment has been cancelled.</p>
+                {% if submission_ref %}
+                    <p><a href={% url 'fundraising:recipe_book_contribution_detail' submission_ref %}>Go back to your submission</a></p>
+                {% endif %}
             </div>
         </div>
     </div>

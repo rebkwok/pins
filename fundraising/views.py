@@ -10,6 +10,7 @@ from django.views.generic import CreateView, DetailView, UpdateView
 from crispy_forms.utils import render_crispy_form
 from paypal.standard.forms import PayPalPaymentsForm
 
+
 from payments.utils import signature
 
 from .forms import RecipeBookContrbutionForm, RecipeBookContrbutionEditForm
@@ -64,11 +65,13 @@ class RecipeBookSubmissionDetailView(DetailView):
     model = RecipeBookSubmission
     template_name = "fundraising/recipe_book_contribution_detail.html"
     context_object_name = "submission"
-
+    
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
         submission = context["submission"]
+        
         if not submission.paid:
+            self.request.session["submission_ref"] = submission.reference
             if settings.PAYPAL_TEST and settings.PAYPAL_TEST_CALLBACK_DOMAIN:
                 paypal_urls = {
                     "notify_url": f"{settings.PAYPAL_TEST_CALLBACK_DOMAIN}{reverse('paypal-ipn')}",
@@ -113,7 +116,7 @@ class RecipeBookSubmissionUpdateView(UpdateView):
         context["new"] = False
         return context
     
-    
+
 def update_form_fields(request):
     ctx = {}
     ctx.update(csrf(request))
@@ -137,3 +140,7 @@ def method_char_count(request):
 
 def profile_caption_char_count(request):
     return char_count(request, "profile_caption")
+
+
+def recipe_modal(request):
+    return render(request, "fundraising/recipe_modal.html")
