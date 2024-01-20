@@ -2238,3 +2238,12 @@ input[type='radio'] {
     margin-top: 40px;
   }
 }
+
+.richtext-image.half-page {
+  display: block;
+  width: 50%;
+}
+.richtext-image.quarter-page {
+  display: block;
+  width: 25%;
+}
