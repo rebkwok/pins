@@ -2,7 +2,7 @@ from django.urls import include, path
 
 from .views import (
     RecipeBookSubmissionCreateView, RecipeBookSubmissionDetailView, RecipeBookSubmissionUpdateView, 
-    update_form_fields, method_char_count, profile_caption_char_count, recipe_modal
+    update_form_fields, method_char_count, profile_caption_char_count
 )
 app_name = "fundraising"
 urlpatterns = [

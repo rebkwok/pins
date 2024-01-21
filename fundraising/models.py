@@ -30,7 +30,7 @@ def validate_image_size(image, width=None, height=None):
         error = True
     if error:
         raise ValidationError(
-            [f'Size should be at least {width} x {height} pixels.']
+            [f'Size should be at least {width} x {height} pixels ({image.width} x {image.height} submitted).']
         )
 
 
@@ -103,8 +103,10 @@ class RecipeBookSubmission(models.Model):
         upload_to=image_upload_path,
         validators=[FileExtensionValidator(['jpg', 'jpeg']), validate_photo],
         help_text=(
-            "In order to print at good quality (300dpi), we photos with min width 1500px, min height 2100px. "
-            "To print a full borderless page, photos need to be min width 2490px, min height 3510px. "
+            "Please upload the highest quality photo you can. "
+            "To print a full borderless page at 300dpi, photos need to be min width 2490px, min height 3510px. "
+            "You can upload a photo smaller than this (min width 1500px, min height 2100px) "
+            "but they may need to be printed smaller than full page."
         )
     )
     photo_title = models.CharField(

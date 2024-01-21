@@ -30,19 +30,27 @@ class RecipeBookSubmissionCreateView(CreateView):
         self.send_submission_email(submission)
         return redirect(submission)
 
+    def form_invalid(self, form):
+        form = RecipeBookContrbutionForm(
+            data=self.request.POST, files=self.request.FILES, page_type=self.request.POST.get("page_type")
+        )
+        return super().form_invalid(form)
+        
+    
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
         context["new"] = True
         return context
     
     def send_submission_email(self, submission):
+        title = f"Recipe title: {submission.title}\n" if submission.page_type != "photo" else ""
         send_mail(
             "Recipe book contribution received!",
             (
-                "Thank you for your contribution.\n"
+                f"Thank you for your contribution!\n{title}\n"
                 f"You can view/edit your submission at https://{self.request.get_host()}{submission.get_absolute_url()}.\n"
-                f"To edit your submission details you will need your passcode: {submission.code}\n"
-                "If you have not already made your payment, you can find a PayPal link there too.\n"
+                f"To edit your submission details you will need your passcode: {submission.code}\n\n"
+                "If you have not already made your payment, you can find a PayPal link there too.\n\n"
                 "Thank you for supporting Podencos In Need (PINS) <3."
             ),
             settings.DEFAULT_FROM_EMAIL,
@@ -54,6 +62,7 @@ class RecipeBookSubmissionCreateView(CreateView):
             (
                 f"From: {submission.name}\n"
                 f"Page type: {submission.page_type_verbose()}\n"
+                f"{title}"
             ),
             settings.DEFAULT_FROM_EMAIL,
             [settings.CC_EMAIL],
@@ -141,7 +150,3 @@ def method_char_count(request):
 
 def profile_caption_char_count(request):
     return char_count(request, "profile_caption")
-
-
-def recipe_modal(request):
-    return render(request, "fundraising/recipe_modal.html")

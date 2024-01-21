@@ -10,7 +10,7 @@ media/
 
 .env
 
-*.log
+*.log*
 
 pins/.fb_*
 .scraped_album_data*
