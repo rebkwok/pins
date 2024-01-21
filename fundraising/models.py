@@ -72,6 +72,7 @@ class RecipeBookSubmission(models.Model):
 
     # recipe fields, applies to all except photo page types
     title = models.CharField(blank=True, max_length=100, help_text="Title of recipe. Maximum 100 characters.")
+    category = models.CharField(choices=[("dog", "Dog recipes"), ("human", "Human recipes")], blank=True)
     preparation_time = models.CharField(help_text="Preparation time (please include units)", blank=True, max_length=50)
     cook_time = models.CharField(help_text="Cook time (please include units)", blank=True, max_length=50)
 
