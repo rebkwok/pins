@@ -15,6 +15,12 @@ PAGE_TYPE_COSTS = {
     "single_with_facing": 10,
     "photo": 5,
 }
+PAGE_TYPE_PAGE_COUNTS = {
+    "single": 1,
+    "double": 2,
+    "single_with_facing": 2,
+    "photo": 1,
+}
 
 
 def image_upload_path(instance, filename):
