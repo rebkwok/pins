@@ -133,6 +133,12 @@ class RecipeBookSubmission(models.Model):
 
     code = models.PositiveIntegerField(default=random.randint(1000, 9999))
 
+    def __str__(self):
+        title_str = ""
+        if self.title:
+            title_str = f"; recipe '{self.title}'"
+        return f"Submission from {self.name}{title_str} ({self.reference})"
+    
     @property
     def cost(self):
         return PAGE_TYPE_COSTS[self.page_type]
