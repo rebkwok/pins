@@ -6,7 +6,7 @@ from ..forms import RecipeBookContrbutionForm
 pytestmark = pytest.mark.django_db
 
 
-always_required = ["name", "email", "page_type"]
+always_required = ["name", "email", "email1", "page_type"]
 recipe_required_fields =[
     "title", "preparation_time", "cook_time", "servings", "ingredients", "method",
     "submitted_by", "profile_image"

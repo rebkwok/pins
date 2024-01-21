@@ -31,7 +31,7 @@ def test_create_view_get(client):
     resp = client.get(url)
     assert resp.status_code == 200
     field_names = [pt.name for pt in resp.context_data["form"].helper.layout.get_field_names()]
-    assert field_names == ["name", "email", "page_type"]
+    assert field_names == ["name", "email", "email1", "page_type"]
     
 
 def test_create_view_post_profile_image_too_small(client, image):
@@ -40,6 +40,7 @@ def test_create_view_post_profile_image_too_small(client, image):
     data = {
         "name": "Test",
         "email": "test@test.com",
+        "email1": "test@test.com",
         "page_type": "single",
         "title": "Test", 
         "preparation_time": "10", 
@@ -64,6 +65,7 @@ def test_create_view_post_single_page(client, image):
     data = {
         "name": "Test",
         "email": "test@test.com",
+        "email1": "test@test.com",
         "page_type": "single",
         "title": "Test", 
         "preparation_time": "10", 
@@ -82,6 +84,31 @@ def test_create_view_post_single_page(client, image):
     # sends emails
     assert len(mail.outbox) == 2
     assert mail.outbox[0].to == ["test@test.com"]
+
+
+def test_create_view_post_email_mismatch(client, image):
+    assert not RecipeBookSubmission.objects.exists()
+    url = reverse("fundraising:recipe_book_contribution_add")
+    data = {
+        "name": "Test",
+        "email": "test@test.com",
+        "email1": "test@test1.com",
+        "page_type": "single",
+        "title": "Test", 
+        "preparation_time": "10", 
+        "cook_time": "10", 
+        "servings": "2", 
+        "ingredients": "A bean", 
+        "method": "Cook the bean",
+        "submitted_by": "Me", 
+        "profile_image": [image]
+
+    }
+    with patch("fundraising.models.validate_image_size", return_value=True):
+        resp = client.post(url, data)
+    assert resp.status_code == 200
+    form = resp.context_data["form"]
+    assert form.errors == {"email1": ["Email fields do not match"]}
 
 
 def test_unpaid_submission_detail_view(client, submission):
@@ -121,6 +148,7 @@ def test_edit_submission(client, submission):
         "id": submission.reference,
         "name": submission.name,
         "email":submission.email,
+        "email1":submission.email,
         "page_type": "single",
         "title": "Test", 
         "preparation_time": "10", 
@@ -147,6 +175,7 @@ def test_edit_submission_code_check_fail(client, submission):
         "id": submission.reference,
         "name": submission.name,
         "email":submission.email,
+        "email1":submission.email,
         "page_type": "single",
         "title": "Test", 
         "preparation_time": "10", 

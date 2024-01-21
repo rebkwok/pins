@@ -1,5 +1,6 @@
 from typing import Any
 from django import forms
+from django.core.exceptions import ValidationError
 from django.urls import reverse
 
 from crispy_forms.helper import FormHelper
@@ -14,6 +15,8 @@ class CustomFileInput(forms.widgets.ClearableFileInput):
 
 
 class RecipeBookContrbutionForm(forms.ModelForm):
+    email1 = forms.EmailField(label="Email (again)")
+
     recipe_fields = [
         HTML("<h2>Recipe Details</h2><hr>"),
         "title", 
@@ -65,7 +68,7 @@ class RecipeBookContrbutionForm(forms.ModelForm):
         self.fields["page_type"].choices = tuple([("", "---"), *page_type_choices])
         # make all recipe and photo fields not required; validate later based on page_type
         # chosen
-        required_fields = ["name", "email", "page_type", *self.required_fields_by_page_type.get(page_type, [])]
+        required_fields = ["name", "email", "email1", "page_type", *self.required_fields_by_page_type.get(page_type, [])]
         for field in required_fields:
             self.fields[field].required = True
 
@@ -113,6 +116,7 @@ class RecipeBookContrbutionForm(forms.ModelForm):
         return [
             "name",
             "email",
+            "email1",
             "page_type"
         ]
 
@@ -120,6 +124,10 @@ class RecipeBookContrbutionForm(forms.ModelForm):
         return [
             Submit('submit', 'Submit')
         ]
+    
+    def clean_email1(self):
+        if self.cleaned_data["email"] != self.cleaned_data["email1"]:
+            raise ValidationError("Email fields do not match")
 
     class Meta:
         model = RecipeBookSubmission
@@ -163,7 +171,7 @@ class RecipeBookContrbutionEditForm(RecipeBookContrbutionForm):
     
     def clean_code_check(self):
         if self.cleaned_data.get("code_check") != self.instance.code:
-            self.add_error("code_check", "Code is invalid")
+            raise ValidationError("Code is invalid")
     
     def get_final_fields(self):
         final_fields = super().get_final_fields()
