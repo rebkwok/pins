@@ -169,6 +169,7 @@ class RecipeBookContrbutionEditForm(RecipeBookContrbutionForm):
         return [
             Hidden("name", self.instance.name),
             Hidden("email", self.instance.email),
+            Hidden("email1", self.instance.email),
             Hidden("page_type", self.instance.page_type),
             HTML(
                 "<h2>Your details</h2>"
