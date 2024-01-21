@@ -24,6 +24,9 @@ def image_upload_path(instance, filename):
 
 def validate_image_size(image, width=None, height=None):
     error = False
+    # limit to 10Mb
+    if image.size > 1_000_000:
+        raise ValidationError("Max upload size is 10Mb")
     if width is not None and image.width < width:
         error = True
     if height is not None and image.height < height:
@@ -103,7 +106,7 @@ class RecipeBookSubmission(models.Model):
         upload_to=image_upload_path,
         validators=[FileExtensionValidator(['jpg', 'jpeg']), validate_photo],
         help_text=(
-            "Please upload the highest quality photo you can. "
+            "Please upload the highest quality photo you can (up to 10Mb). "
             "To print a full borderless page at 300dpi, photos need to be min width 2490px, min height 3510px. "
             "You can upload a photo smaller than this (min width 1500px, min height 2100px) "
             "but they may need to be printed smaller than full page."
