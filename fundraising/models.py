@@ -31,8 +31,8 @@ def image_upload_path(instance, filename):
 def validate_image_size(image, width=None, height=None):
     error = False
     # limit to 10Mb
-    if image.size > 1_000_000:
-        raise ValidationError("Max upload size is 10Mb")
+    if image.size > 10_000_000:
+        raise ValidationError(f"Exceeds max upload size (max 10Mb, {image.size/1_000_000} submitted).")
     if width is not None and image.width < width:
         error = True
     if height is not None and image.height < height:
