@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags navigation_tags wagtailimages_tags %}
+
+{% block content %}
+
+    <div class="container">
+        <div class="row">
+            <div class="col">            
+
+                <h1>Recipe Book Contribution</h1>
+
+                <div>
+                    <div>
+                    <label>STATUS</label>: <span class="label label-{{ submission.status_colour }}">{{ submission.status }}</span>
+                    </div>
+                    {% if not submission.paid %}
+                        <div>
+                            <p>Payment due: {{ submission.formatted_cost}}</p>
+                            <p>Click the button below to go to PayPal to make your payment.</p>
+                        </div>
+                        
+                        {{ paypal_form.render }}
+                    {% endif %}
+                    <hr><br>
+                    <p>
+                        {% if submission.complete %}
+                            Your contribution has been processed and can no longer be edited.<br>
+                            <span class="btn btn-sm pins-btn disabled">Edit submission details</a>
+                        {% elif submission.processing  %}
+                            Your contribution is being processed and can no longer be edited.<br>
+                            <span class="btn btn-sm pins-btn disabled">Edit submission details</a>
+                        {% else %}
+                            <a class="btn btn-sm pins-btn" href={% url 'fundraising:recipe_book_contribution_edit' submission.reference %}>Edit submission details</a><br>
+                            <span class="help-block">You can edit your submission until we begin processing it into the book layout.</span>
+                        {% endif %}
+                    </p>
+                </div>
+                
+                <hr>
+                <h2>Submission</h2>
+                <label>Name:</label> {{ submission.name }}<br/>
+                <label>Email:</label> {{ submission.email }}<br/>
+                <label>Page type:</label> {{ submission.page_type_verbose }}<br/>
+                <label>Submitted on:</label> {{ submission.date_submitted | date:'d M Y' }}<br/>
+                
+                {% if submission.page_type != "photo" %}
+                    <hr>
+                    <h2>Recipe Details</h2>
+                    <label>Title:</label> {{ submission.title }}<br/>
+                    <label>Cost:</label> £{{ submission.cost }}<br/>
+                    <label>Preparation Time:</label> {{ submission.preparation_time }}<br/>
+                    <label>Cook Time:</label> {{ submission.cook_time }}<br/>
+                    <label>Servings:</label> {{ submission.servings }}<br/>
+                    <label>Ingredients:</label>{{ submission.ingredients | linebreaks }}
+                    <label>Method:</label> {{ submission.method | linebreaks }}
+                    <hr>
+                    <h2>Profile</h2>
+                    <label>Submitted by:</label> {{ submission.submitted_by }}<br/>
+                    <label>Profile Image:</label> <img class="recipe-thumbnail" src="{{ submission.profile_image.url }}"> <br/>
+                    <label>Profile Caption:</label> {{ submission.profile_caption | linebreaks }}
+                {% endif %}
+
+                {% if submission.page_type != "single" %}
+                    <hr>
+                    <h2>Photo page</h2>
+                    <label>Photo:</label> <img class="recipe-thumbnail" src="{{ submission.photo.url }}"> <br/>
+                    {% if submission.page_type != "single_with_facing" %}
+                        <label>Title:</label> {{ submission.photo_title }}<br/>
+                        <label>Photo Caption:</label> {{ submission.photo_caption | linebreaks }}
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock content %}

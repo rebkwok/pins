@@ -97,7 +97,6 @@ INSTALLED_APPS = [
     "django_extensions",
     "django_ses",
     "wagtail.contrib.forms",
-    "wagtail.contrib.modeladmin",
     "wagtail.contrib.redirects",
     "wagtail.contrib.settings",
     "wagtail.embeds",
@@ -108,6 +107,7 @@ INSTALLED_APPS = [
     "wagtail.images",
     "wagtail.search",
     "wagtail.admin",
+    "wagtail_modeladmin",
     "wagtail",
     "modelcluster",
     "taggit",
@@ -120,8 +120,14 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.forms",
     "wagtail_json_widget",
     "dogs",
+    "fundraising",
+    "crispy_forms",
+    "crispy_bootstrap3",
+    "paypal.standard.ipn",
+    "payments",
 ]
 
 
@@ -154,6 +160,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "wagtail.contrib.settings.context_processors.settings",
                 "home.context_processors.home",
+                "fundraising.context_processors.recipes",
             ],
         },
     },
@@ -304,6 +311,7 @@ else:  # pragma: no cover
 
 DEFAULT_FROM_EMAIL = 'pins.scot.web+no-reply@gmail.com'
 SUPPORT_EMAIL = 'rebkwok@gmail.com'
+CC_EMAIL = "pinscotland16@gmail.com"
 SERVER_EMAIL = SUPPORT_EMAIL
 
 # MAILCATCHER
@@ -478,3 +486,20 @@ if not TESTING:  # pragma: no cover
     RECAPTCHA_PUBLIC_KEY = env.str("RECAPTCHA_PUBLIC_KEY", "")
     RECAPTCHA_PRIVATE_KEY = env.str("RECAPTCHA_PRIVATE_KEY", "")
     NOCAPTCHA = True
+
+
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap3"
+
+CRISPY_TEMPLATE_PACK = "bootstrap3"
+
+FORM_RENDERER = 'django.forms.renderers.TemplatesSetting'
+
+# PAYPAL
+PAYPAL_TEST = env.bool("PAYPAL_TEST", False)
+# In paypal test mode, this can be optionally set to an ngrok-type domain
+# e.g.  https://d45c-81-187-158-175.ngrok-free.app for testing paypal callbacks
+PAYPAL_TEST_CALLBACK_DOMAIN = env.str("PAYPAL_TEST_CALLBACK_DOMAIN", "")
+PAYPAL_EMAIL = env.str("PAYPAL_EMAIL")
+# A key we define ourselves, to verify paypal return items
+PAYPAL_CUSTOM_KEY = env.str("PAYPAL_CUSTOM_KEY")
+PAYPAL_BUY_BUTTON_IMAGE = "/static/images/paypal-button.png"

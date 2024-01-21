@@ -1331,7 +1331,7 @@ footer {
   padding-bottom: 60px;
 }
 
-.form-page input,
+.form-page input[type='text'],
 textarea,
 select {
   display: block;
@@ -1414,7 +1414,7 @@ input[type='radio'] {
 }
 
 @media (min-width: 766px) {
-  .form-page input,
+  .form-page input[type='text'],
   textarea,
   select {
     width: 100%;
@@ -2243,7 +2243,34 @@ input[type='radio'] {
   display: block;
   width: 50%;
 }
+
 .richtext-image.quarter-page {
   display: block;
   width: 25%;
+}
+
+img.recipe-thumbnail {
+  width: 200px;
+}
+
+.help-block {
+  font-size: small;
+  font-style: italic;
+}
+
+.btn.pins-btn {
+    border: none;
+    color: var(--white);
+    background-color: rgba(207,148,131);
+    font-weight: normal;
+    padding: 10px 20px;
+    display: inline-block;
+    vertical-align: middle;
+    transition-duration: 0.1s;
+    width: max-content;
+    font-size: var(--font-md);
+}
+
+label.light {
+  font-weight: 400;
 }

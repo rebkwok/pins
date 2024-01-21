@@ -8,13 +8,17 @@ from wagtail.documents import urls as wagtaildocs_urls
 
 from search import views as search_views
 from home import orders_urls
+from fundraising import urls
 
 urlpatterns = [
     path("django-admin/", admin.site.urls),
     path("admin/", include(wagtailadmin_urls)),
     path("documents/", include(wagtaildocs_urls)),
     path("search/", search_views.search, name="search"),
-    path("orders/", include(orders_urls))
+    path("orders/", include(orders_urls)),
+    path("fundraising/", include(urls)),
+    path('paypal/', include("paypal.standard.ipn.urls")),
+    path("payments/", include("payments.urls")),
 ]
 
 
