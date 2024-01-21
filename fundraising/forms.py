@@ -118,7 +118,19 @@ class RecipeBookContrbutionForm(forms.ModelForm):
             "name",
             "email",
             "email1",
-            "page_type"
+            HTML(
+               "<span class='help-block'>Choose your page type:</span>"
+               "<ul class='help-block'>"
+               "<li>Single page recipe: A recipe on one page, with a small profile photo</li>"
+               "<li>Double page recipe: A longer recipe that won't fit on a single one page, "
+               "with method continuing to a second page, a small profile photo, and an optional additional photo on the second page</li>"
+               "<li>Single page recipe with full page facing photo: recipe on one page, with small profile photo, and full-page photo on the opposite page</li>"
+               "<li>Photo page only: no recipe, full-page photo with title/caption</li>"
+               "</ul>"
+               "<span class='help-block'>See example pages <a href='https://podencosinneed.org/fundraising-recipe-book/'>here.</a></span>"
+            ),
+            "page_type",
+            
         ]
 
     def get_final_fields(self):
