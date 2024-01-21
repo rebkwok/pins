@@ -8,7 +8,7 @@ pytestmark = pytest.mark.django_db
 
 always_required = ["name", "email", "email1", "page_type"]
 recipe_required_fields =[
-    "title", "preparation_time", "cook_time", "servings", "ingredients", "method",
+    "title", "category", "preparation_time", "cook_time", "servings", "ingredients", "method",
     "submitted_by", "profile_image"
 ]
 never_required = ["profile_caption", "photo_caption"]

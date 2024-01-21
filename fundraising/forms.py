@@ -19,7 +19,8 @@ class RecipeBookContrbutionForm(forms.ModelForm):
 
     recipe_fields = [
         HTML("<h2>Recipe Details</h2><hr>"),
-        "title", 
+        "title",
+        "category",
         "preparation_time", 
         "cook_time", 
         "servings", 
@@ -42,7 +43,7 @@ class RecipeBookContrbutionForm(forms.ModelForm):
     }
 
     recipe_required =[
-        "title", "preparation_time", "cook_time", "servings", "ingredients", "method",
+        "title", "category", "preparation_time", "cook_time", "servings", "ingredients", "method",
         "submitted_by", "profile_image"
     ]
 
@@ -134,7 +135,7 @@ class RecipeBookContrbutionForm(forms.ModelForm):
         fields = [
             "name", "email",
             "page_type",
-            "title", "preparation_time", "cook_time", "servings", "ingredients", "method",
+            "title", "category", "preparation_time", "cook_time", "servings", "ingredients", "method",
             "submitted_by", "profile_image", "profile_caption",
             "photo",  "photo_title", "photo_caption"
         ]
