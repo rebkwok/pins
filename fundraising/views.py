@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.shortcuts import render, redirect, HttpResponse
 from django.urls import reverse
+from django.template.response import TemplateResponse
 from django.template.context_processors import csrf
 from django.views.generic import CreateView, DetailView, UpdateView
 
@@ -125,7 +126,7 @@ class RecipeBookSubmissionUpdateView(UpdateView):
         context = super().get_context_data(**kwargs)
         context["new"] = False
         return context
-    
+
 
 def update_form_fields(request):
     ctx = {}
@@ -150,3 +151,13 @@ def method_char_count(request):
 
 def profile_caption_char_count(request):
     return char_count(request, "profile_caption")
+
+
+def submitted_recipes(request):
+    dog_recipes = RecipeBookSubmission.objects.filter(category="dog").order_by("title").values_list("title", flat=True)
+    human_recipes = RecipeBookSubmission.objects.filter(category="human").order_by("title").values_list("title", flat=True)
+    return TemplateResponse(
+        request, 
+        "fundraising/recipe_list.html", 
+        {"dog_recipes": dog_recipes, "human_recipes": human_recipes}
+    )

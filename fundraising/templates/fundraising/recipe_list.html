@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags navigation_tags wagtailimages_tags %}
+
+{% block content %}
+
+    <div class="container">
+        <div class="row">
+            <div class="col">            
+
+                <h1>Submitted Recipes</h1>
+
+                <h2>Dog Recipes</h2>
+                <ul>
+                    {% for recipe in dog_recipes %}<li>{{ recipe }}</li>{% endfor %}
+                </ul>
+
+                <h2>Human Recipes</h2>
+                <ul>
+                    {% for recipe in human_recipes %}<li>{{ recipe }}</li>{% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+{% endblock content %}
