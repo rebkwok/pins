@@ -140,7 +140,7 @@ class RecipeBookContrbutionForm(forms.ModelForm):
         return [
             Submit('submit', "Submit", onclick="document.getElementById('spinner').classList.add('show');"),
             HTML(
-                '<div class="alert-success show" id="spinner">'
+                '<div class="alert-success" id="spinner">'
                 '<div class="lds-ellipsis">'
                     '<div></div>'
                     '<div></div>'
