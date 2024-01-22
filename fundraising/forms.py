@@ -23,6 +23,12 @@ class RecipeBookContrbutionForm(forms.ModelForm):
 
     recipe_layout_fields = [
         HTML("<h2>Recipe Details</h2><hr>"),
+        HTML(
+            '<div class="alert-warning">'
+            'Please take a look at the list of <a href="/fundraising/recipe-book/recipes" target="_blank">'
+            'already submitted recipes here</a> and avoid submitting duplicates if possible!'
+            '</div>'
+        ),
         _field_with_spinner_js("title"),
         _field_with_spinner_js("category"),
         _field_with_spinner_js("preparation_time"), 
