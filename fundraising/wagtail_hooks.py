@@ -15,7 +15,7 @@ from paypal.standard.ipn.models import PayPalIPN
 # ensure our modeladmin is created
 class RecipeBookSubmissionViewSet(SnippetViewSet):
     model = RecipeBookSubmission
-    list_display = ("reference", "date_submitted", "name", "email", "page_type_verbose", "category", "formatted_cost", BooleanColumn("paid"), "status")
+    list_display = ("reference", "date_submitted", "name", "page_type_verbose", "title", "category", "formatted_cost", BooleanColumn("paid"), "status")
     list_export = (
             "reference", 
             "date_submitted", 
