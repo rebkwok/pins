@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.urls import reverse
 
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Submit, Hidden, HTML, Div
+from crispy_forms.layout import Layout, Submit, Hidden, HTML, Div, Field
 
 from .models import RecipeBookSubmission, PAGE_TYPE_COSTS
 
@@ -14,32 +14,36 @@ class CustomFileInput(forms.widgets.ClearableFileInput):
     template_name = 'fundraising/widgets/image_file_input.html'
 
 
+def _field_with_spinner_js(field_name):
+    return Field(field_name, onfocus="document.getElementById('spinner').classList.remove('show');")
+
+
 class RecipeBookContrbutionForm(forms.ModelForm):
     email1 = forms.EmailField(label="Email (again)")
 
-    recipe_fields = [
+    recipe_layout_fields = [
         HTML("<h2>Recipe Details</h2><hr>"),
-        "title",
-        "category",
-        "preparation_time", 
-        "cook_time", 
-        "servings", 
-        "ingredients", 
-        Div("method", HTML("<span id='method_ch_count' class='help-block'>Character count: 0</span>")),
+        _field_with_spinner_js("title"),
+        _field_with_spinner_js("category"),
+        _field_with_spinner_js("preparation_time"), 
+        _field_with_spinner_js("cook_time"), 
+        _field_with_spinner_js("servings"), 
+        _field_with_spinner_js("ingredients"), 
+        Div(_field_with_spinner_js("method"), HTML("<span id='method_ch_count' class='help-block'>Character count: 0</span>")),
         HTML("<h2>Profile</h2><hr>"),
-        "submitted_by",
-        "profile_image",
-        Div("profile_caption", HTML("<span id='profile_caption_ch_count' class='help-block'>Character count: 0</span>")),
+        _field_with_spinner_js("submitted_by"),
+        _field_with_spinner_js("profile_image"),
+        Div(_field_with_spinner_js("profile_caption"), HTML("<span id='profile_caption_ch_count' class='help-block'>Character count: 0</span>")),
     ]
-    photo_fields = ["photo", "photo_title", "photo_caption"]
-    fields_by_page_type = {
-        "single": recipe_fields,
-        "single_with_facing": [*recipe_fields, HTML("<h2>Facing Full-Page Photo</h2><hr>"), *photo_fields],
-        "double": recipe_fields + [
+    photo_layout_fields = [_field_with_spinner_js("photo"), _field_with_spinner_js("photo_title"), _field_with_spinner_js("photo_caption")]
+    layout_fields_by_page_type = {
+        "single": recipe_layout_fields,
+        "single_with_facing": [*recipe_layout_fields, HTML("<h2>Facing Full-Page Photo</h2><hr>"), *photo_layout_fields],
+        "double": recipe_layout_fields + [
             HTML("<h2>Additional Photo on second page (optional)</h2><hr>"),
-            "photo"
+            _field_with_spinner_js("photo")
         ],
-        "photo": [HTML("<h2>Full-Page Photo</h2><hr>"), *photo_fields],
+        "photo": [HTML("<h2>Full-Page Photo</h2><hr>"), *photo_layout_fields],
     }
 
     recipe_required =[
@@ -74,7 +78,7 @@ class RecipeBookContrbutionForm(forms.ModelForm):
             self.fields[field].required = True
 
         page_type = self.instance.page_type or page_type
-        layout_fields = self.fields_by_page_type.get(page_type, [])
+        layout_fields = self.layout_fields_by_page_type.get(page_type, [])
         
         if page_type != "photo":
             method_field = self.fields["method"]
@@ -112,12 +116,12 @@ class RecipeBookContrbutionForm(forms.ModelForm):
             *layout_fields,
             *self.get_final_fields()
         )
-
+    
     def get_base_layout_fields(self):
         return [
-            "name",
-            "email",
-            "email1",
+            _field_with_spinner_js("name"),
+            _field_with_spinner_js("email"),
+            _field_with_spinner_js("email1"),
             HTML(
                "<span class='help-block'>Choose your page type:</span>"
                "<ul class='help-block'>"
@@ -129,13 +133,23 @@ class RecipeBookContrbutionForm(forms.ModelForm):
                "</ul>"
                "<span class='help-block'>See example pages <a href='https://podencosinneed.org/fundraising-recipe-book/'>here.</a></span>"
             ),
-            "page_type",
-            
+            _field_with_spinner_js("page_type"),
         ]
 
     def get_final_fields(self):
         return [
-            Submit('submit', 'Submit')
+            Submit('submit', "Submit", onclick="document.getElementById('spinner').classList.add('show');"),
+            HTML(
+                '<div class="alert-success show" id="spinner">'
+                '<div class="lds-ellipsis">'
+                    '<div></div>'
+                    '<div></div>'
+                    '<div></div>'
+                    '<div></div>'
+                '</div>'
+                '<small>Uploading photos may take a minute or two, please wait.</small>'
+                '</div>'
+                )
         ]
     
     def clean_email1(self):
@@ -189,4 +203,4 @@ class RecipeBookContrbutionEditForm(RecipeBookContrbutionForm):
     
     def get_final_fields(self):
         final_fields = super().get_final_fields()
-        return ["code_check", *final_fields]
+        return [_field_with_spinner_js("code_check"), *final_fields]
