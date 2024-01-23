@@ -36,7 +36,6 @@ class RecipeBookSubmissionCreateView(CreateView):
             data=self.request.POST, files=self.request.FILES, page_type=self.request.POST.get("page_type")
         )
         return super().form_invalid(form)
-        
     
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
@@ -131,7 +130,7 @@ class RecipeBookSubmissionUpdateView(UpdateView):
 def update_form_fields(request):
     ctx = {}
     ctx.update(csrf(request))
-    initial = {k: request.POST.get(k) for k in request.POST }
+    initial = {k: request.POST.get(k) for k in request.POST if k not in ["profile_image", "photo"]}
     form = RecipeBookContrbutionForm(initial=initial, page_type=request.POST.get("page_type"))
     return HttpResponse(render_crispy_form(form, context=ctx))
 
