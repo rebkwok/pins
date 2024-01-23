@@ -56,14 +56,14 @@
                     <hr>
                     <h2>Profile</h2>
                     <label>Submitted by:</label> {{ submission.submitted_by }}<br/>
-                    <label>Profile Image:</label> <img class="recipe-thumbnail" src="{{ submission.profile_image.url }}"> <br/>
+                    <label>Profile Image:</label>{% if submission.profile_image %} <img class="recipe-thumbnail" src="{{ submission.profile_image.url }}"> {% endif %}<br/>
                     <label>Profile Caption:</label> {{ submission.profile_caption | linebreaks }}
                 {% endif %}
 
                 {% if submission.page_type != "single" %}
                     <hr>
                     <h2>Photo page</h2>
-                    <label>Photo:</label> <img class="recipe-thumbnail" src="{{ submission.photo.url }}"> <br/>
+                    <label>Photo:</label> {% if submission.photo %}<img class="recipe-thumbnail" src="{{ submission.photo.url }}"> {% endif %}<br/>
                     {% if submission.page_type != "single_with_facing" %}
                         <label>Title:</label> {{ submission.photo_title }}<br/>
                         <label>Photo Caption:</label> {{ submission.photo_caption | linebreaks }}
