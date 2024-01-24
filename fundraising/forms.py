@@ -41,7 +41,16 @@ class RecipeBookContrbutionForm(forms.ModelForm):
         _field_with_spinner_js("profile_image"),
         Div(_field_with_spinner_js("profile_caption"), HTML("<span id='profile_caption_ch_count' class='help-block'>Character count: 0</span>")),
     ]
-    photo_layout_fields = [_field_with_spinner_js("photo"), _field_with_spinner_js("photo_title"), _field_with_spinner_js("photo_caption")]
+    photo_layout_fields = [
+        HTML(
+            "<p class='text-danger'>Full page photos will be printed A4 size (if image quality allows), in portrait orientation. "
+            "You are welcome to submit photos in any orientation, but be aware that we will need to crop them or "
+            "or reduce the print size to fit the page.</p>"
+        ),
+        _field_with_spinner_js("photo"), 
+        _field_with_spinner_js("photo_title"), 
+        _field_with_spinner_js("photo_caption")
+    ]
     layout_fields_by_page_type = {
         "single": recipe_layout_fields,
         "single_with_facing": [*recipe_layout_fields, HTML("<h2>Facing Full-Page Photo</h2><hr>"), *photo_layout_fields],
