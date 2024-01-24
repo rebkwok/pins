@@ -15,7 +15,13 @@ from paypal.standard.ipn.models import PayPalIPN
 # ensure our modeladmin is created
 class RecipeBookSubmissionViewSet(SnippetViewSet):
     model = RecipeBookSubmission
-    list_display = ("reference", "date_submitted", "name", "page_type_verbose", "title", "category", "formatted_cost", BooleanColumn("paid"), "status")
+    list_display = (
+        "reference", "date_submitted", "name", "page_type_verbose",
+        "title", "category", "formatted_cost",
+        BooleanColumn("paid"), "status"
+    )
+    search_fields = ("name", "title")
+    list_filter = ["paid", "processing", "complete"]
     list_export = (
             "reference", 
             "date_submitted", 
@@ -86,6 +92,7 @@ class RecipeBookSubmissionViewSet(SnippetViewSet):
 class PayPalIPNViewSet(SnippetViewSet):
     model = PayPalIPN
     list_display = ("invoice", "txn_id", "payment_status", "payment_date", BooleanColumn("flag"), "flag_info")
+    search_fields = ("invoice",)
     fields = ("invoice", "payment_status", "flag", "flag_info")
 
     edit_handler = TabbedInterface([
