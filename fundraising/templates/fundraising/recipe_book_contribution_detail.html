@@ -23,11 +23,9 @@
                     {% endif %}
                     <hr><br>
                     <p>
-                        {% if submission.complete %}
-                            Your contribution has been processed and can no longer be edited.<br>
-                            <span class="btn btn-sm pins-btn disabled">Edit submission details</a>
-                        {% elif submission.processing  %}
-                            Your contribution is being processed and can no longer be edited.<br>
+                        {% if submission.complete or submission.processing %}
+                            Your contribution {% if submission.complete %}has been{% else %}is being{%endif%} processed and can no longer be edited online.<br>
+                            We can still make changes before the book goes to print - please contact us if there's anything you need to update.<br/>
                             <span class="btn btn-sm pins-btn disabled">Edit submission details</a>
                         {% else %}
                             <a class="btn btn-sm pins-btn" href={% url 'fundraising:recipe_book_contribution_edit' submission.reference %}>Edit submission details</a><br>
