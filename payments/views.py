@@ -5,10 +5,11 @@ from fundraising.models import RecipeBookSubmission
 
 @csrf_exempt
 def paypal_return(request):
-    submission_ref = request.session.get("submission_ref")
+    paypal_item_reference = request.session.get("paypal_item_reference")
     context = {}
     try:
-        context["submission"] = RecipeBookSubmission.objects.get(pk=submission_ref)
+        # TODO Find Recipe Book Submission OR OrderFormSubmission with this reference
+        context["submission"] = RecipeBookSubmission.objects.get(pk=paypal_item_reference)
     except RecipeBookSubmission.DoesNotExist:
         ...
     return render(request, "payments/paypal_return.html", context)
@@ -16,7 +17,7 @@ def paypal_return(request):
 
 @csrf_exempt
 def payment_cancel(request):
-    submission = request.session.get("submission_ref")
-    return render(request, "payments/paypal_cancel.html", {"submission_ref": submission})
+    submission = request.session.get("paypal_item_reference")
+    return render(request, "payments/paypal_cancel.html", {"paypal_item_reference": submission})
 
 
