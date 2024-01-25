@@ -1,9 +1,12 @@
 import datetime
 
 from django.conf import settings
+from django.core.validators import validate_slug
 from django.db import models
 from django.template.response import TemplateResponse
 from django.utils.formats import date_format
+
+from shortuuid.django_fields import ShortUUIDField
 
 from modelcluster.fields import ParentalKey
 
@@ -32,6 +35,8 @@ from wagtail.models import (
 from wagtail.contrib.forms.utils import get_field_clean_name
 
 from wagtailcaptcha.models import WagtailCaptchaEmailForm, WagtailCaptchaForm, WagtailCaptchaFormBuilder
+
+from payments.utils import get_paypal_form
 
 
 class HomePage(Page):
@@ -467,7 +472,22 @@ class OrderFormSubmissionsListView(SubmissionsListView):
         return context_data
 
 
+
+class OrderVoucher(Orderable):
+    """
+    Simple code that gives a discount on an order (e.g. if collecting, can remove shipping cost)
+    """
+    order_form_page = ParentalKey("OrderFormPage", related_name="voucher_codes", on_delete=models.CASCADE)
+    code = models.CharField(max_length=20, validators=[validate_slug])
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    # so we can deactivate vouchers
+    active = models.BooleanField(default=True)
+
+
+
 class OrderBaseForm(BaseForm):
+    # TODO Can we add a "voucher code" field that's always present?
+
     def clean(self):
         super().clean()
         allowed, validation_error_msg = self.page.quantity_submitted_is_valid(self.cleaned_data)
@@ -551,6 +571,27 @@ class OrderFormPage(WagtailCaptchaEmailForm):
             ],
             "Email",
         ),
+        MultiFieldPanel(
+            [
+                HelpPanel(
+                    content="""
+                    Voucher codes that can be used to apply a discount amount to
+                    orders placed using this form. E.g. a discount equivalent to 
+                    the shipping cost that can be given out to people who will
+                    collect and don't require shipping.
+                    """
+                ),
+                InlinePanel(
+                    "voucher_codes", label="Voucher codes", 
+                    panels=[
+                        FieldPanel("code"),
+                        FieldPanel("amount"),
+                        FieldPanel("active"),
+                    ]
+                ),
+            ],
+            "Voucher codes",
+        )
     ]
 
     subpage_types = []
@@ -616,6 +657,8 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         if total > 0:
             total += self.shipping_cost
 
+        # TODO Look at form data for valid voucher code and deduct amount from total
+
         return variant_quantities, total
 
     def _item_counts_per_variant(self):
@@ -677,7 +720,15 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         context = self.get_context(request)
         context["form_submission"] = form_submission
         _, total = self.get_variant_quantities_and_total(form_submission.get_data())
+        
+        # TODO Add in paypal form for total amount
         context["total"] = total
+        context["paypal_form"] = get_paypal_form(
+            request=request,
+            amount=total, 
+            item_name=f"Order form submission: {self.title}",
+            reference=form_submission.reference
+        )
         return TemplateResponse(
             request, self.get_landing_page_template(request), context
         )
@@ -687,6 +738,9 @@ class OrderFormPage(WagtailCaptchaEmailForm):
 
 
 class OrderFormSubmission(AbstractFormSubmission):
+    reference = ShortUUIDField(
+        editable = False
+    )
     paid = models.BooleanField(default=False)
     shipped = models.BooleanField(default=False)
 
