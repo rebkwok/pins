@@ -37,7 +37,7 @@ urlpatterns = [
         name="reset_order_form_submissions"
     ),
     path(
-        "order/<str:reference>/",
+        "<str:reference>/",
         order_detail,
         name="order_detail",
     )

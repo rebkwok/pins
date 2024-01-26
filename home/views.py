@@ -1,3 +1,5 @@
+import re
+
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponse, HttpResponseRedirect
 from django.template.response import TemplateResponse
@@ -65,7 +67,13 @@ def _change_order_form_submission_status(request, update_function):
 
 def order_detail(request, reference):
     submission = get_object_or_404(OrderFormSubmission, reference=reference)
-    context = {"page": submission.page, "form_submission": submission, "total": submission.cost}
+    title = re.sub(r"Order Form", "", submission.page.title, flags=re.IGNORECASE)
+    context = {
+        "page": submission.page.orderformpage, 
+        "title": title.strip(), 
+        "form_submission": submission, 
+        "total": submission.cost
+    }
 
     if not submission.paid:
         context["paypal_form"] = get_paypal_form(

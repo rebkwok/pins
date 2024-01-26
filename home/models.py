@@ -535,7 +535,7 @@ class OrderFormBuilder(WagtailCaptchaFormBuilder):
             formfields.update(
                 {
                     "voucher_code": voucher_code_field, 
-                    # "wagtailcaptcha": original_fields["wagtailcaptcha"]
+                    "wagtailcaptcha": original_fields["wagtailcaptcha"]
                 }
             )
             return formfields
@@ -871,6 +871,26 @@ class OrderFormSubmission(AbstractFormSubmission):
         self.paid = False
         self.shipped = False
         self.save()
+
+    def items_ordered(self):
+        variant_quantities, _, _ = self.page.orderformpage.get_variant_quantities_and_total(self.form_data)
+        return variant_quantities.values()
+
+    def status(self):
+        if self.paid:
+            if self.shipped:
+                return "Paid and shipped"
+            else:
+                return "Paid"
+        else:
+            return "Payment pending"
+
+    def status_colour(self):
+        colours = {
+            "Paid and shipped": "success",
+            "Paid": "primary"
+        }
+        return colours.get(self.status(), "danger")
 
     def get_absolute_url(self):
         return reverse("orders:order_detail", kwargs={"reference": self.reference})

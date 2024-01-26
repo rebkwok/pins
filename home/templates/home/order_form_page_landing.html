@@ -5,11 +5,25 @@
 
     <div class="container form-page-thanks">
         <div class="row">
+            
             <div class="col-md-12">
-                <h1 class="index-header__title">{{ page.title }}</h1>
+                <h1 class="index-header__title">{% if title %}{{ title }}{% else %}{{ page.title }}{% endif %}</h1>
             </div>
+
             <div class="col-md-7 index-header__body-introduction">
+                {{ page.thank_you_text|richtext }}
+            
+            <p>Order reference: {{ form_submission.reference }}</p>
+            <p>Here's what you ordered:
+                <ul>
+                    {% for item, quantity in form_submission.items_ordered %}
+                        <li>{{ item.name }} ({{ quantity }})</li>
+                    {% endfor %}
+                </ul>
+                A confirmation email has been sent to {{ form_submission.email }}.
+            </p>
             <p>Your order total is <strong>£{{ total }}</strong></p>
+            <p>Order status: <span class="label label-{{ form_submission.status_colour }}">{{ form_submission.status }}</span></p>
 
             {% if paypal_form %}
                 <p>Click the button below to go to PayPal to make your payment.<br>
@@ -18,9 +32,7 @@
                 {{ paypal_form.render }}
                 </div>
                 
-                <div class="col-md-7 index-header__body-introduction">
-                    {{ page.thank_you_text|richtext }}
-                </div>
+                
             {% endif %}
         </div>
     </div>
