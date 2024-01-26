@@ -11,7 +11,7 @@ import pytest
 
 import wagtail_factories
 
-from ..models import FormPage, FormField, FooterText
+from ..models import FormPage, FormField, FooterText, OrderFormPage, OrderFormField, ProductVariant
 
 pytestmark = pytest.mark.django_db
 
@@ -19,6 +19,12 @@ pytestmark = pytest.mark.django_db
 class FormPageFactory(wagtail_factories.PageFactory):
     class Meta:
         model = FormPage
+
+
+class OrderFormPageFactory(wagtail_factories.PageFactory):
+    shipping_cost = 2
+    class Meta:
+        model = OrderFormPage
 
 
 @pytest.fixture
@@ -29,6 +35,22 @@ def contact_form_page(home_page):
     baker.make(FormField, label="subject", field_type="singleline", page=form_page)
     baker.make(FormField, label="email_address", field_type="email", page=form_page)
     baker.make(FormField, label="message", field_type="multiline", page=form_page)
+    yield form_page
+
+
+@pytest.fixture
+def order_form_page(home_page):
+    with patch("home.models.OrderFormPage.clean"):
+        form_page = OrderFormPageFactory(
+            parent=home_page, title="Test Order Form", to_address="admin@test.com", subject="test order",
+        )
+    baker.make(OrderFormField, label="name", field_type="singleline", page=form_page)
+    baker.make(OrderFormField, label="email_address", field_type="email", page=form_page)
+    
+    # Make an order form field matching a product variant.
+    baker.make(OrderFormField, label="pv__test_product", field_type="dropdown", page=form_page, default_value=1)
+    baker.make(ProductVariant, page=form_page, name="test product", cost=10)
+    form_page.save()
     yield form_page
 
 
@@ -118,3 +140,11 @@ def test_footer_text(home_page):
 
     assert footer.get_preview_context(request, None) == {"footer_text": "I am a footer"}
     assert footer.get_preview_template(request, None) == "base.html"
+
+
+def test_order_form_page(order_form_page):
+    assert order_form_page.default_total() == 12
+    assert order_form_page.product_quantity_field_names == {"pv__test_product"}
+    assert order_form_page.product_variant_slugs == {"pv__test_product"}
+
+
