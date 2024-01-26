@@ -6,6 +6,7 @@ from home.views import (
     mark_order_form_submissions_shipped,
     mark_order_form_submissions_paid_and_shipped,
     reset_order_form_submissions,
+    order_detail,
 )
 
 app_name = "orders"
@@ -35,4 +36,9 @@ urlpatterns = [
         reset_order_form_submissions, 
         name="reset_order_form_submissions"
     ),
+    path(
+        "order/<str:reference>/",
+        order_detail,
+        name="order_detail",
+    )
 ]

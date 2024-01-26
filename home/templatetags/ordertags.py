@@ -13,3 +13,7 @@ def is_order_quantity(page, field_name):
 def get_product_variant(page, field_name):
     return page.product_variants.get(slug=field_name)
 
+
+@register.filter
+def is_end_of_form_field(page, field_name):
+    return field_name in page.end_of_form_field_names

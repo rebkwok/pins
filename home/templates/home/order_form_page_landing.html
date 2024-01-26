@@ -10,11 +10,18 @@
             </div>
             <div class="col-md-7 index-header__body-introduction">
             <p>Your order total is <strong>£{{ total }}</strong></p>
-            </div>
-            
-            <div class="col-md-7 index-header__body-introduction">
-                {{ page.thank_you_text|richtext }}
-            </div>
+
+            {% if paypal_form %}
+                <p>Click the button below to go to PayPal to make your payment.<br>
+                    <strong><i>Note: you do not need a PayPal account, payments can be taken by debit/credit card.</i></strong>
+                </p>
+                {{ paypal_form.render }}
+                </div>
+                
+                <div class="col-md-7 index-header__body-introduction">
+                    {{ page.thank_you_text|richtext }}
+                </div>
+            {% endif %}
         </div>
     </div>
 {% endblock content %}
