@@ -14,7 +14,6 @@ from django.urls import reverse
 from fundraising.models import RecipeBookSubmission
 from paypal.standard.ipn.models import PayPalIPN
 
-from payments.signals import PayPalError
 from ..utils import signature
 
 pytestmark = pytest.mark.django_db
@@ -107,55 +106,49 @@ def test_paypal_notify_url_happy_path(mock_postback, client, settings):
 
 
 @patch('paypal.standard.ipn.models.PayPalIPN._postback')
-def test_paypal_notify_url_unexpected_payment_status(mock_postback, client, settings):
+def test_paypal_notify_url_unexpected_payment_status(mock_postback, client, settings, caplog):
     mock_postback.return_value = b"VERIFIED"
 
     settings.PAYPAL_EMAIL = TEST_RECEIVER_EMAIL.decode()
     submission = baker.make(RecipeBookSubmission, page_type="single")
     assert not PayPalIPN.objects.exists()
-    with pytest.raises(PayPalError):
-        paypal_post(
-            client,
-            {
-                **IPN_POST_PARAMS, 
-                'invoice': submission.reference, 
-                'custom': signature(submission.reference), 
-                'txn_id': 'test',
-                'mc_gross': 5,
-                'payment_status': "Refunded",
-            }
-        )
+    paypal_post(
+        client,
+        {
+            **IPN_POST_PARAMS, 
+            'invoice': submission.reference, 
+            'custom': signature(submission.reference), 
+            'txn_id': 'test',
+            'mc_gross': 5,
+            'payment_status': "Refunded",
+        }
+    )
     assert PayPalIPN.objects.count() == 1
-    assert len(mail.outbox) == 1
-    # Error email sent
-    assert "Internal Server Error" in mail.outbox[0].subject
-    assert "Unexpected status: Refunded" in mail.outbox[0].body
+    assert len(mail.outbox) == 0
+    assert "Unexpected status Refunded" in caplog.text
     submission.refresh_from_db()
     assert not submission.paid
     assert submission.date_paid is None
 
 
-def test_paypal_notify_url_invalid_postback(client, settings):
+def test_paypal_notify_url_invalid_postback(client, settings, caplog):
     settings.PAYPAL_EMAIL = TEST_RECEIVER_EMAIL.decode()
     submission = baker.make(RecipeBookSubmission, page_type="single")
     assert not PayPalIPN.objects.exists()
-    with pytest.raises(PayPalError):
-        paypal_post(
-            client,
-            {
-                **IPN_POST_PARAMS, 
-                'invoice': submission.reference, 
-                'custom': signature(submission.reference), 
-                'txn_id': 'test',
-                'mc_gross': 5,
-                'payment_status': "Refunded",
-            }
-        )
+    paypal_post(
+        client,
+        {
+            **IPN_POST_PARAMS, 
+            'invoice': submission.reference, 
+            'custom': signature(submission.reference), 
+            'txn_id': 'test',
+            'mc_gross': 5,
+            'payment_status': "Refunded",
+        }
+    )
     assert PayPalIPN.objects.count() == 1
-    assert len(mail.outbox) == 1
-    # Error email sent
-    assert "Internal Server Error" in mail.outbox[0].subject
-    assert "Invalid postback" in mail.outbox[0].body
+    assert len(mail.outbox) == 0
+    assert "Invalid postback" in caplog.text
     submission.refresh_from_db()
     assert not submission.paid
     assert submission.date_paid is None
@@ -191,13 +184,13 @@ def test_paypal_notify_url_complete_with_flag_info(mock_postback, client, settin
 @pytest.mark.parametrize(
     "post_params,match",
     [
-        ({"custom": "foo"}, "invalid signature"),
-        ({"receiver_email": "foo@foo.com"}, "invalid receiver email"),
-        ({"mc_gross": "100"}, "invalid amount"),
+        ({"custom": "foo"}, "Invalid signature"),
+        ({"receiver_email": "foo@foo.com"}, "Invalid receiver email"),
+        ({"mc_gross": "100"}, "Invalid amount"),
     ]
 )
 @patch('paypal.standard.ipn.models.PayPalIPN._postback')
-def test_paypal_notify_url_errors(mock_postback, client, settings, post_params, match):
+def test_paypal_notify_url_errors(mock_postback, client, settings, caplog, post_params, match):
     mock_postback.return_value = b"VERIFIED"
 
     settings.PAYPAL_EMAIL = TEST_RECEIVER_EMAIL.decode()
@@ -211,14 +204,11 @@ def test_paypal_notify_url_errors(mock_postback, client, settings, post_params, 
         'mc_gross': 5,
     }
     params.update(post_params)
-    with pytest.raises(PayPalError, match=match):
-        paypal_post(client, params)
+    paypal_post(client, params)
 
     assert PayPalIPN.objects.count() == 1
-    assert len(mail.outbox) == 1
-    # Error email sent
-    assert "Internal Server Error" in mail.outbox[0].subject
-    assert match in mail.outbox[0].body
+    assert len(mail.outbox) == 0
+    assert match in caplog.text
     submission.refresh_from_db()
     assert not submission.paid
     assert submission.date_paid is None

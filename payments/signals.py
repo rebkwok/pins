@@ -14,10 +14,6 @@ from .utils import signature
 logger = logging.getLogger(__name__)
 
 
-class PayPalError(Exception):
-    ...
-
-
 def send_payment_received_email(obj):
     send_mail(
         "Recipe book contribution: payment processed",
