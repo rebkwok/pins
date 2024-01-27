@@ -4,7 +4,6 @@ from home.views import (
     calculate_order_total_view, 
     mark_order_form_submissions_paid,
     mark_order_form_submissions_shipped,
-    mark_order_form_submissions_paid_and_shipped,
     reset_order_form_submissions,
     order_detail,
 )
@@ -25,11 +24,6 @@ urlpatterns = [
         "mark-orders-shipped/", 
         mark_order_form_submissions_shipped, 
         name="mark_order_form_submissions_shipped"
-    ),
-    path(
-        "mark-orders-paid-and-shipped/", 
-        mark_order_form_submissions_paid_and_shipped, 
-        name="mark_order_form_submissions_paid_and_shipped"
     ),
     path(
         "reset-orders/", 

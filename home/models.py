@@ -861,11 +861,6 @@ class OrderFormSubmission(AbstractFormSubmission):
     def mark_shipped(self):
         self.shipped = True
         self.save()
-    
-    def mark_paid_and_shipped(self):
-        self.paid = True
-        self.shipped = True
-        self.save()
 
     def reset(self):
         self.paid = False
@@ -874,7 +869,7 @@ class OrderFormSubmission(AbstractFormSubmission):
 
     def items_ordered(self):
         variant_quantities, _, _ = self.page.orderformpage.get_variant_quantities_and_total(self.form_data)
-        return variant_quantities.values()
+        return [variant for variant in variant_quantities.values() if variant[1] > 0]
 
     def status(self):
         if self.paid:

@@ -47,10 +47,6 @@ def mark_order_form_submissions_shipped(request):
     return _change_order_form_submission_status(request, "mark_shipped")
 
 
-def mark_order_form_submissions_paid_and_shipped(request):
-    return _change_order_form_submission_status(request, "mark_paid_and_shipped")
-
-
 def reset_order_form_submissions(request):
     return _change_order_form_submission_status(request, "reset")
 
