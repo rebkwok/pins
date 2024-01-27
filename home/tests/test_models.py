@@ -1,6 +1,4 @@
 import datetime
-import os
-from unittest.mock import patch
 
 from django.core import mail
 from django.test import RequestFactory
@@ -9,49 +7,11 @@ from model_bakery import baker
 
 import pytest
 
-import wagtail_factories
-
-from ..models import FormPage, FormField, FooterText, OrderFormPage, OrderFormField, ProductVariant
+from .conftest import FormPageFactory
+from ..models import FormField, FooterText
 
 pytestmark = pytest.mark.django_db
 
-
-class FormPageFactory(wagtail_factories.PageFactory):
-    class Meta:
-        model = FormPage
-
-
-class OrderFormPageFactory(wagtail_factories.PageFactory):
-    shipping_cost = 2
-    class Meta:
-        model = OrderFormPage
-
-
-@pytest.fixture
-def contact_form_page(home_page):
-    form_page = FormPageFactory(
-        parent=home_page, title="Test Contact Form", to_address="admin@test.com", subject="contact"
-    )
-    baker.make(FormField, label="subject", field_type="singleline", page=form_page)
-    baker.make(FormField, label="email_address", field_type="email", page=form_page)
-    baker.make(FormField, label="message", field_type="multiline", page=form_page)
-    yield form_page
-
-
-@pytest.fixture
-def order_form_page(home_page):
-    with patch("home.models.OrderFormPage.clean"):
-        form_page = OrderFormPageFactory(
-            parent=home_page, title="Test Order Form", to_address="admin@test.com", subject="test order",
-        )
-    baker.make(OrderFormField, label="name", field_type="singleline", page=form_page)
-    baker.make(OrderFormField, label="email_address", field_type="email", page=form_page)
-    
-    # Make an order form field matching a product variant.
-    baker.make(OrderFormField, label="pv__test_product", field_type="dropdown", page=form_page, default_value=1)
-    baker.make(ProductVariant, page=form_page, name="test product", cost=10)
-    form_page.save()
-    yield form_page
 
 
 def test_home_page_str(home_page):
@@ -148,3 +108,39 @@ def test_order_form_page(order_form_page):
     assert order_form_page.product_variant_slugs == {"pv__test_product"}
 
 
+def test_order_form_submission(order_form_submission):
+    submission = order_form_submission({})
+    assert not submission.paid
+    assert not submission.shipped
+    assert submission.email == "mickey.mouse@test.com"
+    assert submission.items_ordered() == [(submission.page.product_variants.first(), 2)]
+
+    submission.mark_paid()
+    assert submission.paid
+    assert not submission.shipped
+
+    submission.mark_shipped()
+    assert submission.paid
+    assert submission.shipped
+
+    submission.reset()
+    assert not submission.paid
+    assert not submission.shipped
+
+
+@pytest.mark.parametrize(
+    "paid,shipped,status,colour",
+    [
+       (False, False, "Payment pending", "danger"),
+       (False, True, "Payment pending", "danger"),
+       (True, False, "Paid", "primary"),
+       (True, True, "Paid and shipped", "success"),
+    ]
+)
+def test_order_form_submission_status(order_form_submission, paid, shipped, status, colour):
+    submission = order_form_submission({})
+    submission.paid = paid
+    submission.shipped = shipped
+    submission.save()
+    assert submission.status() == status
+    assert submission.status_colour() == colour
