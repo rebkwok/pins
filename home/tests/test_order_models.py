@@ -93,6 +93,23 @@ def test_order_form_page(order_form_page):
     assert order_form_page.product_quantity_field_names == {"pv__test_product", "pv__test_product_1"}
     assert order_form_page.default_total() == 12
 
+
+@pytest.mark.parametrize(
+    "title,subject_title",
+    [
+        ("Thing Order Form", "Thing"),
+        ("Thing", "Thing")
+    ]
+)
+def test_order_form_page_subject_title(order_form_page, order_form_submission, title, subject_title):
+    order_form_page.title = title
+    order_form_page.save()
+    assert order_form_page.subject_title == subject_title
+
+    submission = order_form_submission()
+    assert submission.page.subject_title == subject_title
+    
+
 def test_order_form_page_builder_no_email_field(home_page):
     orderformpage = OrderFormPageFactory(parent=home_page)
     builder =  orderformpage.form_builder(orderformpage.order_form_fields.all(), page=orderformpage)

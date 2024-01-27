@@ -663,6 +663,12 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         for field_name in fields_to_remove:
             self.order_form_fields.get(clean_name=field_name).delete()      
 
+    @property
+    def subject_title(self):
+        title = re.sub(r"Order Form", "", self.title, flags=re.IGNORECASE)
+        title = title.strip()
+        return title
+
     def create_or_update_order_form_field(self, product_variant_slug):
         variant = self.product_variants.get(slug=product_variant_slug)
         try:

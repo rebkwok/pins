@@ -14,12 +14,12 @@ from .utils import signature
 logger = logging.getLogger(__name__)
 
 
-def send_payment_received_email(obj):
+def send_payment_received_email(obj, subject, payment_item):
     send_mail(
-        "Recipe book contribution: payment processed",
+        f"{subject}: payment processed",
         (
             "Thank you for your payment!\n"
-            f"You can view your submission at https://{settings.DOMAIN}{obj.get_absolute_url()}.\n"
+            f"You can view your {payment_item} at https://{settings.DOMAIN}{obj.get_absolute_url()}.\n"
             "Thank you for supporting Podencos In Need (PINS) <3."
         ),
         settings.DEFAULT_FROM_EMAIL,
@@ -44,8 +44,12 @@ def process_paypal(sender, **kwargs):
 
         try:
             obj = RecipeBookSubmission.objects.get(pk=ipn_obj.invoice)
+            subject = "Recipe book contribution"
+            payment_item = "submission"
         except RecipeBookSubmission.DoesNotExist:
             obj = OrderFormSubmission.objects.get(reference=ipn_obj.invoice)
+            subject = obj.page.subject_title
+            payment_item = "order"
         # ALSO: for the same reason, you need to check the amount
         # received, `custom` etc. are all what you expect or what
         # is allowed.
@@ -66,7 +70,7 @@ def process_paypal(sender, **kwargs):
         obj.paid = True
         obj.save()
 
-        send_payment_received_email(obj)
+        send_payment_received_email(obj, subject, payment_item)
     else:
         logger.error(
             "Unexpected status %s; ipn %s", ipn_obj.payment_status, ipn_obj.id

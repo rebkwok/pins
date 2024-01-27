@@ -62,10 +62,9 @@ def _change_order_form_submission_status(request, update_function):
 
 def order_detail(request, reference):
     submission = get_object_or_404(OrderFormSubmission, reference=reference)
-    title = re.sub(r"Order Form", "", submission.page.title, flags=re.IGNORECASE)
     context = {
         "page": submission.page.orderformpage, 
-        "title": title.strip(), 
+        "title": submission.page.subject_title, 
         "form_submission": submission, 
         "total": submission.cost
     }
