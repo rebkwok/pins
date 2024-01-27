@@ -1,7 +1,6 @@
 import re
 
 from django.shortcuts import get_object_or_404
-from django.http import HttpResponse, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.utils.safestring import mark_safe
 

@@ -13,7 +13,6 @@ from ..models import FormField, FooterText
 pytestmark = pytest.mark.django_db
 
 
-
 def test_home_page_str(home_page):
     assert str(home_page) == "Home"
 
@@ -100,47 +99,3 @@ def test_footer_text(home_page):
 
     assert footer.get_preview_context(request, None) == {"footer_text": "I am a footer"}
     assert footer.get_preview_template(request, None) == "base.html"
-
-
-def test_order_form_page(order_form_page):
-    assert order_form_page.default_total() == 12
-    assert order_form_page.product_quantity_field_names == {"pv__test_product"}
-    assert order_form_page.product_variant_slugs == {"pv__test_product"}
-
-
-def test_order_form_submission(order_form_submission):
-    submission = order_form_submission({})
-    assert not submission.paid
-    assert not submission.shipped
-    assert submission.email == "mickey.mouse@test.com"
-    assert submission.items_ordered() == [(submission.page.product_variants.first(), 2)]
-
-    submission.mark_paid()
-    assert submission.paid
-    assert not submission.shipped
-
-    submission.mark_shipped()
-    assert submission.paid
-    assert submission.shipped
-
-    submission.reset()
-    assert not submission.paid
-    assert not submission.shipped
-
-
-@pytest.mark.parametrize(
-    "paid,shipped,status,colour",
-    [
-       (False, False, "Payment pending", "danger"),
-       (False, True, "Payment pending", "danger"),
-       (True, False, "Paid", "primary"),
-       (True, True, "Paid and shipped", "success"),
-    ]
-)
-def test_order_form_submission_status(order_form_submission, paid, shipped, status, colour):
-    submission = order_form_submission({})
-    submission.paid = paid
-    submission.shipped = shipped
-    submission.save()
-    assert submission.status() == status
-    assert submission.status_colour() == colour

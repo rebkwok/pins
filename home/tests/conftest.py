@@ -17,6 +17,9 @@ class FormPageFactory(wagtail_factories.PageFactory):
 
 
 class OrderFormPageFactory(wagtail_factories.PageFactory):
+    title = "Test Order Form"
+    to_address = "admin@test.com"
+    subject = "test order"
     shipping_cost = 2
     class Meta:
         model = OrderFormPage
@@ -44,17 +47,18 @@ def order_form_page(home_page):
     
     # Make an order form field matching a product variant.
     baker.make(OrderFormField, label="pv__test_product", field_type="dropdown", page=form_page, default_value=1)
-    baker.make(ProductVariant, page=form_page, name="test product", cost=10)
+    baker.make(ProductVariant, page=form_page, name="test product", cost=10, item_count=1)
     form_page.save()
     yield form_page
 
 
 @pytest.fixture
 def order_form_submission(order_form_page):
-    def _submission(form_data):
+    def _submission(form_data=None):
+        form_data = form_data or {}
         data = {
             "name": "Mickey Mouse",
-            "email": "mickey.mouse@test.com",
+            "email_address": "mickey.mouse@test.com",
             "pv__test_product": 2,
             **form_data
         }

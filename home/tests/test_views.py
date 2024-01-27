@@ -21,3 +21,7 @@ def test_reset_order_form_submissions():
 
 def test_order_detail():
     ...
+
+
+def test_order_form_submission_list_view():
+    ...

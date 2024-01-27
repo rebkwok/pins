@@ -3,7 +3,6 @@ import re
 
 from django import forms
 from django.conf import settings
-from django.core.exceptions import ValidationError
 from django.core.validators import validate_slug
 from django.db import models
 from django.template.response import TemplateResponse
@@ -23,7 +22,7 @@ from wagtail.admin.panels import (
     MultiFieldPanel,
     PublishingPanel,
 )
-from wagtail.contrib.forms.forms import FormBuilder, BaseForm
+from wagtail.contrib.forms.forms import BaseForm
 from wagtail.contrib.forms.models import AbstractEmailForm, AbstractFormField, AbstractFormSubmission
 from wagtail.contrib.forms.views import SubmissionsListView
 
@@ -38,7 +37,7 @@ from wagtail.models import (
 )
 from wagtail.contrib.forms.utils import get_field_clean_name
 
-from wagtailcaptcha.models import WagtailCaptchaEmailForm, WagtailCaptchaForm, WagtailCaptchaFormBuilder
+from wagtailcaptcha.models import WagtailCaptchaEmailForm, WagtailCaptchaFormBuilder
 
 from payments.utils import get_paypal_form
 
@@ -499,9 +498,12 @@ class OrderBaseForm(BaseForm):
 
     def clean(self):
         super().clean()
-
         voucher_code = self.cleaned_data.get("voucher_code", "").strip()
-        if voucher_code and voucher_code not in self.page.voucher_codes.filter(code=voucher_code, active=True):
+        if (
+            voucher_code and 
+            voucher_code not in 
+            self.page.voucher_codes.filter(code=voucher_code, active=True).values_list("code", flat=True)
+        ):
             del self.cleaned_data["voucher_code"]
         allowed, validation_error_msg = self.page.quantity_submitted_is_valid(self.cleaned_data)
         if not allowed:
@@ -512,11 +514,16 @@ class OrderFormBuilder(WagtailCaptchaFormBuilder):
 
     def __init__(self, fields, **kwargs):
         self.page = kwargs.pop("page")
-        super().__init__(fields)
+        super().__init__(fields)            
 
     @property
     def formfields(self):
-        original_fields = super().formfields        
+        original_fields = super().formfields
+        if not set(original_fields) & {"email", "email_address"}:
+            original_fields = {
+                "email": forms.EmailField(),
+                **original_fields
+            }    
         if self.page.voucher_codes.filter(active=True).exists():
             formfields = {
                 k: v for k, v in original_fields.items() if k != "wagtailcaptcha"
@@ -641,18 +648,11 @@ class OrderFormPage(WagtailCaptchaEmailForm):
 
     end_of_form_field_names = ["wagtailcaptcha", "voucher_code"]
     subpage_types = []
-
-    def clean(self, *args, **kwargs):
-        super().clean(*args, **kwargs)
-        if not set(self.order_form_fields.values_list("clean_name", flat=True)) & {"email", "email_address"}:
-            raise ValidationError(
-                {"__all__": ["'Email' or 'Email address' field is required."]}
-            )
     
     def save(self, *args, **kwargs):
         self.from_address = settings.DEFAULT_FROM_EMAIL
-
         super().save(*args, **kwargs)
+    
         # Save the product variants to ensure slugs have been generated
         for pr in self.product_variants.all():
             pr.save()
@@ -753,7 +753,7 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         ]
 
     def get_total_quantity_ordered(self):
-        submissions = self.formsubmission_set.all()
+        submissions = self.orderformsubmission_set.all()
         item_counts_per_variant = self._item_counts_per_variant()
         total = 0
         for submission in submissions:
@@ -778,21 +778,29 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         remaining_stock = self.total_available - total_ordered_so_far
         valid = total_for_this_order <= remaining_stock
         if not valid:
-            validation_error_msg  = f"Quantity selected is unavailable; select a maximum of {remaining_stock} total items."
+            rem_stock = remaining_stock if remaining_stock >= 0 else 0
+            validation_error_msg  = f"Quantity selected is unavailable; select a maximum of {rem_stock} total items."
         return valid, validation_error_msg
 
-    def render_email(self, form):
-        content = super().render_email(form)
+    def _render_extra_email(self, form):
         _, total, discount = self.get_variant_quantities_and_total(form.cleaned_data)
-        content += f"\nTotal items ordered: {self.quantity_ordered_by_submission(form.cleaned_data)}"
+        content = f"\nTotal items ordered: {self.quantity_ordered_by_submission(form.cleaned_data)}"
         if discount:
-            content += f"\nDiscount: {discount}"
+            content += f"\nDiscount: £{discount}"
         content += f"\nTotal amount due: £{total}"
         return content
 
+    def render_email(self, form):
+        content = super().render_email(form)
+        content += self._render_extra_email(form)
+        return content
+
     def render_email_for_purchaser(self, form, submission):
-        content = self.render_email(form)
-        content += f"\n\nView your submission at https://{settings.DOMAIN}{submission.get_absolute_url()}"
+        content = "Thank you for your order!\n"
+        content += self._render_extra_email(form)
+        content += "\nOrder summary:\n"
+        content += "\n".join([f"  - {variant.name} ({quantity})" for variant, quantity in submission.items_ordered()])
+        content += f"\n\nView your submission at https://{settings.DOMAIN}{submission.get_absolute_url()}."
         content += f"\nIf you haven't made your payment yet, you'll also find a link there."
         return content
     
