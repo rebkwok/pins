@@ -5,12 +5,7 @@ from datetime import datetime
 
 from django.urls import reverse
 import openpyxl
-from model_bakery import baker
 import pytest
-
-from django.contrib.auth.models import User
-
-from ..models import OrderFormSubmissionsListView
 
 
 pytestmark = pytest.mark.django_db

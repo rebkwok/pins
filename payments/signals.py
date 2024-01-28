@@ -48,7 +48,7 @@ def process_paypal(sender, **kwargs):
             payment_item = "submission"
         except RecipeBookSubmission.DoesNotExist:
             obj = OrderFormSubmission.objects.get(reference=ipn_obj.invoice)
-            subject = obj.page.subject_title
+            subject = f"{obj.page.orderformpage.subject_title} order"
             payment_item = "order"
         # ALSO: for the same reason, you need to check the amount
         # received, `custom` etc. are all what you expect or what
@@ -65,7 +65,7 @@ def process_paypal(sender, **kwargs):
             return 
         
         if ipn_obj.flag_info:
-            logger.warn("Payal ipn %s has completed status and flag info %s", ipn_obj.id, ipn_obj.flag_status)
+            logger.warn("Payal ipn %s has completed status and flag info '%s'", ipn_obj.id, ipn_obj.flag_status)
 
         obj.paid = True
         obj.save()

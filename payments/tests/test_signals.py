@@ -106,6 +106,33 @@ def test_paypal_notify_url_happy_path(mock_postback, client, settings):
 
 
 @patch('paypal.standard.ipn.models.PayPalIPN._postback')
+def test_paypal_notify_url_happy_path_order_submission(mock_postback, client, settings, order_form_submission):
+    mock_postback.return_value = b"VERIFIED"
+
+    settings.PAYPAL_EMAIL = TEST_RECEIVER_EMAIL.decode()
+    submission = order_form_submission()
+    assert not PayPalIPN.objects.exists()
+    resp = paypal_post(
+        client,
+        {
+            **IPN_POST_PARAMS, 
+            'invoice': submission.reference, 
+            'custom': signature(submission.reference), 
+            'txn_id': 'test',
+            'mc_gross': 22,
+        }
+    )
+    assert resp.status_code == 200
+    assert PayPalIPN.objects.count() == 1
+    ppipn = PayPalIPN.objects.first()
+    # 2 emails on creation of order, 3rd is the payment one
+    assert len(mail.outbox) == 3
+    assert "Test order: payment processed" in mail.outbox[2].subject
+    submission.refresh_from_db()
+    assert submission.paid
+
+
+@patch('paypal.standard.ipn.models.PayPalIPN._postback')
 def test_paypal_notify_url_unexpected_payment_status(mock_postback, client, settings, caplog):
     mock_postback.return_value = b"VERIFIED"
 
