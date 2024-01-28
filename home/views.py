@@ -1,6 +1,6 @@
 import re
 
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, HttpResponse
 from django.template.response import TemplateResponse
 from django.utils.safestring import mark_safe
 
@@ -14,7 +14,7 @@ def calculate_order_total_view(request, order_page_id):
     discount_str = f" (discount £{discount})" if discount else ""
     resp_str = f"<span id='order-total'>{total}{discount_str}</span>"
     
-    if request.POST.get("voucher_code").strip() and not discount:
+    if request.POST.get("voucher_code", "").strip() and not discount:
         resp_str += f"""
             <div id='invalid-voucher' hx-swap-oob='true' class='text-danger'>
             Voucher code {request.POST.get('voucher_code')} is invalid.
@@ -64,7 +64,7 @@ def order_detail(request, reference):
     submission = get_object_or_404(OrderFormSubmission, reference=reference)
     context = {
         "page": submission.page.orderformpage, 
-        "title": submission.page.subject_title, 
+        "title": submission.page.orderformpage.subject_title, 
         "form_submission": submission, 
         "total": submission.cost
     }

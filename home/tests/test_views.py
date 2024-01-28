@@ -3,6 +3,7 @@ from decimal import Decimal
 import io
 from datetime import datetime
 
+from django.urls import reverse
 import openpyxl
 from model_bakery import baker
 import pytest
@@ -15,24 +16,92 @@ from ..models import OrderFormSubmissionsListView
 pytestmark = pytest.mark.django_db
 
 
-def test_calculate_order_total_view(order_form_page):
-    ...
+def test_calculate_order_total_view(client, order_form_page):
+    url = reverse("orders:calculate_order_total", args=(order_form_page.id,))
+    resp = client.post(url, {"pv__test_product": 2})
+    assert "<span id='order-total'>22.00</span>" in resp.content.decode()
 
 
-def test_mark_order_form_submissions_paid():
-    ...
+def test_calculate_order_total_view_with_invalid_voucher(client, order_form_page):
+    url = reverse("orders:calculate_order_total", args=(order_form_page.id,))
+    resp = client.post(url, {"pv__test_product": 2, "voucher_code": "unk"})
+    content = resp.content.decode()
+    assert "<span id='order-total'>22.00</span>" in content
+    assert "Voucher code unk is invalid" in content
 
 
-def test_mark_order_form_submissions_shipped():
-    ...
+def test_calculate_order_total_view_with_invalid_quantity(client, order_form_page):
+    order_form_page.total_available = 2
+    order_form_page.save()
+    url = reverse("orders:calculate_order_total", args=(order_form_page.id,))
+    resp = client.post(url, {"pv__test_product": 3})
+    content = resp.content.decode()
+    assert "<span id='order-total'>32.00</span>" in content
+    assert "Quantity selected is unavailable" in content
 
 
-def test_reset_order_form_submissions():
-    ...
+def test_mark_order_form_submissions_paid(client, order_form_submission):
+    s1 = order_form_submission()
+    s2 = order_form_submission()
+    s3 = order_form_submission()
+    for s in [s1, s2, s3]:
+        assert not s.paid
+    client.get(reverse("orders:mark_order_form_submissions_paid"), {"selected-submissions": [s1.id, s2.id]})
+    for s in [s1, s2, s3]:
+        s.refresh_from_db()
+    assert s1.paid
+    assert s2.paid
+    assert not s3.paid
 
 
-def test_order_detail():
-    ...
+def test_mark_order_form_submissions_shipped(client, order_form_submission):
+    s1 = order_form_submission()
+    s2 = order_form_submission()
+    s3 = order_form_submission()
+    for s in [s1, s2, s3]:
+        assert not s.shipped
+    client.get(reverse("orders:mark_order_form_submissions_shipped"), {"selected-submissions": [s1.id, s2.id]})
+    for s in [s1, s2, s3]:
+        s.refresh_from_db()
+    assert s1.shipped
+    assert s2.shipped
+    assert not s3.paid
+
+
+def test_reset_order_form_submissions(client, order_form_submission):
+    s1 = order_form_submission()
+    s2 = order_form_submission()
+    for s in [s1, s2]:
+        s.shipped = True
+        s.paid = True
+        s.save()
+    
+    client.get(reverse("orders:reset_order_form_submissions"), {"selected-submissions": [s1.id]})
+    for s in [s1, s2]:
+        s.refresh_from_db()
+    assert not s1.shipped
+    assert not s1.paid
+    assert s2.shipped
+    assert s2.paid
+
+
+def test_order_detail(client, order_form_submission):
+    submission = order_form_submission()
+    assert not submission.paid
+    resp = client.get(reverse("orders:order_detail", args=(submission.reference,)))
+
+    assert "paypal_form" in resp.context_data
+    assert resp.context_data["title"] == "Test"
+
+
+def test_order_detail_paid(client, order_form_submission):
+    submission = order_form_submission()
+    submission.paid = True
+    submission.save()
+    resp = client.get(reverse("orders:order_detail", args=(submission.reference,)))
+
+    assert "paypal_form" not in resp.context_data
+    assert resp.context_data["title"] == "Test"
 
 
 def test_order_form_submission_list_view(rf, admin_user, order_form_page, order_form_submission):
