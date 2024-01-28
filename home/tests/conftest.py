@@ -38,10 +38,9 @@ def contact_form_page(home_page):
 
 @pytest.fixture
 def order_form_page(home_page):
-    with patch("home.models.OrderFormPage.clean"):
-        form_page = OrderFormPageFactory(
-            parent=home_page, title="Test Order Form", to_address="admin@test.com", subject="test order",
-        )
+    form_page = OrderFormPageFactory(
+        parent=home_page, title="Test Order Form", to_address="admin@test.com", subject="test order",
+    )
     baker.make(OrderFormField, label="name", field_type="singleline", page=form_page)
     baker.make(OrderFormField, label="email_address", field_type="email", page=form_page)
     
@@ -56,6 +55,27 @@ def order_form_page(home_page):
 def order_form_submission(order_form_page):
     def _submission(form_data=None):
         form_data = form_data or {}
+        form_class = order_form_page.get_form_class()
+        form = form_class(
+            {
+                "name": "Mickey Mouse",
+                "email_address": "mickey.mouse@test.com",
+                "pv__test_product": 2,
+                "g-recaptcha-response": "PASSED",
+                **form_data
+            },
+            page=order_form_page
+        )
+        assert form.is_valid()
+        with patch("wagtail.admin.mail.send_mail"):
+            submission = order_form_page.process_form_submission(form)
+        return submission
+    return _submission
+
+
+@pytest.fixture
+def order_form_pre_submission(order_form_page):
+    def _submission(form_data=None):
         data = {
             "name": "Mickey Mouse",
             "email_address": "mickey.mouse@test.com",
@@ -63,7 +83,6 @@ def order_form_submission(order_form_page):
             **form_data
         }
         return baker.make(
-            OrderFormSubmission, page=order_form_page,
-            form_data=data    
+            OrderFormSubmission, page=order_form_page, form_data=data
         )
     return _submission

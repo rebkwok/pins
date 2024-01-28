@@ -412,14 +412,7 @@ class OrderFormSubmissionsListView(SubmissionsListView):
 
     template_name = "home/order_list_submissions_index.html"
 
-    def stream_csv(self, queryset):
-        self.list_export += ["total", "total_items", "paid", "shipped"]
-        self.export_headings.update(
-            {"total": "Total (£)", "total_items": "Total items", "paid": "Paid", "shipped": "Shipped"}
-        )
-        return super().stream_csv(queryset)
-
-    def write_xlsx(self, queryset, output):
+    def _export_headings(self):
         self.list_export += ["reference", "total", "total_items", "paid", "shipped"]
         self.export_headings.update(
             {
@@ -430,6 +423,13 @@ class OrderFormSubmissionsListView(SubmissionsListView):
                 "shipped": "Shipped"
             }
         )
+
+    def stream_csv(self, queryset):
+        self._export_headings()
+        return super().stream_csv(queryset)
+
+    def write_xlsx(self, queryset, output):
+        self._export_headings()
         return super().write_xlsx(queryset, output)
 
     def to_row_dict(self, item):

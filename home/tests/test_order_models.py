@@ -3,7 +3,6 @@ import datetime
 from django.conf import settings
 from django.core import mail
 from django.core.exceptions import ValidationError
-from django.test import RequestFactory
 
 from model_bakery import baker
 
@@ -196,7 +195,7 @@ def test_order_form_page_out_of_stock(order_form_page, order_form_submission):
     assert order_form_page.sold_out()
 
 
-def test_order_form_page_disallowed_variants(order_form_page, order_form_submission):
+def test_order_form_page_disallowed_variants(order_form_page, order_form_pre_submission):
     assert order_form_page.disallowed_variants() == []
 
     # order form page has 1 product variant, test_product, sold in quantities of 1
@@ -210,12 +209,12 @@ def test_order_form_page_disallowed_variants(order_form_page, order_form_submiss
     assert order_form_page.disallowed_variants() == [variant10]
 
     # make an order for 6
-    order_form_submission({"pv__test_product": 1, "pv__test_product_x5": 1})
+    order_form_pre_submission({"pv__test_product": 1, "pv__test_product_x5": 1})
     assert order_form_page.get_total_quantity_ordered() == 6
 
     assert order_form_page.disallowed_variants() == [variant5, variant10]
     # sell out
-    order_form_submission({"pv__test_product": 1})
+    order_form_pre_submission({"pv__test_product": 1})
     assert order_form_page.sold_out()
     assert order_form_page.disallowed_variants() == [order_form_page.product_variants.first(), variant5, variant10]
 
@@ -257,12 +256,12 @@ def test_order_form_submission_status(order_form_submission, paid, shipped, stat
     assert submission.status_colour() == colour
 
 
-def test_quantity_ordered_by_submission(order_form_page, order_form_submission):
+def test_quantity_ordered_by_submission(order_form_page, order_form_pre_submission):
     baker.make("home.ProductVariant", page=order_form_page, name="test product x5", cost=45, item_count=5)
     baker.make("home.ProductVariant", page=order_form_page, name="test product x10", cost=90, item_count=10)
 
     # make an order for 6
-    submission = order_form_submission({"pv__test_product": 1, "pv__test_product_x5": 2, "pv__test_product_x10": 1})
+    submission = order_form_pre_submission({"pv__test_product": 1, "pv__test_product_x5": 2, "pv__test_product_x10": 1})
     assert order_form_page.get_total_quantity_ordered() == 21
     assert order_form_page.quantity_ordered_by_submission(submission.form_data) == 21
 
@@ -276,12 +275,12 @@ def test_quantity_ordered_by_submission(order_form_page, order_form_submission):
         (10, 5, False, f"Quantity selected is unavailable; select a maximum of 4 total items."),
     ]
 )
-def test_quantity_submitted_is_valid(order_form_page, order_form_submission, total_available, quantity, is_valid, err_msg):
+def test_quantity_submitted_is_valid(order_form_page, order_form_pre_submission, total_available, quantity, is_valid, err_msg):
     baker.make("home.ProductVariant", page=order_form_page, name="test product x5", cost=45, item_count=5)
     baker.make("home.ProductVariant", page=order_form_page, name="test product x10", cost=90, item_count=10)
 
     # existing order for 6
-    order_form_submission({"pv__test_product": 1, "pv__test_product_x5": 1})
+    order_form_pre_submission({"pv__test_product": 1, "pv__test_product_x5": 1})
     assert order_form_page.get_total_quantity_ordered() == 6
 
     # set available value
@@ -390,9 +389,9 @@ def test_order_form_process_form_submission_with_voucher_code(order_form_page):
     )
 
 
-def test_order_form_render_landing_page(order_form_page, order_form_submission):
+def test_order_form_render_landing_page(rf, order_form_page, order_form_submission):
     submission = order_form_submission({"pv__test_product": 2})
-    request = RequestFactory().get("/")
+    request = rf.get("/")
     request.session = {}
     resp = order_form_page.render_landing_page(request, submission)
     assert request.session["paypal_item_reference"] == submission.reference
