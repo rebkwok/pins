@@ -46,6 +46,32 @@ def test_order_form_with_invalid_voucher_code(order_form_page):
     assert "voucher_code" not in form.cleaned_data
 
 
+def test_order_form_with_invalid_voucher_code_for_other_page(order_form_page):
+    order_form_page1 = OrderFormPageFactory(title="Another page")
+
+    # invalid (active, same code, but different page)
+    baker.make(
+        "home.OrderVoucher", order_form_page=order_form_page1, code="foo", amount=2, active=True
+    )
+    # valid (so voucher_code is a displayed field)
+    baker.make(
+        "home.OrderVoucher", order_form_page=order_form_page, code="bar", amount=2, active=True
+    )
+    form_class = order_form_page.get_form_class()
+    form = form_class(
+        {
+            "name": "Minnie Mouse", 
+            "email_address": "m@mouse.com", 
+            "pv__test_product": 1,
+            "voucher_code": "foo",
+            "g-recaptcha-response": "PASSED"
+        },
+        page=order_form_page
+    )
+    assert form.is_valid()
+    assert "voucher_code" not in form.cleaned_data
+
+
 def test_order_form_with_valid_voucher_code(order_form_page):
     baker.make(
         "home.OrderVoucher", order_form_page=order_form_page, code="foo", amount=2, active=True
@@ -400,3 +426,39 @@ def test_order_form_render_landing_page(rf, order_form_page, order_form_submissi
     assert paypal_form.initial["amount"] == 22
     assert paypal_form.initial["item_name"] == 'Order form submission: Test Order Form'
     assert paypal_form.initial["invoice"] == submission.reference
+
+
+def test_order_form_submission_paid_deactivates_one_time_voucher(order_form_page, order_form_submission):
+    voucher = baker.make(
+        "home.OrderVoucher", order_form_page=order_form_page, code="foo", amount=2, 
+        active=True, one_time_use=True
+    )
+    assert voucher.active
+    submission = order_form_submission({"voucher_code": "foo"})
+
+    # mark as paid, makes voucher inactive
+    submission.paid = True
+    submission.save()
+    voucher.refresh_from_db()
+    assert not voucher.active
+
+    # make voucher active again. Saving already-paid submission doesn't deactivate it again.
+    voucher.active = True
+    voucher.save()
+    submission.save()
+    assert voucher.active
+
+
+def test_order_form_submission_paid_does_not_deactivates_multiuse_voucher(order_form_page, order_form_submission):
+    voucher = baker.make(
+        "home.OrderVoucher", order_form_page=order_form_page, code="foo", amount=2, 
+        active=True, one_time_use=False
+    )
+    assert voucher.active
+    submission = order_form_submission({"voucher_code": "foo"})
+
+    # mark as paid, voucher still active
+    submission.paid = True
+    submission.save()
+    voucher.refresh_from_db()
+    assert voucher.active

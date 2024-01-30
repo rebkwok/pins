@@ -7,6 +7,7 @@ from django.core.validators import validate_slug
 from django.db import models
 from django.template.response import TemplateResponse
 from django.utils.formats import date_format
+from django.utils import timezone
 from django.urls import reverse
 
 from shortuuid.django_fields import ShortUUIDField
@@ -492,6 +493,10 @@ class OrderVoucher(Orderable):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     # so we can deactivate vouchers
     active = models.BooleanField(default=True)
+    one_time_use = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ("order_form_page", "code")
 
 
 class OrderBaseForm(BaseForm):
@@ -860,6 +865,7 @@ class OrderFormSubmission(AbstractFormSubmission):
         editable = False
     )
     paid = models.BooleanField(default=False)
+    date_paid = models.DateTimeField(null=True, blank=True)
     shipped = models.BooleanField(default=False)
     cost = models.DecimalField(max_digits=10, decimal_places=2, null=True)
 
@@ -903,6 +909,24 @@ class OrderFormSubmission(AbstractFormSubmission):
 
     def get_absolute_url(self):
         return reverse("orders:order_detail", kwargs={"reference": self.reference})
+    
+    def save(self, *args, **kwargs):
+        if self.paid and not self.date_paid:
+            self.date_paid = timezone.now()
+            # This submission has just been marked as paid; look for a one-time voucher
+            # used for it, and deactivate it if applicable
+            # We don't do this for subsequent saves, because the code could have been
+            # reactivated for another use
+            voucher_code = self.form_data.get("voucher_code")
+            if voucher_code:
+                # is there a matching one-time use voucher? If so, deactivate it now
+                try:
+                    voucher = OrderVoucher.objects.get(code=voucher_code, one_time_use=True)
+                    voucher.active = False
+                    voucher.save()
+                except OrderVoucher.DoesNotExist:
+                    ...
+        super().save(*args, **kwargs)
     
 
 class StandardPage(Page):

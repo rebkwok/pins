@@ -133,6 +133,37 @@ def test_paypal_notify_url_happy_path_order_submission(mock_postback, client, se
 
 
 @patch('paypal.standard.ipn.models.PayPalIPN._postback')
+def test_paypal_notify_url_order_submission_with_voucher(
+    mock_postback, client, settings, order_form_page, order_form_submission
+):
+    mock_postback.return_value = b"VERIFIED"
+    settings.PAYPAL_EMAIL = TEST_RECEIVER_EMAIL.decode()
+
+    voucher = baker.make(
+        "home.OrderVoucher", order_form_page=order_form_page, code="foo", amount=2, 
+        active=True, one_time_use=True
+    )
+    submission = order_form_submission({"voucher_code": "foo"})
+
+    assert not PayPalIPN.objects.exists()
+    resp = paypal_post(
+        client,
+        {
+            **IPN_POST_PARAMS, 
+            'invoice': submission.reference, 
+            'custom': signature(submission.reference), 
+            'txn_id': 'test',
+            'mc_gross': 20,
+        }
+    )
+
+    submission.refresh_from_db()
+    voucher.refresh_from_db()
+    assert submission.paid
+    assert not voucher.active
+
+
+@patch('paypal.standard.ipn.models.PayPalIPN._postback')
 def test_paypal_notify_url_unexpected_payment_status(mock_postback, client, settings, caplog):
     mock_postback.return_value = b"VERIFIED"
 
