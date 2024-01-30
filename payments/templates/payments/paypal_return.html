@@ -10,8 +10,8 @@
                 {% if not submission.paid %}
                 <p>We will send you an email when your payment has been processed.</p>
                 {% endif %}
-                {% if submission %}
-                    <p><a href={% url 'fundraising:recipe_book_contribution_detail' submission.pk %}>View your submission</a></p>
+                {% if item %}
+                    <p><a href={{ item.get_absolute_url }}>View your {{ item_type }}.</a></p>
                 {% endif %}
             </div>
         </div>

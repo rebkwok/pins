@@ -7,8 +7,8 @@
         <div class="row">
             <div class="col">            
                 <p>Your payment has been cancelled.</p>
-                {% if paypal_item_reference %}
-                    <p><a href={% url 'fundraising:recipe_book_contribution_detail' paypal_item_reference %}>Go back to your submission</a></p>
+                {% if item %}
+                    <p><a href={{ item.get_absolute_url }}>View your {{ item_type }}</a></p>
                 {% endif %}
             </div>
         </div>

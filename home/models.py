@@ -547,7 +547,7 @@ class OrderFormBuilder(WagtailCaptchaFormBuilder):
             formfields.update(
                 {
                     "voucher_code": voucher_code_field, 
-                    "wagtailcaptcha": original_fields["wagtailcaptcha"]
+                    # "wagtailcaptcha": original_fields["wagtailcaptcha"]
                 }
             )
             return formfields
@@ -859,7 +859,7 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         content += self._render_extra_email(form)
         content += "\nOrder summary:\n"
         content += "\n".join([f"  - {variant.name} ({quantity})" for variant, quantity in submission.items_ordered()])
-        content += f"\n\nView your submission at https://{settings.DOMAIN}{submission.get_absolute_url()}."
+        content += f"\n\nView your order at https://{settings.DOMAIN}{submission.get_absolute_url()}."
         content += f"\nIf you haven't made your payment yet, you'll also find a link there."
         return content
     

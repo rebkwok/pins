@@ -361,7 +361,7 @@ def test_order_form_process_form_submission(order_form_page):
         "Total amount due: £12.00\n"
         "Order summary:\n"
         "  - test product (1)\n"
-        f"\nView your submission at https://{settings.DOMAIN}{order_form_page.orderformsubmission_set.first().get_absolute_url()}.\n"
+        f"\nView your order at https://{settings.DOMAIN}{order_form_page.orderformsubmission_set.first().get_absolute_url()}.\n"
         "If you haven't made your payment yet, you'll also find a link there."
     )
 
@@ -412,7 +412,7 @@ def test_order_form_process_form_submission_with_voucher_code(order_form_page):
         "Total amount due: £10.00\n"
         "Order summary:\n"
         "  - test product (1)\n"
-        f"\nView your submission at https://{settings.DOMAIN}{order_form_page.orderformsubmission_set.first().get_absolute_url()}.\n"
+        f"\nView your order at https://{settings.DOMAIN}{order_form_page.orderformsubmission_set.first().get_absolute_url()}.\n"
         "If you haven't made your payment yet, you'll also find a link there."
     )
 
