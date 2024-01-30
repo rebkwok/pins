@@ -32,7 +32,18 @@
                     {{ variant.name }}: £{{ variant.cost }}<br/>
                     {% endfor %}
                 </p>
-                {% if page.shipping_cost %}Plus P&P: £{{page.shipping_cost }} per order{% endif %}
+                {% if page.shipping_costs_dict %}
+                    {% if page.shipping_costs_dict|length == 1 %}
+                        Plus P&P - {% for label, shipping_cost in page.shipping_costs_dict.values %}{{ label }}: £{{shipping_cost }}{% endfor %}
+                    {% else %}
+                    Plus P&P:
+                    <ul>
+                        {% for label, shipping_cost in page.shipping_costs_dict.values %}
+                            <li>{{ label }}: £{{shipping_cost }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                {% endif %}
             </div>
         </div>
     </div>

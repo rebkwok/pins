@@ -8,7 +8,7 @@ import pytest
 import wagtail_factories
 
 from home.tests.conftest import FormPageFactory, OrderFormPageFactory
-from home.models import FormField, OrderFormField, ProductVariant, OrderFormSubmission
+from home.models import FormField, OrderFormField, ProductVariant, OrderFormSubmission, OrderShippingCost
 
 
 pytestmark = pytest.mark.django_db
@@ -56,6 +56,8 @@ def order_form_page(home_page):
     baker.make(OrderFormField, label="name", field_type="singleline", page=form_page)
     baker.make(OrderFormField, label="email_address", field_type="email", page=form_page)
     
+    baker.make(OrderShippingCost, amount=2, order_form_page=form_page)
+
     # Make an order form field matching a product variant.
     baker.make(OrderFormField, label="pv__test_product", field_type="dropdown", page=form_page, default_value=1)
     baker.make(ProductVariant, page=form_page, name="test product", cost=10, item_count=1)

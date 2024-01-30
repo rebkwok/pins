@@ -12,6 +12,5 @@ class OrderFormPageFactory(wagtail_factories.PageFactory):
     title = "Test Order Form"
     to_address = "admin@test.com"
     subject = "test order"
-    shipping_cost = 2
     class Meta:
         model = OrderFormPage

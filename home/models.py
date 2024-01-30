@@ -557,6 +557,17 @@ class OrderFormBuilder(WagtailCaptchaFormBuilder):
         return type("WagtailForm", (OrderBaseForm,), self.formfields)
 
 
+class OrderShippingCost(Orderable):
+    DEFAULT_MAX = 999999999
+    order_form_page = ParentalKey("OrderFormPage", related_name="shipping_costs", on_delete=models.CASCADE)
+    max_quantity = models.PositiveIntegerField(default=DEFAULT_MAX)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        ordering = ("max_quantity",)
+        unique_together = ("order_form_page", "max_quantity")
+
+
 class OrderFormPage(WagtailCaptchaEmailForm):
     form_builder = OrderFormBuilder
     submissions_list_view_class = OrderFormSubmissionsListView
@@ -572,7 +583,6 @@ class OrderFormPage(WagtailCaptchaEmailForm):
     )
     product_name = models.CharField(blank=True, max_length=250)
     product_description = models.CharField(blank=True, max_length=250)
-    shipping_cost = models.DecimalField(max_digits=10, decimal_places=2)
     total_available = models.PositiveIntegerField(
         null=True, blank=True, help_text="Max total number available (optional)"
     )
@@ -590,8 +600,14 @@ class OrderFormPage(WagtailCaptchaEmailForm):
             [
                 FieldPanel("product_name"),
                 FieldPanel("product_description"),
-                FieldPanel("shipping_cost"),
                 FieldPanel("total_available"),
+                InlinePanel(
+                    "shipping_costs", label="Shipping Costs", 
+                    panels=[
+                        FieldPanel("max_quantity", help_text="Max quantity this rate applies to. Default ceiling value is 999999999"),
+                        FieldPanel("amount"),
+                    ]
+                ),
                 InlinePanel(
                     "product_variants", label="Product Variants", 
                     panels=[
@@ -674,6 +690,36 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         title = title.strip()
         return title
 
+    @property
+    def shipping_costs_dict(self):
+        if self.shipping_costs.exists():
+            sc_dict = {}
+            previous_max_quantity = None
+            for sc in self.shipping_costs.all():
+                if sc.max_quantity ==  1:
+                    label = f"1 item"
+                elif sc.max_quantity == OrderShippingCost.DEFAULT_MAX:
+                    if previous_max_quantity is not None:
+                        label = f"{previous_max_quantity + 1}+ items"
+                    else:
+                        label = "Flat rate per order"
+                elif previous_max_quantity is None:
+                        label = f"1-{sc.max_quantity} items"
+                else:
+                    label = f"{previous_max_quantity + 1}-{sc.max_quantity} items"
+                sc_dict[sc.max_quantity] = (label, sc.amount)
+                previous_max_quantity = sc.max_quantity
+            return sc_dict
+
+    def get_shipping_cost(self, quantity):
+        if not self.shipping_costs_dict:
+            return 0
+        for max_quantity, shipping_label_and_cost in self.shipping_costs_dict.items():
+            if max_quantity >= quantity:
+                return shipping_label_and_cost[1]
+        # If there was no ceiling max set, use the highest rate
+        return shipping_label_and_cost[1]
+
     def create_or_update_order_form_field(self, product_variant_slug):
         variant = self.product_variants.get(slug=product_variant_slug)
         try:
@@ -739,7 +785,9 @@ class OrderFormPage(WagtailCaptchaEmailForm):
             variant_quantities[key] = (variant, quantity)
             total += (variant.cost * quantity)
         if total > 0:
-            total += self.shipping_cost
+            # shipping cost
+            total_quantity = self.quantity_ordered_by_submission(data)
+            total += self.get_shipping_cost(total_quantity)
             total -= voucher_amount
 
         return variant_quantities, total, voucher_amount

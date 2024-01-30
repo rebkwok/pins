@@ -9,7 +9,7 @@ from model_bakery import baker
 import pytest
 
 from .conftest import OrderFormPageFactory
-from ..models import OrderFormField
+from ..models import OrderShippingCost
 
 pytestmark = pytest.mark.django_db
 
@@ -242,7 +242,9 @@ def test_order_form_page_disallowed_variants(order_form_page, order_form_pre_sub
     # sell out
     order_form_pre_submission({"pv__test_product": 1})
     assert order_form_page.sold_out()
-    assert order_form_page.disallowed_variants() == [order_form_page.product_variants.first(), variant5, variant10]
+    assert sorted(
+        pv.id for pv in order_form_page.disallowed_variants()
+    ) == sorted([order_form_page.product_variants.first().id, variant5.id, variant10.id])
 
 def test_order_form_submission(order_form_submission):
     submission = order_form_submission()
@@ -462,3 +464,111 @@ def test_order_form_submission_paid_does_not_deactivates_multiuse_voucher(order_
     submission.save()
     voucher.refresh_from_db()
     assert voucher.active
+
+
+@pytest.mark.parametrize(
+    "shipping_rates,expected",
+    [
+        (
+            [(OrderShippingCost.DEFAULT_MAX, 1)], 
+            {
+                OrderShippingCost.DEFAULT_MAX: ("Flat rate per order", 1)
+            }
+        ),
+        (
+            [
+                (1, 1),
+                (OrderShippingCost.DEFAULT_MAX, 2)
+            ], 
+            {   
+                1: ("1 item", 1),
+                OrderShippingCost.DEFAULT_MAX: ("2+ items", 2)
+            }
+        ),
+        (
+            [
+                (5, 1),
+                (OrderShippingCost.DEFAULT_MAX, 2)
+            ], 
+            {   
+                5: ("1-5 items", 1),
+                OrderShippingCost.DEFAULT_MAX: ("6+ items", 2)
+            }
+        ),
+        (
+            [   
+                (1, 1),
+                (3, 2),
+                (5, 3),
+                (OrderShippingCost.DEFAULT_MAX, 4)
+            ], 
+            {   
+                1: ("1 item", 1),
+                3: ("2-3 items", 2),
+                5: ("4-5 items", 3),
+                OrderShippingCost.DEFAULT_MAX: ("6+ items", 4)
+            }
+        ),
+        (
+            [], 
+            None
+        ),
+    ]
+)
+def test_order_form_page_shipping_costs_dict(order_form_page, shipping_rates, expected):
+    OrderShippingCost.objects.all().delete() 
+    for max_quantity, amount in shipping_rates:
+        baker.make(OrderShippingCost, order_form_page=order_form_page, max_quantity=max_quantity, amount=amount)
+
+    assert order_form_page.shipping_costs_dict == expected
+
+@pytest.mark.parametrize(
+    "quantity_ordered,shipping_cost,total_cost",
+    [
+        (1, 1, 11),
+        (2, 1.5, 21.5),
+        (3, 1.5, 31.5),
+        (4, 1.5, 41.5),
+        (5, 3, 53),
+        (100, 3, 1003),
+    ]
+)
+def test_order_form_submission_get_shipping_costs(
+    order_form_page, quantity_ordered, shipping_cost, total_cost
+):
+    OrderShippingCost.objects.all().delete() 
+    baker.make(OrderShippingCost, order_form_page=order_form_page, max_quantity=1, amount=1)
+    baker.make(OrderShippingCost, order_form_page=order_form_page, max_quantity=4, amount=1.5)
+    baker.make(OrderShippingCost, order_form_page=order_form_page, amount=3)
+
+    assert order_form_page.get_shipping_cost(quantity_ordered) == shipping_cost
+    _, total, _ = order_form_page.get_variant_quantities_and_total({"pv__test_product": quantity_ordered})
+    assert total == total_cost
+
+
+def test_order_form_submission_no_shipping_cost(order_form_page):
+    OrderShippingCost.objects.all().delete() 
+    assert order_form_page.get_shipping_cost(5) == 0
+    _, total, _ = order_form_page.get_variant_quantities_and_total({"pv__test_product": 1})
+    assert total == 10
+
+
+def test_order_form_submission_get_shipping_costs_no_ceiling(order_form_page):
+    OrderShippingCost.objects.all().delete() 
+    baker.make(OrderShippingCost, order_form_page=order_form_page, max_quantity=1, amount=1)
+    baker.make(OrderShippingCost, order_form_page=order_form_page, max_quantity=4, amount=2)
+
+    assert order_form_page.shipping_costs_dict == {
+        1: ("1 item", 1),
+        4: ("2-4 items", 2)
+    }
+    assert order_form_page.get_shipping_cost(1) == 1
+    assert order_form_page.get_shipping_cost(4) == 2
+    assert order_form_page.get_shipping_cost(10) == 2
+
+
+def test_order_form_submission_no_shipping_cost(order_form_page):
+    OrderShippingCost.objects.all().delete() 
+    assert order_form_page.get_shipping_cost(5) == 0
+    _, total, _ = order_form_page.get_variant_quantities_and_total({"pv__test_product": 1})
+    assert total == 10
