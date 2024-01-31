@@ -9,7 +9,7 @@ from django.template.context_processors import csrf
 from django.views.generic import CreateView, DetailView, UpdateView
 
 from crispy_forms.utils import render_crispy_form
-from paypal.standard.forms import PayPalPaymentsForm
+from payments.utils import get_paypal_form
 
 
 from payments.utils import signature
@@ -81,30 +81,12 @@ class RecipeBookSubmissionDetailView(DetailView):
         submission = context["submission"]
         
         if not submission.paid:
-            self.request.session["submission_ref"] = submission.reference
-            if settings.PAYPAL_TEST and settings.PAYPAL_TEST_CALLBACK_DOMAIN:
-                paypal_urls = {
-                    "notify_url": f"{settings.PAYPAL_TEST_CALLBACK_DOMAIN}{reverse('paypal-ipn')}",
-                    "return": f"{settings.PAYPAL_TEST_CALLBACK_DOMAIN}{reverse('payments:paypal_return')}",
-                    "cancel_return": f"{settings.PAYPAL_TEST_CALLBACK_DOMAIN}{reverse('payments:paypal_cancel')}",
-                }
-            else:
-                paypal_urls = {
-                    "notify_url": self.request.build_absolute_uri(reverse('paypal-ipn')),
-                    "return": self.request.build_absolute_uri(reverse('payments:paypal_return')),
-                    "cancel_return": self.request.build_absolute_uri(reverse('payments:paypal_cancel')),
-                }
-
-            paypal_dict = {
-                "business": settings.PAYPAL_EMAIL,
-                "amount": submission.cost,
-                "item_name": f"Recipe Book submission: {submission.page_type_verbose()}",
-                "invoice": submission.reference,
-                "currency_code": "GBP",
-                "custom": signature(submission.reference),
-                **paypal_urls
-            }
-            context["paypal_form"] = PayPalPaymentsForm(initial=paypal_dict)
+            context["paypal_form"] = get_paypal_form(
+                request=self.request,
+                amount=submission.cost, 
+                item_name=f"Recipe Book submission: {submission.page_type_verbose()}",
+                reference=submission.reference
+            )
         return context
 
 

@@ -1,43 +1,23 @@
 import datetime
-import os
-from unittest.mock import patch
 
 from django.core import mail
-from django.test import RequestFactory
 
 from model_bakery import baker
 
 import pytest
 
-import wagtail_factories
-
-from ..models import FormPage, FormField, FooterText
+from .conftest import FormPageFactory
+from ..models import FormField, FooterText
 
 pytestmark = pytest.mark.django_db
-
-
-class FormPageFactory(wagtail_factories.PageFactory):
-    class Meta:
-        model = FormPage
-
-
-@pytest.fixture
-def contact_form_page(home_page):
-    form_page = FormPageFactory(
-        parent=home_page, title="Test Contact Form", to_address="admin@test.com", subject="contact"
-    )
-    baker.make(FormField, label="subject", field_type="singleline", page=form_page)
-    baker.make(FormField, label="email_address", field_type="email", page=form_page)
-    baker.make(FormField, label="message", field_type="multiline", page=form_page)
-    yield form_page
 
 
 def test_home_page_str(home_page):
     assert str(home_page) == "Home"
 
 
-def test_form_page(contact_form_page, client):
-    request = RequestFactory().get(contact_form_page.url)
+def test_form_page(contact_form_page, rf):
+    request = rf.get(contact_form_page.url)
     request.user = None
     resp = contact_form_page.serve(request)
     assert (
@@ -46,8 +26,8 @@ def test_form_page(contact_form_page, client):
     )
 
 
-def test_form_page_with_ref(contact_form_page):
-    request = RequestFactory().get(contact_form_page.url + "?ref=doug")
+def test_form_page_with_ref(contact_form_page, rf):
+    request = rf.get(contact_form_page.url + "?ref=doug")
     request.user = None
     resp = contact_form_page.serve(request)
     assert resp.context_data["form"].fields["subject"].initial == "Enquiry about doug"
@@ -109,10 +89,10 @@ def test_form_page_send_email_other_fields(home_page):
     assert mail.outbox[0].body == "date: 15-Dec-2023\n\ndatetime: 01-Aug-2023 12:00\n\nlist: a, b"
 
 
-def test_footer_text(home_page):
+def test_footer_text(home_page, rf):
     footer = FooterText.objects.create(body="I am a footer")
     assert str(footer) == "Footer text"
-    request = RequestFactory().get(home_page.url)
+    request = rf.get(home_page.url)
     resp = home_page.serve(request)
     assert "I am a footer" in resp.rendered_content
 

@@ -1,9 +1,16 @@
 import datetime
+import re
 
+from django import forms
 from django.conf import settings
+from django.core.validators import validate_slug
 from django.db import models
 from django.template.response import TemplateResponse
 from django.utils.formats import date_format
+from django.utils import timezone
+from django.urls import reverse
+
+from shortuuid.django_fields import ShortUUIDField
 
 from modelcluster.fields import ParentalKey
 
@@ -16,7 +23,7 @@ from wagtail.admin.panels import (
     MultiFieldPanel,
     PublishingPanel,
 )
-from wagtail.contrib.forms.forms import FormBuilder, BaseForm
+from wagtail.contrib.forms.forms import BaseForm
 from wagtail.contrib.forms.models import AbstractEmailForm, AbstractFormField, AbstractFormSubmission
 from wagtail.contrib.forms.views import SubmissionsListView
 
@@ -31,7 +38,9 @@ from wagtail.models import (
 )
 from wagtail.contrib.forms.utils import get_field_clean_name
 
-from wagtailcaptcha.models import WagtailCaptchaEmailForm, WagtailCaptchaForm, WagtailCaptchaFormBuilder
+from wagtailcaptcha.models import WagtailCaptchaEmailForm, WagtailCaptchaFormBuilder
+
+from payments.utils import get_paypal_form
 
 
 class HomePage(Page):
@@ -404,25 +413,31 @@ class OrderFormSubmissionsListView(SubmissionsListView):
 
     template_name = "home/order_list_submissions_index.html"
 
-    def stream_csv(self, queryset):
-        self.list_export += ["total", "total_items", "paid", "shipped"]
+    def _export_headings(self):
+        self.list_export += ["reference", "total", "total_items", "paid", "shipped"]
         self.export_headings.update(
-            {"total": "Total (£)", "total_items": "Total items", "paid": "Paid", "shipped": "Shipped"}
+            {
+                "reference": "Reference",
+                "total": "Total (£)", 
+                "total_items": "Total items", 
+                "paid": "Paid", 
+                "shipped": "Shipped"
+            }
         )
+
+    def stream_csv(self, queryset):
+        self._export_headings()
         return super().stream_csv(queryset)
 
     def write_xlsx(self, queryset, output):
-        self.list_export += ["total", "total_items", "paid", "shipped"]
-        self.export_headings.update(
-            {"total": "Total (£)", "total_items": "Total items", "paid": "Paid", "shipped": "Shipped"}
-        )
+        self._export_headings()
         return super().write_xlsx(queryset, output)
 
     def to_row_dict(self, item):
         """Orders the submission dictionary for spreadsheet writing"""
         row_dict = super().to_row_dict(item)
-        _, total = self.form_page.get_variant_quantities_and_total(row_dict)
-        row_dict["total"] = total
+        row_dict["reference"] = item.reference
+        row_dict["total"] = item.cost
         row_dict["total_items"] = self.form_page.quantity_ordered_by_submission(row_dict)
         row_dict["paid"] = "Y" if item.paid else "-"
         row_dict["shipped"] = "Y" if item.shipped else "-"
@@ -438,6 +453,7 @@ class OrderFormSubmissionsListView(SubmissionsListView):
                 remaining_stock = "N/A"
             context_data["description"] = f"Total sold: {total_ordered_so_far} | Remaining stock: {remaining_stock}"
             extra_cols = [
+                {"name": "reference", "label": "Reference", "order": 0},
                 {'name': 'total', 'label': 'Total (£)', 'order': None},
                 {'name': 'total_items', 'label': 'Total items', 'order': None},
                 {'name': 'paid', 'label': 'Paid', 'order': None},
@@ -449,6 +465,8 @@ class OrderFormSubmissionsListView(SubmissionsListView):
             submissions = OrderFormSubmission.objects.filter(
                 id__in=[row["model_id"] for row in context_data["data_rows"]]
             )
+            submission_reference = {sub.id: sub.reference for sub in submissions}
+            submission_cost = {sub.id: sub.cost for sub in submissions}
             submission_paid_shipped = {
                 sub.id: ("Y" if sub.paid else "-", "Y" if sub.shipped else "-") 
                 for sub in submissions
@@ -457,27 +475,97 @@ class OrderFormSubmissionsListView(SubmissionsListView):
             for row in context_data["data_rows"]:
                 form_data = row["fields"]
                 form_data_dict = {field[0]: form_data[i] for i, field in enumerate(fields)}
-                _, total = self.form_page.get_variant_quantities_and_total(form_data_dict)
                 total_items = self.form_page.quantity_ordered_by_submission(form_data_dict)
                 extra_form_data = [
-                    total, total_items, *submission_paid_shipped[row["model_id"]]
+                    submission_reference[row["model_id"]], submission_cost[row["model_id"]], total_items, *submission_paid_shipped[row["model_id"]]
                 ]
                 form_data.extend(extra_form_data)
 
         return context_data
 
 
+class OrderVoucher(Orderable):
+    """
+    Simple code that gives a discount on an order (e.g. if collecting, can remove shipping cost)
+    """
+    order_form_page = ParentalKey("OrderFormPage", related_name="voucher_codes", on_delete=models.CASCADE)
+    code = models.CharField(max_length=20, validators=[validate_slug])
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    # so we can deactivate vouchers
+    active = models.BooleanField(default=True)
+    one_time_use = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ("order_form_page", "code")
+
+
 class OrderBaseForm(BaseForm):
+
     def clean(self):
         super().clean()
+        voucher_code = self.cleaned_data.get("voucher_code", "").strip()
+        if (
+            voucher_code and 
+            voucher_code not in 
+            self.page.voucher_codes.filter(code=voucher_code, active=True).values_list("code", flat=True)
+        ):
+            del self.cleaned_data["voucher_code"]
         allowed, validation_error_msg = self.page.quantity_submitted_is_valid(self.cleaned_data)
         if not allowed:
             self.add_error("__all__", validation_error_msg)
 
 
 class OrderFormBuilder(WagtailCaptchaFormBuilder):
+
+    def __init__(self, fields, **kwargs):
+        self.page = kwargs.pop("page")
+        super().__init__(fields)            
+
+    @property
+    def formfields(self):
+        original_fields = super().formfields
+        if not set(original_fields) & {"email", "email_address"}:
+            original_fields = {
+                "email": forms.EmailField(),
+                **original_fields
+            }    
+        if self.page.voucher_codes.filter(active=True).exists():
+            formfields = {
+                k: v for k, v in original_fields.items() if k != "wagtailcaptcha"
+            }
+            voucher_code_field = forms.CharField(
+                required=False,
+                help_text="If you have a voucher code, enter it here."
+            )
+            voucher_code_field.widget.attrs.update(
+                {
+                    "hx-post": f"{reverse('orders:calculate_order_total', args=(self.page.id,))}",
+                    "hx-trigger": "keyup changed delay:0.3s",
+                    "hx-target": "#order-total"
+                }
+            )
+            formfields.update(
+                {
+                    "voucher_code": voucher_code_field, 
+                    # "wagtailcaptcha": original_fields["wagtailcaptcha"]
+                }
+            )
+            return formfields
+        return original_fields
+
     def get_form_class(self):
         return type("WagtailForm", (OrderBaseForm,), self.formfields)
+
+
+class OrderShippingCost(Orderable):
+    DEFAULT_MAX = 999999999
+    order_form_page = ParentalKey("OrderFormPage", related_name="shipping_costs", on_delete=models.CASCADE)
+    max_quantity = models.PositiveIntegerField(default=DEFAULT_MAX)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        ordering = ("max_quantity",)
+        unique_together = ("order_form_page", "max_quantity")
 
 
 class OrderFormPage(WagtailCaptchaEmailForm):
@@ -495,7 +583,6 @@ class OrderFormPage(WagtailCaptchaEmailForm):
     )
     product_name = models.CharField(blank=True, max_length=250)
     product_description = models.CharField(blank=True, max_length=250)
-    shipping_cost = models.DecimalField(max_digits=10, decimal_places=2)
     total_available = models.PositiveIntegerField(
         null=True, blank=True, help_text="Max total number available (optional)"
     )
@@ -513,8 +600,14 @@ class OrderFormPage(WagtailCaptchaEmailForm):
             [
                 FieldPanel("product_name"),
                 FieldPanel("product_description"),
-                FieldPanel("shipping_cost"),
                 FieldPanel("total_available"),
+                InlinePanel(
+                    "shipping_costs", label="Shipping Costs", 
+                    panels=[
+                        FieldPanel("max_quantity", help_text="Max quantity this rate applies to. Default ceiling value is 999999999"),
+                        FieldPanel("amount"),
+                    ]
+                ),
                 InlinePanel(
                     "product_variants", label="Product Variants", 
                     panels=[
@@ -551,13 +644,36 @@ class OrderFormPage(WagtailCaptchaEmailForm):
             ],
             "Email",
         ),
+        MultiFieldPanel(
+            [
+                HelpPanel(
+                    content="""
+                    Voucher codes that can be used to apply a discount amount to
+                    orders placed using this form. E.g. a discount equivalent to 
+                    the shipping cost that can be given out to people who will
+                    collect and don't require shipping.
+                    """
+                ),
+                InlinePanel(
+                    "voucher_codes", label="Voucher codes", 
+                    panels=[
+                        FieldPanel("code"),
+                        FieldPanel("amount"),
+                        FieldPanel("active"),
+                    ]
+                ),
+            ],
+            "Voucher codes",
+        )
     ]
 
+    end_of_form_field_names = ["wagtailcaptcha", "voucher_code"]
     subpage_types = []
     
     def save(self, *args, **kwargs):
         self.from_address = settings.DEFAULT_FROM_EMAIL
         super().save(*args, **kwargs)
+    
         # Save the product variants to ensure slugs have been generated
         for pr in self.product_variants.all():
             pr.save()
@@ -566,7 +682,43 @@ class OrderFormPage(WagtailCaptchaEmailForm):
             self.create_or_update_order_form_field(slug)
         fields_to_remove = self.product_quantity_field_names - self.product_variant_slugs
         for field_name in fields_to_remove:
-            self.order_form_fields.get(clean_name=field_name).delete()        
+            self.order_form_fields.get(clean_name=field_name).delete()      
+
+    @property
+    def subject_title(self):
+        title = re.sub(r"Order Form", "", self.title, flags=re.IGNORECASE)
+        title = title.strip()
+        return title
+
+    @property
+    def shipping_costs_dict(self):
+        if self.shipping_costs.exists():
+            sc_dict = {}
+            previous_max_quantity = None
+            for sc in self.shipping_costs.all():
+                if sc.max_quantity ==  1:
+                    label = f"1 item"
+                elif sc.max_quantity == OrderShippingCost.DEFAULT_MAX:
+                    if previous_max_quantity is not None:
+                        label = f"{previous_max_quantity + 1}+ items"
+                    else:
+                        label = "Flat rate per order"
+                elif previous_max_quantity is None:
+                        label = f"1-{sc.max_quantity} items"
+                else:
+                    label = f"{previous_max_quantity + 1}-{sc.max_quantity} items"
+                sc_dict[sc.max_quantity] = (label, sc.amount)
+                previous_max_quantity = sc.max_quantity
+            return sc_dict
+
+    def get_shipping_cost(self, quantity):
+        if not self.shipping_costs_dict:
+            return 0
+        for max_quantity, shipping_label_and_cost in self.shipping_costs_dict.items():
+            if max_quantity >= quantity:
+                return shipping_label_and_cost[1]
+        # If there was no ceiling max set, use the highest rate
+        return shipping_label_and_cost[1]
 
     def create_or_update_order_form_field(self, product_variant_slug):
         variant = self.product_variants.get(slug=product_variant_slug)
@@ -596,6 +748,10 @@ class OrderFormPage(WagtailCaptchaEmailForm):
     def get_form_fields(self):
         return self.order_form_fields.all()
     
+    def get_form_class(self):
+        fb = self.form_builder(self.get_form_fields(), page=self)
+        return fb.get_form_class()
+
     def _get_quantities(self, data):
         def get_item(v):
             if isinstance(v, list):
@@ -605,7 +761,22 @@ class OrderFormPage(WagtailCaptchaEmailForm):
             k: get_item(v) for k, v in data.items() if k in self.product_variant_slugs
         }
 
+    def default_total(self):
+        data = {
+            field.clean_name: field.default_value for field in self.get_form_fields() 
+            if field.clean_name in self.product_quantity_field_names
+        }
+        _, total, _ = self.get_variant_quantities_and_total(data)
+        return total
+
     def get_variant_quantities_and_total(self, data):
+        code = data.get("voucher_code", "")
+        if isinstance(code, list):
+            code = code[0]
+        code = code.strip()
+        voucher_amount = 0
+        if code and self.voucher_codes.filter(code=code, active=True).exists():
+            voucher_amount = OrderVoucher.objects.get(code=code, active=True).amount
         quantities = self._get_quantities(data)
         total = 0
         variant_quantities = {}
@@ -614,9 +785,12 @@ class OrderFormPage(WagtailCaptchaEmailForm):
             variant_quantities[key] = (variant, quantity)
             total += (variant.cost * quantity)
         if total > 0:
-            total += self.shipping_cost
+            # shipping cost
+            total_quantity = self.quantity_ordered_by_submission(data)
+            total += self.get_shipping_cost(total_quantity)
+            total -= voucher_amount
 
-        return variant_quantities, total
+        return variant_quantities, total, voucher_amount
 
     def _item_counts_per_variant(self):
         return dict(self.product_variants.values_list("slug", "item_count"))
@@ -638,7 +812,7 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         ]
 
     def get_total_quantity_ordered(self):
-        submissions = self.formsubmission_set.all()
+        submissions = self.orderformsubmission_set.all()
         item_counts_per_variant = self._item_counts_per_variant()
         total = 0
         for submission in submissions:
@@ -663,32 +837,90 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         remaining_stock = self.total_available - total_ordered_so_far
         valid = total_for_this_order <= remaining_stock
         if not valid:
-            validation_error_msg  = f"Quantity selected is unavailable; select a maximum of {remaining_stock} total items."
+            rem_stock = remaining_stock if remaining_stock >= 0 else 0
+            validation_error_msg  = f"Quantity selected is unavailable; select a maximum of {rem_stock} total items."
         return valid, validation_error_msg
+
+    def _render_extra_email(self, form):
+        _, total, discount = self.get_variant_quantities_and_total(form.cleaned_data)
+        content = f"\nTotal items ordered: {self.quantity_ordered_by_submission(form.cleaned_data)}"
+        if discount:
+            content += f"\nDiscount: £{discount}"
+        content += f"\nTotal amount due: £{total}"
+        return content
 
     def render_email(self, form):
         content = super().render_email(form)
-        _, total = self.get_variant_quantities_and_total(form.cleaned_data)
-        content += f"\nTotal items ordered: {self.quantity_ordered_by_submission(form.cleaned_data)}"
-        content += f"\nTotal amount due: £{total}"
+        content += self._render_extra_email(form)
+        return content
+
+    def render_email_for_purchaser(self, form, submission):
+        content = "Thank you for your order!\n"
+        content += self._render_extra_email(form)
+        content += "\nOrder summary:\n"
+        content += "\n".join([f"  - {variant.name} ({quantity})" for variant, quantity in submission.items_ordered()])
+        content += f"\n\nView your order at https://{settings.DOMAIN}{submission.get_absolute_url()}."
+        content += f"\nIf you haven't made your payment yet, you'll also find a link there."
         return content
     
     def render_landing_page(self, request, form_submission=None, *args, **kwargs):
         context = self.get_context(request)
         context["form_submission"] = form_submission
-        _, total = self.get_variant_quantities_and_total(form_submission.get_data())
+        _, total, _ = self.get_variant_quantities_and_total(form_submission.get_data())
+        
         context["total"] = total
+        context["paypal_form"] = get_paypal_form(
+            request=request,
+            amount=total, 
+            item_name=f"Order form submission: {self.title}",
+            reference=form_submission.reference
+        )
         return TemplateResponse(
             request, self.get_landing_page_template(request), context
         )
 
     def get_submission_class(self):
         return OrderFormSubmission
+        
+    def process_form_submission(self, form):
+        """
+        Accepts form instance with submitted data, user and page.
+        Creates submission instance.
 
+        Set cost here to set the cost at the time of submission (in case prices)
+        changed or voucher codes were deactivated
+        """
+        # Super() sends the email to the to_address
+        submission = super().process_form_submission(form)
+        _, total, _ = self.get_variant_quantities_and_total(form.cleaned_data)
+        submission.cost = total
+        submission.save()
+
+        # Send email to purchaser
+        send_mail(
+            self.subject,
+            self.render_email_for_purchaser(form, submission),
+            [submission.email],
+            settings.DEFAULT_FROM_EMAIL,
+            reply_to=[settings.CC_EMAIL],
+        )
+
+        return submission
+    
 
 class OrderFormSubmission(AbstractFormSubmission):
+    reference = ShortUUIDField(
+        editable = False
+    )
     paid = models.BooleanField(default=False)
+    date_paid = models.DateTimeField(null=True, blank=True)
     shipped = models.BooleanField(default=False)
+    cost = models.DecimalField(max_digits=10, decimal_places=2, null=True)
+
+    @property
+    def email(self):
+        email_field = next((k for k in self.form_data if k in ["email", "email_address"]))
+        return self.form_data[email_field]
 
     def mark_paid(self):
         self.paid = True
@@ -697,17 +929,53 @@ class OrderFormSubmission(AbstractFormSubmission):
     def mark_shipped(self):
         self.shipped = True
         self.save()
-    
-    def mark_paid_and_shipped(self):
-        self.paid = True
-        self.shipped = True
-        self.save()
 
     def reset(self):
         self.paid = False
         self.shipped = False
         self.save()
 
+    def items_ordered(self):
+        variant_quantities, _, _ = self.page.orderformpage.get_variant_quantities_and_total(self.form_data)
+        return [variant for variant in variant_quantities.values() if variant[1] > 0]
+
+    def status(self):
+        if self.paid:
+            if self.shipped:
+                return "Paid and shipped"
+            else:
+                return "Paid"
+        else:
+            return "Payment pending"
+
+    def status_colour(self):
+        colours = {
+            "Paid and shipped": "success",
+            "Paid": "primary"
+        }
+        return colours.get(self.status(), "danger")
+
+    def get_absolute_url(self):
+        return reverse("orders:order_detail", kwargs={"reference": self.reference})
+    
+    def save(self, *args, **kwargs):
+        if self.paid and not self.date_paid:
+            self.date_paid = timezone.now()
+            # This submission has just been marked as paid; look for a one-time voucher
+            # used for it, and deactivate it if applicable
+            # We don't do this for subsequent saves, because the code could have been
+            # reactivated for another use
+            voucher_code = self.form_data.get("voucher_code")
+            if voucher_code:
+                # is there a matching one-time use voucher? If so, deactivate it now
+                try:
+                    voucher = OrderVoucher.objects.get(code=voucher_code, one_time_use=True)
+                    voucher.active = False
+                    voucher.save()
+                except OrderVoucher.DoesNotExist:
+                    ...
+        super().save(*args, **kwargs)
+    
 
 class StandardPage(Page):
     """

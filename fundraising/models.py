@@ -51,6 +51,10 @@ def validate_profile_image(image):
     return validate_image_size(image, width=710, height=520)
 
 
+def get_random_code():
+    return random.randint(1000, 9999)
+
+
 class RecipeBookSubmission(models.Model):
 
     page_types = (
@@ -138,7 +142,7 @@ class RecipeBookSubmission(models.Model):
     processing = models.BooleanField(default=False)
     complete = models.BooleanField(default=False)
 
-    code = models.PositiveIntegerField(default=random.randint(1000, 9999))
+    code = models.PositiveIntegerField(default=get_random_code)
 
     def __str__(self):
         title_str = ""

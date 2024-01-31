@@ -77,6 +77,8 @@ class RecipeBookContrbutionForm(forms.ModelForm):
         page_type = kwargs.pop("page_type", None)
         super().__init__(**kwargs)
 
+        page_type = self.instance.page_type or page_type
+
         self.fields["page_type"].widget.attrs = {
             "hx-post": reverse("fundraising:update_form_fields"),
             "hx-target": "#submission-form",
@@ -86,13 +88,10 @@ class RecipeBookContrbutionForm(forms.ModelForm):
             for (choice_k, choice_v) in RecipeBookSubmission.page_types
         ]
         self.fields["page_type"].choices = tuple([("", "---"), *page_type_choices])
-        # make all recipe and photo fields not required; validate later based on page_type
-        # chosen
         required_fields = ["name", "email", "email1", "page_type", *self.required_fields_by_page_type.get(page_type, [])]
         for field in required_fields:
             self.fields[field].required = True
 
-        page_type = self.instance.page_type or page_type
         layout_fields = self.layout_fields_by_page_type.get(page_type, [])
         
         if page_type != "photo":

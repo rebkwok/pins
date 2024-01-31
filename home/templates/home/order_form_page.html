@@ -32,7 +32,18 @@
                     {{ variant.name }}: £{{ variant.cost }}<br/>
                     {% endfor %}
                 </p>
-                {% if page.shipping_cost %}Plus P&P: £{{page.shipping_cost }} per order{% endif %}
+                {% if page.shipping_costs_dict %}
+                    {% if page.shipping_costs_dict|length == 1 %}
+                        Plus P&P - {% for label, shipping_cost in page.shipping_costs_dict.values %}{{ label }}: £{{shipping_cost }}{% endfor %}
+                    {% else %}
+                    Plus P&P:
+                    <ul>
+                        {% for label, shipping_cost in page.shipping_costs_dict.values %}
+                            <li>{{ label }}: £{{shipping_cost }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                {% endif %}
             </div>
         </div>
     </div>
@@ -67,7 +78,7 @@
                     {% endif %}
                     
                     {% for field in form %}
-                        {% if not page|is_order_quantity:field.name %}
+                        {% if not page|is_order_quantity:field.name and not page|is_end_of_form_field:field.name %}
                             <div class="form-page__field" aria-required={% if field.field.required %}"true"{% else %}"false"{% endif %}>
                             
                                 {{ field.label_tag }}{% if field.field.required %}<span class="required">*</span>{% endif %}
@@ -77,6 +88,12 @@
                                 {% endif %}
 
                                 {{ field }}
+
+                                {% if field.errors %}
+                                    <span class="text-danger">
+                                        {% for error in field.errors %}{{ error }}{% endfor %}
+                                    </span>
+                                {% endif %}
                             </div>
                         {% endif %}
                     {% endfor %}
@@ -118,24 +135,45 @@
                             </div>
                         {% endif %}
                     {% endfor %}
+
                     
                     <div>
+                        <h3>Payment details</h4>
                         <p><strong>
-                            Total: £<span id="order-total">-- <input type="submit" 
-                                class="order-btn-sm" 
-                                value="Update"
-                                hx-post="{% url 'orders:calculate_order_total' page.id %}"
-                                hx-trigger="click"
-                                hx-target="#order-total"
-                            ></span> 
+                            Total: £<span id="order-total">{{ page.default_total }}</span><br>
                         </strong></p>
 
                         <div id="not-allowed"></div>
+
+                        {% for field in form %}
+                            {% if page|is_end_of_form_field:field.name %}
+                                <div class="form-page__field" aria-required={% if field.field.required %}"true"{% else %}"false"{% endif %}>
+                                    
+                                    {{ field.label_tag }}{% if field.field.required %}<span class="required">*</span>{% endif %}
+
+                                    {% if field.help_text %}
+                                        <p class="help">{{ field.help_text }}</p>
+                                    {% endif %}
+
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <span class="text-danger">
+                                            {% for error in field.errors %}{{ error }}{% endfor %}
+                                        </span>
+                                    {% endif %}
+                                    {% if field.name == "voucher_code" %}
+                                    <div id="invalid-voucher"></div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+
                         <div>
                             {{ page.form_footer_text|richtext }}
                         </div> 
                     </div>
-                    
+
+
                     <input id="submit-btn" type="submit" class="btn"/>
                 </form>
             {% endif %}

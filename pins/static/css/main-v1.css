@@ -1332,6 +1332,7 @@ footer {
 }
 
 .form-page input[type='text'],
+.form-page input[type='email'],
 textarea,
 select {
   display: block;
@@ -1415,6 +1416,7 @@ input[type='radio'] {
 
 @media (min-width: 766px) {
   .form-page input[type='text'],
+  .form-page input[type='email'],
   textarea,
   select {
     width: 100%;

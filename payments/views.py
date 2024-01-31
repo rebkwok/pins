@@ -2,21 +2,29 @@ from django.shortcuts import render, HttpResponse
 
 from django.views.decorators.csrf import csrf_exempt
 from fundraising.models import RecipeBookSubmission
+from home.models import OrderFormSubmission
+
+
+def _get_context(request):
+    paypal_item_reference = request.session.get("paypal_item_reference")
+    context = {}
+    try:
+        context["item"] = RecipeBookSubmission.objects.get(pk=paypal_item_reference)
+        context["item_type"] = "submission"
+    except RecipeBookSubmission.DoesNotExist:
+        context["item"] = OrderFormSubmission.objects.get(reference=paypal_item_reference)
+        context["item_type"] = "order"
+    except OrderFormSubmission.DoesNotExist:
+        ...
+    return context
 
 @csrf_exempt
 def paypal_return(request):
-    submission_ref = request.session.get("submission_ref")
-    context = {}
-    try:
-        context["submission"] = RecipeBookSubmission.objects.get(pk=submission_ref)
-    except RecipeBookSubmission.DoesNotExist:
-        ...
-    return render(request, "payments/paypal_return.html", context)
+    return render(request, "payments/paypal_return.html", _get_context(request))
 
 
 @csrf_exempt
 def payment_cancel(request):
-    submission = request.session.get("submission_ref")
-    return render(request, "payments/paypal_cancel.html", {"submission_ref": submission})
+    return render(request, "payments/paypal_cancel.html", _get_context(request))
 
 
