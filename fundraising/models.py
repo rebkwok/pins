@@ -144,6 +144,9 @@ class RecipeBookSubmission(models.Model):
 
     code = models.PositiveIntegerField(default=get_random_code)
 
+    class Meta:
+        ordering = ("-date_submitted",)
+
     def __str__(self):
         title_str = ""
         if self.title:
