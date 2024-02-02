@@ -8,6 +8,8 @@ from django.conf import settings
 from django.core.files.images import ImageFile
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db import models
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.safestring import mark_safe
@@ -679,3 +681,10 @@ class DogPage(Page):
                     raise
                 albums_obj = FacebookAlbums.instance()
                 albums_obj.set_rate_limit()
+
+
+@receiver(pre_delete, sender=DogPage, dispatch_uid='dogpage_delete_collection')
+def delete_page_collection(sender, instance, using, **kwargs):
+    album_tracker = FacebookAlbumTracker()
+    collection = album_tracker.get_collection(instance, instance.facebook_album_id)
+    collection.delete()

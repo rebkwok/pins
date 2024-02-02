@@ -39,11 +39,12 @@ IDS_TO_IGNORE = [
     "1892885781052790", # Paloma 3rd, home agreed
     "531587159181577", # Shakira, happily homed
     "557910736549219", # Braken, happily homed
+    "1883457118662323",  # Puma/Norah
+    "668225005517791", # Peeps
 ]
 
 
 ALBUMS_NOT_ACCESSIBLE_VIA_API = [
-    "1883457118662323",  # Puma/Norah
     "1793339751007394",  # Ginger
     "1859859784355390",  # Murray
     "1814842875523748",  # India
@@ -172,10 +173,13 @@ def fetch_non_api_data(page, new_album_data, existing_album_data=None):
         for photo in tqdm(photos.all(), "Parsing image links"):
             photo_href = photo.get_attribute("href")
             match = PHOTO_ID_REGEX.match(photo_href)
+            if match is None:
+                # videos don't match
+                continue
             image_id = match.group("fbid")
             link = photo.get_by_role("img").get_attribute("src")
             this_album_data.setdefault("images", []).append({"image_url": link, "id": image_id})
-
+    
         full_album_data[album_id] = this_album_data
 
     new_album_data["non_api_albums"] = full_album_data
