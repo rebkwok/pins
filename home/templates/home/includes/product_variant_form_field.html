@@ -1,0 +1,19 @@
+{% if variant in page.disallowed_variants %}
+    <span class="text-danger">SOLD OUT</span> 
+    <input type="hidden" id="id_{{ field.name }}" name="{{ field.name }}"  value="0" />
+{% else %}
+    <select 
+        name="{{ field.name }}" 
+        required="" 
+        id="id_{{ field.name }}"
+        {% if page.id %}
+        hx-post="{% url 'orders:calculate_order_total' page.id %}"
+        hx-trigger="change"
+        hx-target="#order-total"
+        {% endif %}
+    >
+        {% for choice, _ in field.field.choices %}
+        <option value="{{ choice }}" {% if choice == field.field.initial %}selected{% endif %}>{{ choice }}</option>
+        {% endfor %}
+    </select>
+{% endif %}

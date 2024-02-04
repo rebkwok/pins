@@ -1,5 +1,9 @@
 {% extends "wagtailforms/submissions_index.html" %}
-{% load i18n wagtailadmin_tags %}
+{% load i18n wagtailadmin_tags static %}
+
+{% block extra_css %}   
+    <link rel="stylesheet" href="{% static 'home/css/admin.css' %}">
+{% endblock %}
 
 {% block extra_js %}
     {{ block.super }}
@@ -27,13 +31,6 @@
         style="background-color: #b45f06; border-color: #b45f06"
         >
         Shipped
-    </button>
-    <button 
-        hx-get="{% url 'orders:mark_order_form_submissions_paid_and_shipped' %}" 
-        hx-include="[name='selected-submissions']" class="button"
-        style="background-color: #b45f06; border-color: #b45f06"
-        >
-        Shipped and paid
     </button>
     <button 
         hx-get="{% url 'orders:reset_order_form_submissions' %}" 

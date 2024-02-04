@@ -382,6 +382,10 @@ class OrderFormField(AbstractFormField):
 
 class ProductVariant(Orderable):
     page = ParentalKey("OrderFormPage", related_name="product_variants", on_delete=models.CASCADE)
+    group_name = models.CharField(
+        max_length=100, blank=True, 
+        help_text="Optional group for this variant. Use to group variants with multiple options, e.g. sizes"
+    )
     name = models.CharField(max_length=50)
     description = models.CharField(blank=True, max_length=250)
     cost = models.DecimalField(max_digits=10, decimal_places=2)
@@ -399,7 +403,10 @@ class ProductVariant(Orderable):
     
     def save(self, *args, **kwargs):
         if not self.slug:
-            base_slug = f"pv__{get_field_clean_name(self.name)}"
+            base_slug = "pv__"
+            if self.group_name:
+                base_slug += f"{get_field_clean_name(self.group_name)}_"
+            base_slug += get_field_clean_name(self.name)
             slug = base_slug
             counter = 0
             while ProductVariant.objects.filter(page=self.page, slug=slug).exclude(id=self.id).exists():
@@ -408,6 +415,12 @@ class ProductVariant(Orderable):
             self.slug = slug
         super().save(*args, **kwargs)
 
+    @property
+    def group_and_name(self):
+        if self.group_name:
+            return f"{self.group_name} - {self.name}"
+        return self.name
+
 
 class OrderFormSubmissionsListView(SubmissionsListView):
 
@@ -415,6 +428,9 @@ class OrderFormSubmissionsListView(SubmissionsListView):
 
     def _export_headings(self):
         self.list_export += ["reference", "total", "total_items", "paid", "shipped"]
+        self.export_headings = {
+            k: self._get_heading_label(k, v) for k, v in self.export_headings.items()
+        }
         self.export_headings.update(
             {
                 "reference": "Reference",
@@ -443,7 +459,19 @@ class OrderFormSubmissionsListView(SubmissionsListView):
         row_dict["shipped"] = "Y" if item.shipped else "-"
         return row_dict
 
+    def _get_heading_label(self, slug, name):
+        try:
+            pv = ProductVariant.objects.get(page=self.form_page, slug=slug)
+            return pv.group_and_name
+        except ProductVariant.DoesNotExist:
+            return name
+    
     def get_context_data(self, **kwargs):
+
+        def _reformat_pv_name(heading):
+            heading["label"] = self._get_heading_label(heading["name"], heading["label"])
+            return heading
+
         context_data = super().get_context_data(**kwargs)
         if not self.is_export:
             total_ordered_so_far = self.form_page.get_total_quantity_ordered()
@@ -459,7 +487,12 @@ class OrderFormSubmissionsListView(SubmissionsListView):
                 {'name': 'paid', 'label': 'Paid', 'order': None},
                 {'name': 'shipped', 'label': 'Shipped', 'order': None},
             ]
-            context_data["data_headings"].extend(extra_cols)
+            data_headings = [
+                _reformat_pv_name(heading) for heading in context_data["data_headings"]
+            ]
+            data_headings.extend(extra_cols)
+            context_data["data_headings"] = data_headings
+
             fields = self.form_page.get_data_fields()
 
             submissions = OrderFormSubmission.objects.filter(
@@ -547,7 +580,7 @@ class OrderFormBuilder(WagtailCaptchaFormBuilder):
             formfields.update(
                 {
                     "voucher_code": voucher_code_field, 
-                    # "wagtailcaptcha": original_fields["wagtailcaptcha"]
+                    "wagtailcaptcha": original_fields["wagtailcaptcha"]
                 }
             )
             return formfields
@@ -586,6 +619,11 @@ class OrderFormPage(WagtailCaptchaEmailForm):
     total_available = models.PositiveIntegerField(
         null=True, blank=True, help_text="Max total number available (optional)"
     )
+    show_summary = models.BooleanField(
+        default=False,
+        help_text="Show a summary of order options before form."
+    )
+
     form_footer_text = RichTextField(blank=True)
     thank_you_text = RichTextField(blank=True)
     
@@ -596,6 +634,7 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         FieldPanel("image"),
         FieldPanel("inline_image"),
         FieldPanel("body"),
+        FieldPanel("show_summary"),
         MultiFieldPanel(
             [
                 FieldPanel("product_name"),
@@ -611,6 +650,7 @@ class OrderFormPage(WagtailCaptchaEmailForm):
                 InlinePanel(
                     "product_variants", label="Product Variants", 
                     panels=[
+                        FieldPanel("group_name"),
                         FieldPanel("name"),
                         FieldPanel("description"),
                         FieldPanel("cost"),
@@ -737,6 +777,14 @@ class OrderFormPage(WagtailCaptchaEmailForm):
             field.label = variant.name
             field.save()
 
+    def variants_by_group(self):
+        groups = self.product_variants.values_list("group_name", flat=True)
+        # remove duplicates but preserve order
+        groups = list(dict.fromkeys(groups))
+        return {
+            group_name: self.product_variants.filter(group_name=group_name) for group_name in groups
+        }
+
     @property
     def product_quantity_field_names(self):
         return set(self.order_form_fields.filter(clean_name__startswith="pv__").values_list("clean_name", flat=True))
@@ -755,8 +803,13 @@ class OrderFormPage(WagtailCaptchaEmailForm):
     def _get_quantities(self, data):
         def get_item(v):
             if isinstance(v, list):
-                return int(v[0])
-            return int(v)     
+                quantity = v[0]
+            else:
+                quantity = v
+            # Quantity may be None if new variants have been added
+            if quantity is None:
+                return 0
+            return int(quantity)     
         return {
             k: get_item(v) for k, v in data.items() if k in self.product_variant_slugs
         }
@@ -858,7 +911,7 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         content = "Thank you for your order!\n"
         content += self._render_extra_email(form)
         content += "\nOrder summary:\n"
-        content += "\n".join([f"  - {variant.name} ({quantity})" for variant, quantity in submission.items_ordered()])
+        content += "\n".join([f"  - {variant.group_and_name} ({quantity})" for variant, quantity in submission.items_ordered()])
         content += f"\n\nView your order at https://{settings.DOMAIN}{submission.get_absolute_url()}."
         content += f"\nIf you haven't made your payment yet, you'll also find a link there."
         return content

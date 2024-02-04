@@ -27,16 +27,23 @@
                     <p class="intro">{{ page.product_description|richtext }}</p>
                 {% endif %}
                 
-                <p>
-                    {% for variant in page.product_variants.all %}
-                    {{ variant.name }}: £{{ variant.cost }}<br/>
+                {% if page.show_summary %}
+                <h3>Order options</h3>
+                    {% for group_name, variants in page.variants_by_group.items %}
+                        {% if group_name %}<h4>{{ group_name }}</h4>{% endif %}
+                        <ul>
+                            {% for variant in variants.all %}
+                                <li>{{ variant.name }}: £{{ variant.cost }}</li>
+                            {% endfor %}
+                        </ul>
                     {% endfor %}
-                </p>
+                {% endif %}
+
                 {% if page.shipping_costs_dict %}
                     {% if page.shipping_costs_dict|length == 1 %}
-                        Plus P&P - {% for label, shipping_cost in page.shipping_costs_dict.values %}{{ label }}: £{{shipping_cost }}{% endfor %}
+                        P&P - {% for label, shipping_cost in page.shipping_costs_dict.values %}{{ label }}: £{{shipping_cost }}{% endfor %}
                     {% else %}
-                    Plus P&P:
+                    P&P:
                     <ul>
                         {% for label, shipping_cost in page.shipping_costs_dict.values %}
                             <li>{{ label }}: £{{shipping_cost }}</li>
@@ -77,6 +84,38 @@
                         </ol>
                     {% endif %}
                     
+                    {% for group_name, variants in page.variants_by_group.items %}
+                    <div class="form-page__field">
+                        {% if group_name %}
+                            <strong>{{ group_name }}</strong><br/>
+                        {% endif %}
+                        {% for variant in variants.all %}
+                            {% get_variant_form_field form=form field_name=variant.slug as field %}
+                            {% if group_name %}
+                                <div aria-required={% if field.field.required %}"true"{% else %}"false"{% endif %}>                            
+                                    {% if variant.description %}
+                                        <p class="help">{{ variant.description }}</p>
+                                    {% endif %}
+                                    {{ variant.name }} (£{{ variant.cost }}) 
+                                    {% include 'home/includes/product_variant_form_field.html' %}  
+                                </div>
+                            {% else %}
+                                {% comment %} No group {% endcomment %}
+                                <div class="form-page__field" aria-required={% if field.field.required %}"true"{% else %}"false"{% endif %}>                            
+                                    {% if variant.description %}
+                                        <p class="help">{{ variant.description }}</p>
+                                    {% endif %}
+                                    <strong>{{ variant.name }} (£{{ variant.cost }})</strong><br/>
+                                    {% include 'home/includes/product_variant_form_field.html' %}  
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                    
+
+
+                    <h3>Your details</h4>
                     {% for field in form %}
                         {% if not page|is_order_quantity:field.name and not page|is_end_of_form_field:field.name %}
                             <div class="form-page__field" aria-required={% if field.field.required %}"true"{% else %}"false"{% endif %}>
@@ -98,47 +137,10 @@
                         {% endif %}
                     {% endfor %}
 
-                    {% for field in form %}
-                        {% if page|is_order_quantity:field.name %}
-                            <div class="form-page__field" aria-required={% if field.field.required %}"true"{% else %}"false"{% endif %}>
-                                {% get_product_variant page=page field_name=field.name as variant %}
-                                
-                                    <strong>{{ variant.name }} (£{{ variant.cost }})</strong><br/>
-                                    
-                                    {% if variant.description %}
-                                        <p class="help">{{ variant.description }}</p>
-                                    {% endif %}
-                                    {% if variant in page.disallowed_variants %}
-                                        <span class="text-danger">SOLD OUT</span> 
-                                        <input type="hidden" id="id_{{ field.name }}" name="{{ field.name }}"  value="0" />
-                                    {% else %}
-                                        <label for={{ field.id }}>Quantity</label>
-                                        {% if field.field.required %}<span class="required">*</span>{% endif %}
 
-                                        <select 
-                                            name="{{ field.name }}" 
-                                            required="" 
-                                            id="id_{{ field.name }}"
-                                            {% if page.id %}
-                                            hx-post="{% url 'orders:calculate_order_total' page.id %}"
-                                            hx-trigger="change"
-                                            hx-target="#order-total"
-                                            {% endif %}
-                                        >
-                                            {% for choice, _ in field.field.choices %}
-                                            <option value="{{ choice }}" {% if choice == field.field.initial %}selected{% endif %}>{{ choice }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    
-                                    {% endif %}
-                                    
-                            </div>
-                        {% endif %}
-                    {% endfor %}
-
-                    
                     <div>
-                        <h3>Payment details</h4>
+                        <h3>Review order</h4>
+                        <div id="order-summary"></div>
                         <p><strong>
                             Total: £<span id="order-total">{{ page.default_total }}</span><br>
                         </strong></p>
@@ -172,7 +174,6 @@
                             {{ page.form_footer_text|richtext }}
                         </div> 
                     </div>
-
 
                     <input id="submit-btn" type="submit" class="btn"/>
                 </form>

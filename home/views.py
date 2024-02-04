@@ -10,7 +10,7 @@ from payments.utils import get_paypal_form
 
 def calculate_order_total_view(request, order_page_id):
     order_page = get_object_or_404(OrderFormPage, pk=order_page_id)
-    _, total, discount = order_page.get_variant_quantities_and_total(dict(request.POST))
+    variant_quantities, total, discount = order_page.get_variant_quantities_and_total(dict(request.POST))
     discount_str = f" (discount £{discount})" if discount else ""
     resp_str = f"<span id='order-total'>{total}{discount_str}</span>"
     
@@ -34,7 +34,13 @@ def calculate_order_total_view(request, order_page_id):
         """
     else:
         resp_str += "<div id='not-allowed' hx-swap-oob='true'></div>"
-
+    ordered = "".join(
+        [
+            f"<li>{variant_quantity[0].group_and_name} ({str(variant_quantity[1])})</li>" 
+            for variant_quantity in variant_quantities.values() if variant_quantity[1] > 0
+        ]
+    )
+    resp_str += f"<div id='order-summary' hx-swap-oob='true'><ul>{ordered}</ul></div>"
     return HttpResponse(mark_safe(resp_str))
 
 

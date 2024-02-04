@@ -13,27 +13,31 @@
             <div class="col-md-7 index-header__body-introduction">
                 {{ page.thank_you_text|richtext }}
             
-            <p>Order reference: {{ form_submission.reference }}</p>
-            <p>Here's what you ordered:
-                <ul>
-                    {% for item, quantity in form_submission.items_ordered %}
-                        <li>{{ item.name }} ({{ quantity }})</li>
-                    {% endfor %}
-                </ul>
-                A confirmation email has been sent to {{ form_submission.email }}.
-            </p>
-            <p>Your order total is <strong>£{{ total }}</strong></p>
-            <p>Order status: <span class="label label-{{ form_submission.status_colour }}">{{ form_submission.status }}</span></p>
+                <p>Your order total is <strong>£{{ total }}</strong></p>
 
             {% if paypal_form %}
                 <p>Click the button below to go to PayPal to make your payment.<br>
                     <strong><i>Note: you do not need a PayPal account, payments can be taken by debit/credit card.</i></strong>
                 </p>
+                
                 {{ paypal_form.render }}
-                </div>
-                
-                
+                <hr>
             {% endif %}
+            </div>
+            <div class="col-md-7 ">
+            <p><strong>Order reference:</strong> {{ form_submission.reference }}</p>
+            <p>Order status: <span class="label label-{{ form_submission.status_colour }}">{{ form_submission.status }}</span></p>
+            <p>Here's what you ordered:
+                <ul>
+                    {% for item, quantity in form_submission.items_ordered %}
+                        <li>{{ item.group_and_name }} ({{ quantity }})</li>
+                    {% endfor %}
+                </ul>
+                A confirmation email has been sent to {{ form_submission.email }}.
+            </p>
+            
+        </div>
+            
         </div>
     </div>
 {% endblock content %}
