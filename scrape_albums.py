@@ -1,4 +1,8 @@
 """
+NOTE: This script is only required if we have to use a user token with
+no permissions for the page. Assuming we have a page token, the 
+FacebookAlbumTracker.update_all() method will do all this for us.
+
 playwright install --with-deps firefox
 """
 from argparse import ArgumentParser
