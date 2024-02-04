@@ -515,7 +515,7 @@ class FacebookAlbumTracker:
             same_albums = set(new_data) & set(saved_data) 
             changes["changed"] = {
                 album_id: new_data[album_id]["name"] for album_id in same_albums
-                if new_data[album_id]["updated_time"] != saved_data[album_id]["updated_time"]
+                if new_data[album_id]["updated_time"] != saved_data[album_id].get("updated_time")
                 
             }
 
