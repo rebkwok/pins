@@ -18,16 +18,9 @@ PHOTO_ID_REGEX = re.compile(r".+fbid=(?P<fbid>.+)&.+")
 IDS_TO_IGNORE = [
     "489076346765992",  # Mobile uploads
     "489076353432658",  # Timeline photos
-    "590092243331068",  # India 2 -happily homed
-    "552824437057849",  # Paddy - Happily homed - staying with foster family
-    "557912256549067",  # Aika - happily homed
-    "518958043777822",  # Luna - Happily Homed
-    "612315007775458",  # Izzi - happily homed
-    "557913456548947",  # Dotty -Happily Homed
     "489076360099324",  # Cover photos
     "489076350099325",  # Profile pictures
     "478527842488598",  # All dogs for adoption/foster/ sponsor
-    "1892881417719893",  # Gladys -Happily Homed
     "1456923637982342",  # In Loving Memory
     "1022503768091000",  # Sponsor a Hound Programme
     "342935776047806",  # Happily Homed Dogs
@@ -35,10 +28,6 @@ IDS_TO_IGNORE = [
     "819257798415599",  # Pal - a remarkable love story -saved from the brink of death
     "795739000767479",  # Nino - in memoriam see Nino's Tale for his story
     "177583412583044",  # Pacita The Pod who Started it All!
-    "1892887014386000", # Alicia, happily homed
-    "1892885781052790", # Paloma 3rd, home agreed
-    "531587159181577", # Shakira, happily homed
-    "557910736549219", # Braken, happily homed
     "1883457118662323",  # Puma/Norah
     "668225005517791", # Peeps
 ]

@@ -23,7 +23,7 @@ from wagtail.fields import RichTextField
 from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, Panel
 from wagtail.images.models import Image
 
-from scrape_albums import ALBUMS_NOT_ACCESSIBLE_VIA_API
+from scrape_albums import IDS_TO_IGNORE
 
 
 logger = logging.getLogger(__name__)
@@ -288,11 +288,6 @@ class FacebookAlbums(models.Model):
 
 class FacebookAlbumTracker:
 
-    albums_to_ignore = [
-        "Cover photos", "Profile pictures", "Timeline photos", "Mobile uploads"
-    ]
-
-
     def __init__(self):
         self._api = None
         self.app_id = settings.FB_APP_ID # Obtained from https://developers.facebook.com/
@@ -330,9 +325,7 @@ class FacebookAlbumTracker:
         """
         Get all albums for existing DogPages
         """
-        album_ids = DogPage.objects.values_list("facebook_album_id", flat=True)
-        # filter None, empty strings, and non-accessible albums
-        album_ids = [albid for albid in album_ids if albid and albid not in ALBUMS_NOT_ACCESSIBLE_VIA_API]
+        album_ids = DogPage.objects.filter(facebook_album_id__isnull=False).values_list("facebook_album_id", flat=True)
         try:
             return self.api.get_objects(album_ids, fields="name,link,description,updated_time,count")
         except GraphAPIError as e:
@@ -389,9 +382,6 @@ class FacebookAlbumTracker:
         return self.api.extend_access_token(self.app_id, self.app_secret)["access_token"]
 
     def create_or_update_album(self, album_id, force_update=False):
-        if album_id in ALBUMS_NOT_ACCESSIBLE_VIA_API:
-            logger.info("Album %s can't be fetched from API, use scraper", album_id)
-            return
         metadata = self.get_album_metadata(album_id)
         if force_update or (
             self.albums_obj.get_album(album_id).get("updated_time") != metadata.get("updated_time")
@@ -434,8 +424,18 @@ class FacebookAlbumTracker:
             return root_collection.add_child(name=collection_name)
         
     def get_album_data(self, album_id, album_metadata=None, force_update=False):
-        page = DogPage.objects.get(facebook_album_id=album_id)
-        page_image_ids = page.gallery_images.values_list("fb_image_id", flat=True)
+        # When we fetch all new album data, there may be data for dogs that we don't
+        # have a page for yet. Those will be created manually, so we just want to 
+        # retrieve the data for them, not to create collection or gallery images.
+        try:
+            page = DogPage.objects.get(facebook_album_id=album_id)
+            page_image_ids = page.gallery_images.values_list("fb_image_id", flat=True)
+            collection = self.get_collection(page, album_id)
+        except DogPage.DoesNotExist:
+            page = None
+            collection = None
+            page_image_ids = []
+
         album_data = album_metadata or self.get_album_metadata(album_id)
         if (
             not force_update 
@@ -443,7 +443,7 @@ class FacebookAlbumTracker:
         ):
             return self.albums_obj.get_album(album_id)
         
-        if album_data["name"] in self.albums_to_ignore:
+        if album_data["id"] in IDS_TO_IGNORE:
             logger.info("Ignoring album '%s'", album_data["name"])
             return
 
@@ -455,43 +455,34 @@ class FacebookAlbumTracker:
         
         if not photos:
             return album_data
-        
-        collection = self.get_collection(page, album_id)
 
         for photo in photos:
             images = photo.pop("images")
             photo["image_url"] = images[0]["source"]
             album_data["images"].append(photo)
 
-            if photo["id"] not in page_image_ids:
+            if page and (photo["id"] not in page_image_ids):
                 self.create_gallery_image(page, collection, photo["id"], photo["image_url"])
                 
         return album_data
 
     def fetch_all(self, force_update=False):
-        """Retrieve and all album data from facebook"""
+        """Retrieve all album data from facebook"""
         # get all albums for page
-        # albums = self.api.get_connections(
-        #     id=settings.FB_PAGE_ID, connection_name="albums", 
-        #     fields="name,link,description,updated_time,count"
-        # )["data"]
+        all_current_albums = self.api.get_connections(
+            id=settings.FB_PAGE_ID, connection_name="albums", 
+            fields="name,link,description,updated_time,count",
+            limit=100,
+        )["data"]
 
-        # get all albums for current dogs
-        albums = self.get_all_albums().values()
-        total = len(albums)
+        total = len(all_current_albums)
         albums_data = {}
-        for i, album_metadata in enumerate(albums, start=1):
+        for i, album_metadata in enumerate(all_current_albums, start=1):
             album_id = album_metadata["id"]
             logger.info("Fetching album %d of %d", i, total)
             album_data = self.get_album_data(album_id, force_update=force_update)
             if album_data is not None:      
                 albums_data[album_id] = album_data
-        logger.info("Adding existing non-api albums")
-        non_api_albums = {
-            album_id: data for album_id, data in self.albums_obj.albums.items()
-            if album_id in ALBUMS_NOT_ACCESSIBLE_VIA_API
-        }
-        albums_data.update(non_api_albums)
         return albums_data
 
     def update_all(self, new_data=None, force_update=False):  
@@ -524,8 +515,7 @@ class FacebookAlbumTracker:
             same_albums = set(new_data) & set(saved_data) 
             changes["changed"] = {
                 album_id: new_data[album_id]["name"] for album_id in same_albums
-                if album_id not in ALBUMS_NOT_ACCESSIBLE_VIA_API
-                and new_data[album_id]["updated_time"] != saved_data[album_id]["updated_time"]
+                if new_data[album_id]["updated_time"] != saved_data[album_id]["updated_time"]
                 
             }
 
@@ -669,9 +659,7 @@ class DogPage(Page):
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         albums_obj = FacebookAlbums.instance()
-        if self.facebook_album_id in ALBUMS_NOT_ACCESSIBLE_VIA_API:
-            logger.info("Album %s can't be fetched from API, use scraper", self.facebook_album_id)
-        elif self.facebook_album_id and not albums_obj.is_rate_limited:
+        if self.facebook_album_id and not albums_obj.is_rate_limited:
             try:
                 logger.info("Checking fb info for album id %s, dog %s", self.facebook_album_id, self.title)
                 self.update_facebook_info()
