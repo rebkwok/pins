@@ -4,11 +4,13 @@ import re
 from django import forms
 from django.conf import settings
 from django.contrib import messages
+from django.core.mail import EmailMultiAlternatives
 from django.core.validators import validate_slug
 from django.db import models
 from django.template.response import TemplateResponse
 from django.shortcuts import redirect
 from django.utils.formats import date_format
+from django.utils.safestring import mark_safe
 from django.utils import timezone
 from django.urls import reverse
 
@@ -43,6 +45,7 @@ from wagtail.contrib.forms.utils import get_field_clean_name
 from wagtailcaptcha.models import WagtailCaptchaEmailForm, WagtailCaptchaFormBuilder
 
 from payments.utils import get_paypal_form
+from .generate_form_submission_pdf import generate_pdf
 
 
 class HomePage(Page):
@@ -381,6 +384,12 @@ class PDFBaseForm(BaseForm):
                 initial=self.instance.reference
             )
 
+    def clean(self, submit=False):
+        if submit:
+            for field in self.fields:
+                if not self.cleaned_data.get(field):
+                    self.add_error(field, "This field is required")
+
 
 class PDFFormBuilder(WagtailCaptchaFormBuilder):           
 
@@ -433,24 +442,32 @@ class PDFFormSubmissionsListView(SubmissionsListView):
     def get_context_data(self, **kwargs):
         context_data = super().get_context_data(**kwargs)
         if not self.is_export:
-            extra_cols = [
-                {"name": "reference", "label": "Reference", "order": 0},
-                {'name': 'status', 'label': 'Status', 'order': 1},
+            # We want the first 3 items (submit time, name, email) and our extra fields
+            context_data["data_headings"] = [
+                *context_data["data_headings"][0:3],
+                {"name": "reference", "label": "Reference", "order": None},
+                {'name': 'status', 'label': 'Status', 'order': None},
+                {'name': 'download', 'label': 'Download', 'order': None},
+                {'name': 'view', 'label': 'View', 'order': None},
             ]
-            context_data["data_headings"].extend(extra_cols)
 
             submissions = PDFFormSubmission.objects.filter(
                 id__in=[row["model_id"] for row in context_data["data_rows"]]
             )
             submission_reference = {sub.id: sub.reference for sub in submissions}
             submission_status = {sub.id: sub.status for sub in submissions}
+            submission_download = {sub.id: mark_safe(f"<a href={reverse('pdf_form_download', args=(sub.pk,))}>Download</a>") for sub in submissions}
+            submission_view = {sub.id: mark_safe(f"<a href={sub.get_absolute_url()}>View</a>") for sub in submissions}
 
             for row in context_data["data_rows"]:
-                form_data = row["fields"]
+                row["fields"] = row["fields"][0:3]
                 extra_form_data = [
-                    submission_reference[row["model_id"]], submission_status[row["model_id"]]
+                    submission_reference[row["model_id"]], 
+                    submission_status[row["model_id"]], 
+                    submission_download[row["model_id"]],
+                    submission_view[row["model_id"]]
                 ]
-                form_data.extend(extra_form_data)
+                row["fields"].extend(extra_form_data)
 
         return context_data
 
@@ -462,6 +479,13 @@ class PDFFormField(AbstractFormField):
     """
 
     page = ParentalKey("PDFFormPage", related_name="pdf_form_fields", on_delete=models.CASCADE)
+
+    def save(self, *args, **kwargs):
+        if self.clean_name in ["email", "email_address", "name"]:
+            self.required = True
+        else:
+            self.required = False
+        super().save(*args, **kwargs)
 
 
 class PDFFormPage(FormPage):
@@ -508,19 +532,23 @@ class PDFFormPage(FormPage):
                 instance=instance
             )
             if form.is_valid():                
-                form_submission = self.process_form_submission(form, save_as_draft=save_as_draft)
+                form_submission, form = self.process_form_submission(form, save_as_draft=save_as_draft)
                 if save_as_draft:
-                    messages.success(request, "Draft saved!")
-                    context = self.get_context(request)
-                    context["form"] = self.get_form(
+                    form = self.get_form(
                         page=self, user=request.user, instance=form_submission, initial=request.POST
                     )
+                    messages.success(request, "Draft saved!")
+                    context = self.get_context(request)
+                    context["form"] = form
                     return TemplateResponse(request, self.get_template(request), context)
-                messages.success(
-                    request, 
-                    "Your form has been submitted successfully. A member of our team "
-                    "will be in touch shortly. "
-                )
+                else:
+                    if form.is_valid():
+                        messages.success(
+                            request, 
+                            "Your form has been submitted successfully. A member of our team "
+                            "will be in touch shortly. "
+                        )
+                        return redirect(form_submission.get_absolute_url())
         else:
             reference = request.GET.get("reference")
             instance = None
@@ -567,12 +595,13 @@ class PDFFormPage(FormPage):
             "headers": {
                 "Auto-Submitted": "auto-generated",
             },
-            "reply_to": submission.email,
+            "reply_to": [submission.email],
         }
         mail = EmailMultiAlternatives(
             self.subject, self.render_email(submission), self.from_address, addresses, **kwargs
         )
-        # mail.attach_file(f"{self.slug}-{form.reference}.pdf")
+        pdf = generate_pdf(submission)
+        mail.attach(submission.get_download_filename(), pdf.read())
         return mail.send()
 
     def process_form_submission(self, form, save_as_draft=True):
@@ -603,6 +632,10 @@ class PDFFormPage(FormPage):
                 settings.DEFAULT_FROM_EMAIL,
             )
         else:
+            form.clean(submit=True)
+            if not form.is_valid():
+                return submission, form
+
             submission.is_draft = False
             submission.save()
             # Send admin email with PDF
@@ -616,7 +649,7 @@ class PDFFormPage(FormPage):
                 settings.DEFAULT_FROM_EMAIL,
                 reply_to=[settings.CC_EMAIL],
             )
-        return submission
+        return submission, form
 
 
 class PDFFormSubmission(AbstractFormSubmission):
@@ -641,14 +674,36 @@ class PDFFormSubmission(AbstractFormSubmission):
         return "Submitted"
 
     def display_data(self):
+        def _format_key(key):
+            try:
+                return self.page.formpage.pdfformpage.pdf_form_fields.get(clean_name=key).label
+            except PDFFormField.DoesNotExist:
+                return key
+
+        def _format_value(value):
+            if isinstance(value, list):
+                value = ", ".join(value)
+            formatted_value = {
+                True: "Yes",
+                False: "No"
+            }.get(value, value)
+            formatted_value = formatted_value.replace("\r\n", "\n")
+            return formatted_value
+
+        fields_in_order = self.page.formpage.pdfformpage.pdf_form_fields.exclude(
+            clean_name__in=["name", "email", "email_address", "wagtailcaptcha", "reference"]
+            ).values_list("clean_name", flat=True)
+        valid_fields = [field for field in  fields_in_order if field in self.form_data]
         return {
-            k: v for k, v in self.form_data.items() if k not in 
-            ["name", "email", "email_address", "wagtailcaptcha", "reference"]
+            _format_key(field): _format_value(self.form_data[field]) for field in valid_fields
         }
 
+    def get_download_filename(self):
+        return f"{self.page.slug}-{self.name.replace(' ', '-')}-{self.reference}.pdf"
+    
     def get_absolute_url(self):
         return reverse("pdf_form_detail", kwargs={"reference": self.reference})
-    
+
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
     

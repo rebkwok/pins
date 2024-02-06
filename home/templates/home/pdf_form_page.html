@@ -27,24 +27,32 @@
         {% endcomment %}
                 <form action="{% pageurl page %}" method="POST">
                     {% csrf_token %}
-                    {% if form.subject.errors %}
-                        <ol>
-                            {% for error in form.subject.errors %}
-                                <li><strong>{{ error|escape }}</strong></li>
+                    {% if form.errors %}
+                        <div class="text-danger">Please correct the errors below:
+                            <ul>    
+                            {% for error in form.non_field_errors %}
+                                <li>{{ error }}</li>
                             {% endfor %}
-                        </ol>
+                            </ul>
+                        </div>
                     {% endif %}
 
                     {% for field in form %}
                         <div class="form-page__field" aria-required={% if field.field.required %}"true"{% else %}"false"{% endif %}>
                             {% if field.name != 'reference' %}
-                                {{ field.label_tag }}{% if field.field.required %}<span class="required">*</span>{% endif %}
+                                {{ field.label_tag }}<span class="required">*</span>
 
                                 {% if field.help_text %}
                                     <p class="help">{{ field.help_text }}</p>
                                 {% endif %}
                             {% endif %}
                             {{ field }}
+
+                            {% if field.errors %}
+                                <span class="text-danger">
+                                    {% for error in field.errors %}{{ error }}{% endfor %}
+                                </span>
+                            {% endif %}
                         </div>
                     {% endfor %}
                     <input type="submit" value="Save draft" name="save_as_draft">

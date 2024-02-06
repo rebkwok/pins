@@ -24,6 +24,11 @@ urlpatterns = [
         "submitted-form/<str:reference>/", 
         home_views.pdf_form_detail, 
         name="pdf_form_detail"
+    ),
+    path(
+        "submitted-form/<int:pk>/download/", 
+        home_views.pdf_form_download, 
+        name="pdf_form_download"
     )
 ]
 
