@@ -473,7 +473,6 @@ class PDFFormPage(FormPage):
         FieldPanel("image"),
         FieldPanel("body"),
         InlinePanel("pdf_form_fields", heading="Form fields", label="Field"),
-        FieldPanel("thank_you_text"),
         MultiFieldPanel(
             [
                 FieldRowPanel(
@@ -544,12 +543,38 @@ class PDFFormPage(FormPage):
         context["form"] = form
         return TemplateResponse(request, self.get_template(request), context)
 
-    def render_save_draft_email_for_user(self, form, submission):
-        return ""
-
-    def render_email_for_user(self, form, submission):
-        return ""
+    def render_save_draft_email_for_user(self, submission):
+        content = "{self.title}\n======================="
+        content = "Your form has been saved.\n"
+        content += f"\n\nYou can view and edit your responses at https://{settings.DOMAIN}{submission.get_absolute_url()}."
+        return content
     
+    def render_email_for_user(self, submission):
+        content = "{self.title}\n======================="
+        content = "Thank you for submitting your form. A member of our team will be in touch shortly\n"
+        content += f"\n\nYou can view your responses at https://{settings.DOMAIN}{submission.get_absolute_url()}."
+        return content
+    
+    def render_email(self, form):
+        # form is a PDFFormSubmission instance
+        content = f"A {self.title} submission has been received from {form.name} ({form.email})."
+        return content
+    
+    def send_mail_with_pdf(self, submission):
+        # form is a PDFFormSubmission instance
+        addresses = [x.strip() for x in self.to_address.split(",")]
+        kwargs = {
+            "headers": {
+                "Auto-Submitted": "auto-generated",
+            },
+            "reply_to": submission.email,
+        }
+        mail = EmailMultiAlternatives(
+            self.subject, self.render_email(submission), self.from_address, addresses, **kwargs
+        )
+        # mail.attach_file(f"{self.slug}-{form.reference}.pdf")
+        return mail.send()
+
     def process_form_submission(self, form, save_as_draft=True):
         """
         Accepts form instance with submitted data, user and page.
@@ -573,19 +598,20 @@ class PDFFormPage(FormPage):
             # Send email to user
             send_mail(
                 f"{self.subject} has been updated",
-                self.render_save_draft_email_for_user(form, submission),
+                self.render_save_draft_email_for_user(submission),
                 [submission.email],
                 settings.DEFAULT_FROM_EMAIL,
             )
         else:
             submission.is_draft = False
             submission.save()
-            # Add PDF to emails
+            # Send admin email with PDF
             if self.to_address:
-                self.send_mail(form)
+                self.send_mail_with_pdf(submission)
+            # send email to user
             send_mail(
                 f"{self.subject} has been submitted",
-                self.render_email_for_user(form, submission),
+                self.render_email_for_user(submission),
                 [submission.email],
                 settings.DEFAULT_FROM_EMAIL,
                 reply_to=[settings.CC_EMAIL],
