@@ -1,0 +1,49 @@
+{% extends "wagtailforms/submissions_index.html" %}
+{% load i18n wagtailadmin_tags static %}
+
+{% block extra_css %}   
+    <link rel="stylesheet" href="{% static 'home/css/admin.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+    {{ block.super }}
+    <script src="https://unpkg.com/htmx.org@1.9.2" integrity="sha384-L6OqL9pRWyyFU3+/bjdSri+iIphTN/bvYyM37tICVyOJkWZLpP2vGn6VUEXgzg6h" crossorigin="anonymous" defer></script>
+{% endblock %}
+
+{% block content %}
+<header class="w-header w-header--no-border w-header--merged">
+    
+    <div class="row">
+        <div class="left">
+            <div class="col">
+                
+    <h3>Change order status:</h3>
+    <button 
+        hx-get="{% url 'orders:mark_order_form_submissions_paid' %}" 
+        hx-include="[name='selected-submissions']" class="button" 
+        style="background-color: #b45f06; border-color: #b45f06"
+    >
+        Paid
+    </button>
+    <button 
+        hx-get="{% url 'orders:mark_order_form_submissions_shipped' %}" 
+        hx-include="[name='selected-submissions']" class="button"
+        style="background-color: #b45f06; border-color: #b45f06"
+        >
+        Shipped
+    </button>
+    <button 
+        hx-get="{% url 'orders:reset_order_form_submissions' %}" 
+        hx-include="[name='selected-submissions']" class="button">
+        Reset
+    </button>
+</div>
+            
+</div>
+
+</div>
+
+</header>
+    {{ block.super }}
+
+{% endblock %}

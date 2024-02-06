@@ -1,10 +1,9 @@
-import re
-
+from django.contrib import messages
 from django.shortcuts import get_object_or_404, HttpResponse
 from django.template.response import TemplateResponse
 from django.utils.safestring import mark_safe
 
-from .models import OrderFormPage, OrderFormSubmission
+from .models import OrderFormPage, OrderFormSubmission, PDFFormSubmission
 from payments.utils import get_paypal_form
 
 
@@ -83,3 +82,20 @@ def order_detail(request, reference):
             reference=submission.reference
         )
     return TemplateResponse(request, "home/order_form_page_landing.html", context)
+
+
+def pdf_form_detail(request, reference):
+    submission = get_object_or_404(PDFFormSubmission, reference=reference)
+    if not submission.is_draft:
+        messages.success(
+            request, 
+            "Your form has been submitted. "
+            "You can review the information you provided below."
+        )
+    else:
+        messages.error(
+            request, 
+            "This form has not yet been submitted."
+        )
+    context = {"page": submission.page, "submission": submission}
+    return TemplateResponse(request, "home/pdf_form_detail.html", context)

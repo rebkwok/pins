@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags %}
+
+{% block content %}
+
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
+                <h1 class="index-header__title">{{ page.title }}</h1>
+            </div>
+            {% if submission.is_draft %}
+                <div class="col-md-12">
+                    <a class="btn btn-sm" href={{ page.url }}?reference={{ submission.reference}}>Edit and submit</a>
+                </div>
+            {% endif %}
+
+            <div class="col-md-12 form-submission-data">
+            <label>Reference:</label> {{ submission.reference }}<br/>
+            <label>Name:</label> {{ submission.name }}<br/>
+            <label>Email:</label> {{ submission.email }}<br/>
+            {% for field, value in submission.display_data.items %}
+            <label>{{ field }}:</label> {{ value }}<br/>
+            {% endfor %}
+            </div>
+        </div>
+    </div>
+{% endblock content %}

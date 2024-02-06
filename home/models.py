@@ -3,9 +3,11 @@ import re
 
 from django import forms
 from django.conf import settings
+from django.contrib import messages
 from django.core.validators import validate_slug
 from django.db import models
 from django.template.response import TemplateResponse
+from django.shortcuts import redirect
 from django.utils.formats import date_format
 from django.utils import timezone
 from django.urls import reverse
@@ -269,7 +271,7 @@ class HomePage(Page):
 
 class FormField(AbstractFormField):
     """
-    for contact form and adoption application form:
+    For standard non-draft-savable forms e.g. contact form
     https://docs.wagtail.org/en/stable/reference/contrib/forms/index.html
     """
 
@@ -316,8 +318,9 @@ class FormPage(WagtailCaptchaEmailForm):
 
     def get_form(self, *args, **kwargs):
         form = super().get_form(*args, **kwargs)
-        if self.ref and "subject" in form.fields:
-            form.fields["subject"].initial = f"Enquiry about {self.ref}"
+        ref =  getattr(self, "ref", None)
+        if ref and "subject" in form.fields:
+            form.fields["subject"].initial = f"Enquiry about {ref}"
         return form
 
     def save(self, *args, **kwargs):
@@ -366,9 +369,266 @@ class FormPage(WagtailCaptchaEmailForm):
         return "\n\n".join(content)
 
 
+class PDFBaseForm(BaseForm):
+
+    def __init__(self, *args, **kwargs):
+        self.instance = kwargs.pop("instance", None)
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.reference:
+            # Add a hidden field with the reference
+            self.fields["reference"] = forms.CharField(
+                widget=forms.HiddenInput(), required=False,
+                initial=self.instance.reference
+            )
+
+
+class PDFFormBuilder(WagtailCaptchaFormBuilder):           
+
+    @property
+    def formfields(self):
+        formfields = super().formfields
+        fields_to_add = {}
+        if "name" not in set(formfields):
+            fields_to_add["name"] = forms.CharField()
+        if not set(formfields) & {"email", "email_address"}:
+            fields_to_add["email"]: forms.EmailField()
+        formfields = {
+            **fields_to_add,
+            **formfields
+        }    
+        return formfields
+
+    def get_form_class(self):
+        return type("WagtailForm", (PDFBaseForm,), self.formfields)
+
+
+class PDFFormSubmissionsListView(SubmissionsListView):
+    # Template shows name/email/submission date and link to PDF/page
+    template_name = "home/pdf_list_submissions_index.html"
+
+    def _export_headings(self):
+        self.list_export += ["reference", "status"]
+        self.export_headings.update(
+            {
+                "reference": "Reference",
+                "status": "Status",
+            }
+        )
+
+    def stream_csv(self, queryset):
+        self._export_headings()
+        return super().stream_csv(queryset)
+
+    def write_xlsx(self, queryset, output):
+        self._export_headings()
+        return super().write_xlsx(queryset, output)
+
+    def to_row_dict(self, item):
+        """Orders the submission dictionary for spreadsheet writing"""
+        row_dict = super().to_row_dict(item)
+        row_dict["reference"] = item.reference
+        row_dict["status"] = item.status
+        return row_dict
+    
+    def get_context_data(self, **kwargs):
+        context_data = super().get_context_data(**kwargs)
+        if not self.is_export:
+            extra_cols = [
+                {"name": "reference", "label": "Reference", "order": 0},
+                {'name': 'status', 'label': 'Status', 'order': 1},
+            ]
+            context_data["data_headings"].extend(extra_cols)
+
+            submissions = PDFFormSubmission.objects.filter(
+                id__in=[row["model_id"] for row in context_data["data_rows"]]
+            )
+            submission_reference = {sub.id: sub.reference for sub in submissions}
+            submission_status = {sub.id: sub.status for sub in submissions}
+
+            for row in context_data["data_rows"]:
+                form_data = row["fields"]
+                extra_form_data = [
+                    submission_reference[row["model_id"]], submission_status[row["model_id"]]
+                ]
+                form_data.extend(extra_form_data)
+
+        return context_data
+
+
+class PDFFormField(AbstractFormField):
+    """
+    For editable forms that are sent as PDF e.g. adoption application form:
+    https://docs.wagtail.org/en/stable/reference/contrib/forms/index.html
+    """
+
+    page = ParentalKey("PDFFormPage", related_name="pdf_form_fields", on_delete=models.CASCADE)
+
+
+class PDFFormPage(FormPage):
+
+    form_builder = PDFFormBuilder
+    submissions_list_view_class = PDFFormSubmissionsListView
+    
+    content_panels = AbstractEmailForm.content_panels + [
+        FieldPanel("image"),
+        FieldPanel("body"),
+        InlinePanel("pdf_form_fields", heading="Form fields", label="Field"),
+        FieldPanel("thank_you_text"),
+        MultiFieldPanel(
+            [
+                FieldRowPanel(
+                    [
+                        FieldPanel("to_address"),
+                    ]
+                ),
+                FieldPanel("subject"),
+            ],
+            "Email",
+        ),
+    ]
+
+    def get_submission_class(self):
+        return PDFFormSubmission
+
+    def get_form_fields(self):
+        return self.pdf_form_fields.all()
+    
+    def serve(self, request, *args, **kwargs):
+        if request.method == "POST":
+            # Is it a save-for-later POST?
+            save_as_draft = "save_as_draft" in request.POST
+            reference = request.POST.get("reference")
+            instance = None
+            if reference:
+                try:
+                    instance = self.pdfformsubmission_set.get(reference=reference)
+                except PDFFormSubmission.DoesNotExist:
+                    ...
+            form = self.get_form(
+                request.POST, request.FILES, page=self, user=request.user,
+                instance=instance
+            )
+            if form.is_valid():                
+                form_submission = self.process_form_submission(form, save_as_draft=save_as_draft)
+                if save_as_draft:
+                    messages.success(request, "Draft saved!")
+                    context = self.get_context(request)
+                    context["form"] = self.get_form(
+                        page=self, user=request.user, instance=form_submission, initial=request.POST
+                    )
+                    return TemplateResponse(request, self.get_template(request), context)
+                messages.success(
+                    request, 
+                    "Your form has been submitted successfully. A member of our team "
+                    "will be in touch shortly. "
+                )
+        else:
+            reference = request.GET.get("reference")
+            instance = None
+            initial = {}
+            if reference:
+                try:
+                    instance = self.pdfformsubmission_set.get(reference=reference)
+                    initial=instance.form_data
+                except PDFFormSubmission.DoesNotExist:
+                    ...
+            if instance and not instance.is_draft:
+                return redirect(instance.get_absolute_url())
+                
+            form = self.get_form(
+                page=self, user=request.user, instance=instance,
+                initial=initial
+            )
+
+        context = self.get_context(request)
+        context["form"] = form
+        return TemplateResponse(request, self.get_template(request), context)
+
+    def render_save_draft_email_for_user(self, form, submission):
+        return ""
+
+    def render_email_for_user(self, form, submission):
+        return ""
+    
+    def process_form_submission(self, form, save_as_draft=True):
+        """
+        Accepts form instance with submitted data, user and page.
+        Creates submission instance.
+
+        If save_as_draft, send an email to the user with a link to
+        their editable form. Save the submission but don't send 
+        usual emails. 
+        """
+        if form.instance:
+            submission = form.instance
+            submission.form_data = form.cleaned_data
+            submission.save()
+        else:
+            submission = self.get_submission_class().objects.create(
+                form_data=form.cleaned_data,
+                page=self,
+            )
+        
+        if save_as_draft:
+            # Send email to user
+            send_mail(
+                f"{self.subject} has been updated",
+                self.render_save_draft_email_for_user(form, submission),
+                [submission.email],
+                settings.DEFAULT_FROM_EMAIL,
+            )
+        else:
+            submission.is_draft = False
+            submission.save()
+            # Add PDF to emails
+            if self.to_address:
+                self.send_mail(form)
+            send_mail(
+                f"{self.subject} has been submitted",
+                self.render_email_for_user(form, submission),
+                [submission.email],
+                settings.DEFAULT_FROM_EMAIL,
+                reply_to=[settings.CC_EMAIL],
+            )
+        return submission
+
+
+class PDFFormSubmission(AbstractFormSubmission):
+    reference = ShortUUIDField(
+        editable = False
+    )
+    is_draft = models.BooleanField(default=True)
+
+    @property
+    def email(self):
+        email_field = next((k for k in self.form_data if k in ["email", "email_address"]))
+        return self.form_data[email_field]
+
+    @property
+    def name(self):
+        return self.form_data["name"]
+
+    @property
+    def status(self):
+        if self.is_draft:
+            return "Draft"
+        return "Submitted"
+
+    def display_data(self):
+        return {
+            k: v for k, v in self.form_data.items() if k not in 
+            ["name", "email", "email_address", "wagtailcaptcha", "reference"]
+        }
+
+    def get_absolute_url(self):
+        return reverse("pdf_form_detail", kwargs={"reference": self.reference})
+    
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+    
+
 class OrderFormField(AbstractFormField):
     """
-    for contact form and adoption application form:
     https://docs.wagtail.org/en/stable/reference/contrib/forms/index.html
     """
     page = ParentalKey("OrderFormPage", related_name="order_form_fields", on_delete=models.CASCADE)
