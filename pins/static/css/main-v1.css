@@ -264,8 +264,8 @@ figure img {
   margin: 40px auto 0;
   max-width: 1400px;
   border-radius: 0;
-  background-color: rgba(207,148,131);
-  color: var(--white);
+  background-color: rgba(207,148,131,0.2);
+  color: var(--dark);
   padding: 40px;
 }
 
@@ -280,6 +280,14 @@ figure img {
   list-style-type: none;
   margin: 0;
   padding-left: 0;
+}
+
+.alert__messages > li.success {
+  color: green;
+}
+
+.alert__messages > li.error {
+  color: darkred;
 }
 
 /* Hero image area */
@@ -2339,4 +2347,8 @@ label.light {
   100% {
     transform: translate(24px, 0);
   }
+}
+
+div.form-submission-data {
+  margin-top: 20px;
 }

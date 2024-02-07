@@ -8,6 +8,7 @@ from wagtail.documents import urls as wagtaildocs_urls
 
 from search import views as search_views
 from home import orders_urls
+from home import views as home_views
 from fundraising import urls
 
 urlpatterns = [
@@ -19,6 +20,21 @@ urlpatterns = [
     path("fundraising/", include(urls)),
     path('paypal/', include("paypal.standard.ipn.urls")),
     path("payments/", include("payments.urls")),
+    path(
+        "submitted-form/<str:reference>/access-request/", 
+        home_views.pdf_form_token_request, 
+        name="pdf_form_token_request"
+    ),
+    path(
+        "submitted-form/<str:reference>/", 
+        home_views.pdf_form_detail, 
+        name="pdf_form_detail"
+    ),
+    path(
+        "submitted-form/<int:pk>/download/", 
+        home_views.pdf_form_download, 
+        name="pdf_form_download"
+    ),
 ]
 
 

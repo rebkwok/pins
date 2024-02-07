@@ -20,6 +20,7 @@ wagtail-django-recaptcha
 django-paypal
 wagtail-modeladmin
 shortuuid
+reportlab
 
 pytest
 coverage

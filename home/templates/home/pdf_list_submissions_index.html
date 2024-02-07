@@ -1,0 +1,17 @@
+{% extends "wagtailforms/submissions_index.html" %}
+{% load i18n wagtailadmin_tags static %}
+
+{% block extra_css %}   
+    <link rel="stylesheet" href="{% static 'home/css/admin.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+    {{ block.super }}
+    <script src="https://unpkg.com/htmx.org@1.9.2" integrity="sha384-L6OqL9pRWyyFU3+/bjdSri+iIphTN/bvYyM37tICVyOJkWZLpP2vGn6VUEXgzg6h" crossorigin="anonymous" defer></script>
+{% endblock %}
+
+{% block content %}
+
+    {{ block.super }}
+
+{% endblock %}
