@@ -1,5 +1,6 @@
 import datetime
 import re
+import uuid
 
 from django import forms
 from django.conf import settings
@@ -548,7 +549,7 @@ class PDFFormPage(FormPage):
                             "Your form has been submitted successfully. A member of our team "
                             "will be in touch shortly. "
                         )
-                        return redirect(form_submission.get_absolute_url())
+                        return redirect(form_submission.get_absolute_url_with_token())
         else:
             reference = request.GET.get("reference")
             instance = None
@@ -559,9 +560,19 @@ class PDFFormPage(FormPage):
                     initial=instance.form_data
                 except PDFFormSubmission.DoesNotExist:
                     ...
-            if instance and not instance.is_draft:
-                return redirect(instance.get_absolute_url())
+            if instance:
+                token = request.GET.get("token")
+                token_qs = f"?token={token}" if token else ""
+                if not instance.is_draft:
+                    # Can't edit if it's not draft
+                    return redirect(instance.get_absolute_url() + token_qs)
                 
+                # skip token check if user is logged in AND is the author of this
+                # submission
+                if not request.user.is_authenticated or (request.user.email != instance.email):
+                    # Can access if token is valid, even if it's expired
+                    if not instance.token_valid(token):
+                        return redirect(instance.get_absolute_url() + token_qs)
             form = self.get_form(
                 page=self, user=request.user, instance=instance,
                 initial=initial
@@ -574,7 +585,7 @@ class PDFFormPage(FormPage):
     def render_save_draft_email_for_user(self, submission):
         content = "{self.title}\n======================="
         content = "Your form has been saved.\n"
-        content += f"\n\nYou can view and edit your responses at https://{settings.DOMAIN}{submission.get_absolute_url()}."
+        content += f"\n\nYou can view and edit your responses at https://{settings.DOMAIN}{submission.get_absolute_url_with_token()}."
         return content
     
     def render_email_for_user(self, submission):
@@ -604,12 +615,21 @@ class PDFFormPage(FormPage):
         self.send_mail_with_pdf(
             submission,
             f"{self.subject} has been submitted",
+            self.render_email_for_user(submission),
             [submission.email], 
             settings.DEFAULT_FROM_EMAIL, 
             [settings.CC_EMAIL]
         )
         
-    def send_mail_with_pdf(self, submission, subject, content, to_addresses, from_address, reply_to_addresses):
+    def send_mail_with_pdf(
+            self, 
+            submission, 
+            subject, 
+            content, 
+            to_addresses, 
+            from_address, 
+            reply_to_addresses
+        ):
         # form is a PDFFormSubmission instance
         kwargs = {
             "headers": {
@@ -635,6 +655,7 @@ class PDFFormPage(FormPage):
         usual emails. 
         """
         if form.instance:
+            new = False
             submission = form.instance
             submission.form_data = form.cleaned_data
             submission.save()
@@ -643,15 +664,18 @@ class PDFFormPage(FormPage):
                 form_data=form.cleaned_data,
                 page=self,
             )
+            new = True
         
         if save_as_draft:
-            # Send email to user
-            send_mail(
-                f"{self.subject} has been updated",
-                self.render_save_draft_email_for_user(submission),
-                [submission.email],
-                settings.DEFAULT_FROM_EMAIL,
-            )
+            if new:
+                # Send email to user if this is the first time the draft is saved
+                # Don't sent repeated emails for each save
+                send_mail(
+                    f"{self.subject} has been updated",
+                    self.render_save_draft_email_for_user(submission),
+                    [submission.email],
+                    settings.DEFAULT_FROM_EMAIL,
+                )
         else:
             form.clean(submit=True)
             if not form.is_valid():
@@ -659,6 +683,7 @@ class PDFFormPage(FormPage):
 
             submission.is_draft = False
             submission.save()
+            submission.reset_token()
             # Send admin email with PDF
             if self.to_address:
                 self.send_mail_to_admin(submission)
@@ -672,6 +697,9 @@ class PDFFormSubmission(AbstractFormSubmission):
         editable = False
     )
     is_draft = models.BooleanField(default=True)
+
+    token = models.UUIDField(null=True)
+    token_expiry = models.DateTimeField(null=True)
 
     @property
     def email(self):
@@ -687,6 +715,19 @@ class PDFFormSubmission(AbstractFormSubmission):
         if self.is_draft:
             return "Draft"
         return "Submitted"
+
+    def reset_token(self):
+        self.token = uuid.uuid4()
+        self.token_expiry = timezone.now() + datetime.timedelta(seconds=60*15)
+        self.save()
+    
+    def token_valid(self, token):
+        """Token is current (but could be expired)"""
+        return self.token is not None and token == str(self.token)
+    
+    def token_active(self, token):
+        """Token is current and has not expired"""
+        return self.token_valid(token) and self.token_expiry > timezone.now()
 
     def display_data(self):
         def _format_key(key):
@@ -719,8 +760,20 @@ class PDFFormSubmission(AbstractFormSubmission):
     def get_absolute_url(self):
         return reverse("pdf_form_detail", kwargs={"reference": self.reference})
 
+    def get_absolute_url_with_token(self):
+        return self.get_absolute_url() + f"?token={self.token}"
+
+    def get_request_token_url(self):
+        return reverse(
+            "pdf_form_token_request", 
+            kwargs={"reference": self.reference}
+        )
+
     def save(self, *args, **kwargs):
+        is_new = not self.id
         super().save(*args, **kwargs)
+        if is_new:
+            self.reset_token()
     
 
 class OrderFormField(AbstractFormField):

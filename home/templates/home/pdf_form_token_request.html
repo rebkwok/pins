@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags navigation_tags wagtailimages_tags %}
+
+{% block content %}
+
+    <div class="container">
+        <div class="row">
+            <h2>Request an access link</h2>
+        </div>
+    </div>
+
+    {% if token_sent %}
+        <div class="container">
+            <div class="row">
+                <div class="col-md-12 index-header__body-introduction">
+                    <p>
+                        An email with an access link has been sent to {{ submission.email }}.
+                        This link will be valid for 15 minutes only.
+                    </p>
+                </div>
+            </div>
+        </div>
+    {% else %}
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12 index-header__body-introduction">
+                <p>
+                    Your access link is invalid or has expired. Please request
+                    a new one using the form below.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8 form-page">
+                <form method="POST">
+                    {% csrf_token %}
+                    {% if form.errors %}
+                        <div class="text-danger">Please correct the errors below:
+                            <ul>    
+                            {% for error in form.non_field_errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+
+                    {% for field in form %}
+                        <div class="form-page__field" aria-required={% if field.field.required %}"true"{% else %}"false"{% endif %}>
+                            {{ field.label_tag }}<span class="required">*</span>
+
+                            {% if field.help_text %}
+                                <p class="help">{{ field.help_text }}</p>
+                            {% endif %}
+
+                            {{ field }}
+
+                            {% if field.errors %}
+                                <span class="text-danger">
+                                    {% for error in field.errors %}{{ error }}{% endfor %}
+                                </span>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    <input type="submit">
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+{% endblock content %}

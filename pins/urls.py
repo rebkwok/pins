@@ -21,6 +21,11 @@ urlpatterns = [
     path('paypal/', include("paypal.standard.ipn.urls")),
     path("payments/", include("payments.urls")),
     path(
+        "submitted-form/<str:reference>/access-request/", 
+        home_views.pdf_form_token_request, 
+        name="pdf_form_token_request"
+    ),
+    path(
         "submitted-form/<str:reference>/", 
         home_views.pdf_form_detail, 
         name="pdf_form_detail"
@@ -29,7 +34,7 @@ urlpatterns = [
         "submitted-form/<int:pk>/download/", 
         home_views.pdf_form_download, 
         name="pdf_form_download"
-    )
+    ),
 ]
 
 

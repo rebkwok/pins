@@ -10,7 +10,7 @@
             </div>
             {% if submission.is_draft %}
                 <div class="col-md-12">
-                    <a class="btn btn-sm" href={{ page.url }}?reference={{ submission.reference}}>Edit and submit</a>
+                    <a class="btn btn-sm" href={{ page.url }}?reference={{ submission.reference}}&token={{ request.GET.token }}>Edit and submit</a>
                 </div>
             {% else %}
                 <div class="col-md-12"><p>Form submitted on {{ submission.submit_time|date:'d M Y' }}.</p> 
