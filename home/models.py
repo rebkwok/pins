@@ -580,25 +580,46 @@ class PDFFormPage(FormPage):
     def render_email_for_user(self, submission):
         content = "{self.title}\n======================="
         content = "Thank you for submitting your form. A member of our team will be in touch shortly\n"
-        content += f"\n\nYou can view your responses at https://{settings.DOMAIN}{submission.get_absolute_url()}."
+        content += f"\n\nA PDF copy is attached."
+        content += f"You can also view your responses at https://{settings.DOMAIN}{submission.get_absolute_url()}."
         return content
     
     def render_email(self, form):
         # form is a PDFFormSubmission instance
-        content = f"A {self.title} submission has been received from {form.name} ({form.email})."
+        content = f"A {self.title} submission has been received from {form.name} ({form.email}) (PDF copy attached)."
         return content
     
-    def send_mail_with_pdf(self, submission):
+    def send_mail_to_admin(self, submission):
+         addresses = [x.strip() for x in self.to_address.split(",")]
+         self.send_mail_with_pdf(
+            submission, 
+            self.subject,  
+            self.render_email(submission), 
+            addresses, 
+            self.from_address, 
+            [submission.email]
+        )
+
+    def send_mail_to_user(self, submission):
+        self.send_mail_with_pdf(
+            submission,
+            f"{self.subject} has been submitted",
+            [submission.email], 
+            settings.DEFAULT_FROM_EMAIL, 
+            [settings.CC_EMAIL]
+        )
+        
+    def send_mail_with_pdf(self, submission, subject, content, to_addresses, from_address, reply_to_addresses):
         # form is a PDFFormSubmission instance
-        addresses = [x.strip() for x in self.to_address.split(",")]
         kwargs = {
             "headers": {
                 "Auto-Submitted": "auto-generated",
             },
-            "reply_to": [submission.email],
+            "reply_to": reply_to_addresses,
         }
+
         mail = EmailMultiAlternatives(
-            self.subject, self.render_email(submission), self.from_address, addresses, **kwargs
+            subject, content, from_address, to_addresses, **kwargs
         )
         pdf = generate_pdf(submission)
         mail.attach(submission.get_download_filename(), pdf.read())
@@ -640,15 +661,9 @@ class PDFFormPage(FormPage):
             submission.save()
             # Send admin email with PDF
             if self.to_address:
-                self.send_mail_with_pdf(submission)
+                self.send_mail_to_admin(submission)
             # send email to user
-            send_mail(
-                f"{self.subject} has been submitted",
-                self.render_email_for_user(submission),
-                [submission.email],
-                settings.DEFAULT_FROM_EMAIL,
-                reply_to=[settings.CC_EMAIL],
-            )
+            self.send_mail_to_user(submission)
         return submission, form
 
 
