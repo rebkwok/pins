@@ -400,8 +400,8 @@ class PDFFormBuilder(WagtailCaptchaFormBuilder):
         fields_to_add = {}
         if "name" not in set(formfields):
             fields_to_add["name"] = forms.CharField()
-        if not set(formfields) & {"email", "email_address"}:
-            fields_to_add["email"]: forms.EmailField()
+        if not (set(formfields) & {"email", "email_address"}):
+            fields_to_add["email"] = forms.EmailField()
         formfields = {
             **fields_to_add,
             **formfields
@@ -566,10 +566,11 @@ class PDFFormPage(FormPage):
                 if not instance.is_draft:
                     # Can't edit if it's not draft
                     return redirect(instance.get_absolute_url() + token_qs)
-                
                 # skip token check if user is logged in AND is the author of this
                 # submission
-                if not request.user.is_authenticated or (request.user.email != instance.email):
+                if request.user.is_authenticated and (request.user.email == instance.email):
+                    ...
+                else:
                     # Can access if token is valid, even if it's expired
                     if not instance.token_valid(token):
                         return redirect(instance.get_absolute_url() + token_qs)
@@ -723,7 +724,7 @@ class PDFFormSubmission(AbstractFormSubmission):
     
     def token_valid(self, token):
         """Token is current (but could be expired)"""
-        return self.token is not None and token == str(self.token)
+        return self.token is not None and str(token) == str(self.token)
     
     def token_active(self, token):
         """Token is current and has not expired"""
@@ -966,7 +967,7 @@ class OrderFormBuilder(WagtailCaptchaFormBuilder):
     @property
     def formfields(self):
         original_fields = super().formfields
-        if not set(original_fields) & {"email", "email_address"}:
+        if not (set(original_fields) & {"email", "email_address"}):
             original_fields = {
                 "email": forms.EmailField(),
                 **original_fields
