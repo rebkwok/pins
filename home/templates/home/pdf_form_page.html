@@ -51,11 +51,15 @@
                             {% if field.errors %}
                                 <span class="text-danger">
                                     {% for error in field.errors %}{{ error }}{% endfor %}
-                                </span>
+                                </span><br/>
+                            {% endif %}
+                            {% if field.name not in 'reference,name,email,address,phone_numbers,wagtailcaptcha' %}
+                            <input type="submit" class="btn-draft" value="Save draft" name="save_as_draft">
                             {% endif %}
                         </div>
                     {% endfor %}
-                    <input type="submit" value="Save draft" name="save_as_draft">
+                    <p>Click below to submit your responses. Please note that you will not
+                        be able to edit the form once submitted.</p>
                     <input type="submit">
                 </form>
             </div>

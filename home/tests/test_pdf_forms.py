@@ -40,13 +40,13 @@ def test_pdf_form_submission(pdf_form_submission):
 def test_pdf_form_page_builder_no_name_or_email_field(home_page):
     pdfformpage = PDFFormPageFactory(parent=home_page)
     builder =  pdfformpage.form_builder(pdfformpage.pdf_form_fields.all())
-    assert list(builder.formfields.keys()) == ["name", "email", "wagtailcaptcha"]
+    assert list(builder.formfields.keys()) == ["name", "email"]
 
 def test_pdf_form_page_builder_with_email_field(home_page):
     pdfformpage = PDFFormPageFactory(parent=home_page)
     baker.make("home.PDFFormField", label="Email address", field_type="email", page=pdfformpage)
     builder =  pdfformpage.form_builder(pdfformpage.pdf_form_fields.all())
-    assert list(builder.formfields.keys()) == ["name", "email_address", "wagtailcaptcha"]
+    assert list(builder.formfields.keys()) == ["name", "email_address"]
 
 
 def test_pdf_form_page_required_fields(home_page):
@@ -186,7 +186,6 @@ def test_pdf_form_page_serve_post_save_draft(pdf_form_page, rf):
         "name": "Mickey Mouse",
         "email": "mickey.mouse@test.com",
         "a_field": "Foo\r\nbar",
-        "g-recaptcha-response": "PASSED",
         "save_as_draft": True
     }
     request = rf.post("/", data)
@@ -204,7 +203,6 @@ def test_pdf_form_page_serve_post_save_draft(pdf_form_page, rf):
         "name": "Mickey Mouse",
         "email": "mickey.mouse@test.com",
         "a_field": "Foo\r\nbar",
-        "g-recaptcha-response": "PASSED",
         "save_as_draft": True
     }
     request = rf.post("/", data)
@@ -233,7 +231,6 @@ def test_pdf_form_page_serve_post_submit_missing_form_data(pdf_form_page, rf):
         "name": "Mickey Mouse",
         "email": "mickey.mouse@test.com",
         "a_field": "Foo\r\nbar",
-        "g-recaptcha-response": "PASSED",
         "submit": "Submit"
     }
     request = rf.post("/", data)
@@ -256,7 +253,6 @@ def test_pdf_form_page_serve_post_submit(pdf_form_page, rf):
         "a_checkbox": True,
         "a_multicheckbox": ["yes"],
         "a_field": "Foo\r\nbar",
-        "g-recaptcha-response": "PASSED",
         "submit": "Submit"
     }
     request = rf.post("/", data)

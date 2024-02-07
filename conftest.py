@@ -136,7 +136,6 @@ def pdf_form_submission(pdf_form_page):
                 "a_field": "Foo\r\nbar",
                 "a_multicheckbox": ["yes", "no"],
                 "a_checkbox": True,
-                "g-recaptcha-response": "PASSED",
                 **form_data
             },
             page=pdf_form_page

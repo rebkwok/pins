@@ -28,7 +28,7 @@ from wagtail.admin.panels import (
     MultiFieldPanel,
     PublishingPanel,
 )
-from wagtail.contrib.forms.forms import BaseForm
+from wagtail.contrib.forms.forms import BaseForm, FormBuilder
 from wagtail.contrib.forms.models import AbstractEmailForm, AbstractFormField, AbstractFormSubmission
 from wagtail.contrib.forms.views import SubmissionsListView
 
@@ -392,7 +392,7 @@ class PDFBaseForm(BaseForm):
                     self.add_error(field, "This field is required")
 
 
-class PDFFormBuilder(WagtailCaptchaFormBuilder):           
+class PDFFormBuilder(FormBuilder):           
 
     @property
     def formfields(self):
