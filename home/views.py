@@ -105,7 +105,7 @@ def pdf_form_detail(request, reference):
             request, 
             "This form has not yet been submitted."
         )
-    context = {"page": submission.page, "submission": submission}
+    context = {"page": submission.page.formpage.pdfformpage, "submission": submission}
     return TemplateResponse(request, "home/pdf_form_detail.html", context)
 
 

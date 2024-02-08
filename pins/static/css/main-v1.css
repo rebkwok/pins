@@ -1409,11 +1409,12 @@ input[type='radio'] {
   color: rgba(207, 148, 131);
 }
 
-.form-page .help {
-  color: var(--dark);
+.form-page .help, p .help {
+  color: var(--grey);
   font-family: var(--font--secondary);
   font-size: var(--font-sm);
-  margin-top: 10px;
+  font-style: italic;
+  margin-top: 5px;
   max-width: 350px;
 }
 
@@ -2382,4 +2383,8 @@ div.form-submission-data {
 .form-page > input.btn.btn-draft {
   margin-top: 5px;
   background-color: transparent;
+}
+
+div.form-response > p {
+  color: darkblue;
 }
