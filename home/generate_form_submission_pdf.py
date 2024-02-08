@@ -1,4 +1,7 @@
 import io
+
+from html2text import html2text
+
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
@@ -63,7 +66,7 @@ def generate_pdf(submission):
         )
 
         if field in submission.form_page.form_field_info_texts:
-            before = submission.form_page.form_field_info_texts[field]["before"]
+            before = html2text(submission.form_page.form_field_info_texts[field]["before"])
             for line in before.split('\n'):
                 story.append(Paragraph(line, styles["Normal"]))
             story.append(Spacer(1, 5))
@@ -73,7 +76,7 @@ def generate_pdf(submission):
 
         if field in submission.form_page.form_field_info_texts:
             story.append(Spacer(1, 5))
-            after = submission.form_page.form_field_info_texts[field]["after"]
+            after = html2text(submission.form_page.form_field_info_texts[field]["after"])
             for line in after.split('\n'):
                 story.append(Paragraph(line, styles["Normal"]))
 

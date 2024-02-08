@@ -21,6 +21,7 @@ django-paypal
 wagtail-modeladmin
 shortuuid
 reportlab
+html2text
 
 pytest
 coverage
