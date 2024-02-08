@@ -525,17 +525,12 @@ class PDFFormPage(FormPage):
 
     @property
     def form_field_info_texts(self):
-        info_texts = {}
-        for field in self.get_form_fields():
-            field_info_texts = {
+        return {
+            field.label: {
                 "before": field.before_info_text, 
                 "after": field.after_info_text
-            }
-            info_texts.update(
-                {field.clean_name : field_info_texts, field.label: field_info_texts}
-            )
-
-        return info_texts
+            } for field in self.get_form_fields()
+        }
 
     def serve(self, request, *args, **kwargs):
         if request.method == "POST":

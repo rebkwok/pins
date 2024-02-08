@@ -44,7 +44,7 @@
                                 {{ field.label_tag }}<span class="required">*</span>    
                             {% endif %}
                             
-                            {% get_info_text field_name=field.name location="before" %}
+                            {% get_info_text field_name=field.label location="before" %}
 
                             {{ field }}
                             
@@ -52,7 +52,7 @@
                                 <p class="help">{{ field.help_text }}</p>
                             {% endif %}
 
-                            {% get_info_text field_name=field.name location="after" %}
+                            {% get_info_text field_name=field.label location="after" %}
 
                             {% if field.errors %}
                                 <span class="text-danger">
@@ -60,7 +60,7 @@
                                 </span><br/>
                             {% endif %}
                             {% if field.name not in 'reference,name,email,address,phone_numbers,wagtailcaptcha' %}
-                            <input type="submit" class="btn-draft" value="Save draft" name="save_as_draft">
+                            <input type="submit" class="btn-draft" value="Save draft" name="save_as_draft"><br/>
                             {% endif %}
                         </div>
                     {% endfor %}
