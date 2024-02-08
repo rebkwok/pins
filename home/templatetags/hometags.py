@@ -21,5 +21,5 @@ def standard_page_button(context, location):
 def get_info_text(context, field_name, location):
     page = context["page"]
     if field_name in page.form_field_info_texts:
-        return mark_safe(page.form_field_info_texts[field_name][location])
+        return mark_safe(f"<div class='info-text'>{page.form_field_info_texts[field_name][location]}</div>")
     return ""

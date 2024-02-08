@@ -1409,14 +1409,16 @@ input[type='radio'] {
   color: rgba(207, 148, 131);
 }
 
-.form-page .help, p .help {
+.form-page .help, p.help {
   color: var(--grey);
   font-family: var(--font--secondary);
   font-size: var(--font-sm);
   font-style: italic;
   margin-top: 5px;
   max-width: 350px;
+  margin-bottom: 10px;
 }
+
 
 .form-page__field {
   color: var(--dark);
@@ -2387,4 +2389,13 @@ div.form-submission-data {
 
 div.form-response > p {
   color: darkblue;
+}
+
+div.info-text ul, div.info-text p {
+  margin-bottom: 10px;;
+}
+
+div.info-text li {
+  list-style: disc;
+  margin: 0 0 0 30px;
 }
