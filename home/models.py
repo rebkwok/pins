@@ -758,6 +758,8 @@ class PDFFormSubmission(AbstractFormSubmission):
                 return key
 
         def _format_value(value):
+            if value is None:
+                return ""
             if isinstance(value, list):
                 value = ", ".join(value)
             formatted_value = {
