@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load wagtailcore_tags navigation_tags wagtailimages_tags %}
+{% load hometags %}
 
 {% block content %}
 
@@ -40,13 +41,18 @@
                     {% for field in form %}
                         <div class="form-page__field" aria-required={% if field.field.required %}"true"{% else %}"false"{% endif %}>
                             {% if field.name != 'reference' %}
-                                {{ field.label_tag }}<span class="required">*</span>
-
-                                {% if field.help_text %}
-                                    <p class="help">{{ field.help_text }}</p>
-                                {% endif %}
+                                {{ field.label_tag }}<span class="required">*</span>    
                             {% endif %}
+                            
+                            {% get_info_text field_name=field.name location="before" %}
+
                             {{ field }}
+                            
+                            {% if field.help_text %}
+                                <p class="help">{{ field.help_text }}</p>
+                            {% endif %}
+
+                            {% get_info_text field_name=field.name location="after" %}
 
                             {% if field.errors %}
                                 <span class="text-danger">

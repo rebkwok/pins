@@ -1,7 +1,6 @@
 from django import template
-from wagtail.models import Page, Site
 
-from home.models import FooterText
+from django.utils.safestring import mark_safe
 
 register = template.Library()
 
@@ -16,3 +15,11 @@ def standard_page_button(context, location):
         return {"page": page, "show_button": True}
 
     return {"show_button": False}
+
+
+@register.simple_tag(takes_context=True)
+def get_info_text(context, field_name, location):
+    page = context["page"]
+    if field_name in page.form_field_info_texts:
+        return mark_safe(page.form_field_info_texts[field_name][location])
+    return ""

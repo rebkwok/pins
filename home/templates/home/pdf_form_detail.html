@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load wagtailcore_tags %}
+{% load wagtailcore_tags hometags %}
 
 {% block content %}
 
@@ -19,9 +19,23 @@
             <div class="col-md-12 form-submission-data">
             <label>Reference:</label> {{ submission.reference }}<br/>
             <label>Name:</label> {{ submission.name }}<br/>
-            <label>Email:</label> {{ submission.email }}<br/>
+            <label>Email:</label> {{ submission.email }}<br/><br/>
             {% for field, value in submission.display_data.items %}
-            <label>{{ field }}:</label> {{ value | linebreaks }}
+                <h4>{{ field }}</h4>
+                {% get_info_text field_name=field location="before" as before_text %}
+                {% if before_text %}
+                    <span class="help">{{ before_text }}</span>
+                {% endif %}
+                <label>Response:</label>
+                {% if not value %}
+                    <span class="text-danger">NOT ANSWERED</span>
+                {% else %}
+                <div class="form-response">{{ value | linebreaks }}</div>
+                {% endif %}
+                {% get_info_text field_name=field location="after" as after_text %}
+                {% if after_text %}
+                    <span class="help">{{ after_text }}</span>
+                {% endif %}
             {% endfor %}
             </div>
         </div>

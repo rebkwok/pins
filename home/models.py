@@ -480,7 +480,13 @@ class PDFFormField(AbstractFormField):
     """
 
     page = ParentalKey("PDFFormPage", related_name="pdf_form_fields", on_delete=models.CASCADE)
+    before_info_text = RichTextField(blank=True)
+    after_info_text = RichTextField(blank=True)
 
+    panels = AbstractFormField.panels + [
+        FieldPanel("before_info_text"),
+        FieldPanel("after_info_text"),
+    ]
     def save(self, *args, **kwargs):
         if self.clean_name in ["email", "email_address", "name"]:
             self.required = True
@@ -516,7 +522,21 @@ class PDFFormPage(FormPage):
 
     def get_form_fields(self):
         return self.pdf_form_fields.all()
-    
+
+    @property
+    def form_field_info_texts(self):
+        info_texts = {}
+        for field in self.get_form_fields():
+            field_info_texts = {
+                "before": field.before_info_text, 
+                "after": field.after_info_text
+            }
+            info_texts.update(
+                {field.clean_name : field_info_texts, field.label: field_info_texts}
+            )
+
+        return info_texts
+
     def serve(self, request, *args, **kwargs):
         if request.method == "POST":
             # Is it a save-for-later POST?
@@ -683,6 +703,7 @@ class PDFFormPage(FormPage):
                 return submission, form
 
             submission.is_draft = False
+            submission.submit_time = timezone.now()
             submission.save()
             submission.reset_token()
             # Send admin email with PDF
@@ -702,6 +723,10 @@ class PDFFormSubmission(AbstractFormSubmission):
     token = models.UUIDField(null=True)
     token_expiry = models.DateTimeField(null=True)
 
+    @property
+    def form_page(self):
+        return self.page.formpage.pdfformpage
+    
     @property
     def email(self):
         email_field = next((k for k in self.form_data if k in ["email", "email_address"]))
@@ -733,7 +758,7 @@ class PDFFormSubmission(AbstractFormSubmission):
     def display_data(self):
         def _format_key(key):
             try:
-                return self.page.formpage.pdfformpage.pdf_form_fields.get(clean_name=key).label
+                return self.form_page.pdf_form_fields.get(clean_name=key).label
             except PDFFormField.DoesNotExist:
                 return key
 
@@ -747,7 +772,7 @@ class PDFFormSubmission(AbstractFormSubmission):
             formatted_value = formatted_value.replace("\r\n", "\n")
             return formatted_value
 
-        fields_in_order = self.page.formpage.pdfformpage.pdf_form_fields.exclude(
+        fields_in_order = self.form_page.pdf_form_fields.exclude(
             clean_name__in=["name", "email", "email_address", "wagtailcaptcha", "reference"]
             ).values_list("clean_name", flat=True)
         valid_fields = [field for field in  fields_in_order if field in self.form_data]
