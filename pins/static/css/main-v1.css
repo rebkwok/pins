@@ -1415,7 +1415,6 @@ input[type='radio'] {
   font-size: var(--font-sm);
   font-style: italic;
   margin-top: 5px;
-  max-width: 350px;
   margin-bottom: 10px;
 }
 
