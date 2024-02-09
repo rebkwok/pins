@@ -26,7 +26,7 @@ def test_pdf_form_submission(pdf_form_submission):
     assert submission.display_data() == {
         "A field": "Foo\nbar",
         "A multicheckbox": "yes, no",
-        "A checkbox": "Yes",
+        "A checkbox": "Confirmed",
     }
     assert (
         submission.get_download_filename() == 

@@ -763,8 +763,8 @@ class PDFFormSubmission(AbstractFormSubmission):
             if isinstance(value, list):
                 value = ", ".join([str(v) for v in value])
             formatted_value = {
-                True: "Yes",
-                False: "No"
+                True: "Confirmed",
+                False: "Not answered"
             }.get(value, str(value))
             formatted_value = formatted_value.replace("\r\n", "\n")
             return formatted_value
