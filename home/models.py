@@ -687,7 +687,7 @@ class PDFFormPage(FormPage):
                 # Send email to user if this is the first time the draft is saved
                 # Don't sent repeated emails for each save
                 send_mail(
-                    f"{self.subject} has been updated",
+                    f"{self.subject} has been saved",
                     self.render_save_draft_email_for_user(submission),
                     [submission.email],
                     settings.DEFAULT_FROM_EMAIL,
