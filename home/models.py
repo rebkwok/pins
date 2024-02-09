@@ -416,6 +416,14 @@ class PDFFormSubmissionsListView(SubmissionsListView):
     # Template shows name/email/submission date and link to PDF/page
     template_name = "home/pdf_list_submissions_index.html"
 
+    orderable_fields = (
+        "id",
+        "submit_time",
+        "name",
+        "email",
+        "reference",
+    )
+    
     def _export_headings(self):
         self.list_export += ["reference", "status"]
         self.export_headings.update(
@@ -440,13 +448,22 @@ class PDFFormSubmissionsListView(SubmissionsListView):
         row_dict["status"] = item.status
         return row_dict
     
+    def _get_order_label(self, ordering_by_field, field):
+        order = ordering_by_field.get(field)
+        return order[1] if order else "orderable"
+
     def get_context_data(self, **kwargs):
         context_data = super().get_context_data(**kwargs)
         if not self.is_export:
-            # We want the first 3 items (submit time, name, email) and our extra fields
+            # We want submit time, name, email (from the submission, not the form), 
+            # and our extra fields
+            ordering_by_field = self.get_validated_ordering()
+            
             context_data["data_headings"] = [
-                *context_data["data_headings"][0:3],
-                {"name": "reference", "label": "Reference", "order": None},
+                context_data["data_headings"][0],
+                {"name": "name", "label": "Name", "order": self._get_order_label(ordering_by_field, "name")},
+                {"name": "email", "label": "Email", "order": self._get_order_label(ordering_by_field, "email")},
+                {"name": "reference", "label": "Reference", "order": self._get_order_label(ordering_by_field, "reference")},
                 {'name': 'status', 'label': 'Status', 'order': None},
                 {'name': 'download', 'label': 'Download', 'order': None},
                 {'name': 'view', 'label': 'View', 'order': None},
@@ -455,20 +472,21 @@ class PDFFormSubmissionsListView(SubmissionsListView):
             submissions = PDFFormSubmission.objects.filter(
                 id__in=[row["model_id"] for row in context_data["data_rows"]]
             )
-            submission_reference = {sub.id: sub.reference for sub in submissions}
-            submission_status = {sub.id: sub.status for sub in submissions}
-            submission_download = {sub.id: mark_safe(f"<a href={reverse('pdf_form_download', args=(sub.pk,))}>Download</a>") for sub in submissions}
-            submission_view = {sub.id: mark_safe(f"<a href={sub.get_absolute_url()}>View</a>") for sub in submissions}
-
+            submission_data = {
+                sub.id: [
+                    sub.name, 
+                    sub.email, 
+                    sub.reference, 
+                    sub.status,
+                    mark_safe(f"<a href={reverse('pdf_form_download', args=(sub.pk,))}>Download</a>"),
+                    mark_safe(f"<a href={sub.get_absolute_url()}>View</a>")
+                ] for sub in submissions
+            }
+            
             for row in context_data["data_rows"]:
-                row["fields"] = row["fields"][0:3]
-                extra_form_data = [
-                    submission_reference[row["model_id"]], 
-                    submission_status[row["model_id"]], 
-                    submission_download[row["model_id"]],
-                    submission_view[row["model_id"]]
+                row["fields"] = [
+                    row["fields"][0], *submission_data[row["model_id"]], 
                 ]
-                row["fields"].extend(extra_form_data)
 
         return context_data
 
@@ -715,6 +733,9 @@ class PDFFormSubmission(AbstractFormSubmission):
     )
     is_draft = models.BooleanField(default=True)
 
+    name = models.CharField(blank=True)
+    email = models.EmailField(blank=True)
+
     token = models.UUIDField(null=True)
     token_expiry = models.DateTimeField(null=True)
 
@@ -722,13 +743,11 @@ class PDFFormSubmission(AbstractFormSubmission):
     def form_page(self):
         return self.page.formpage.pdfformpage
     
-    @property
-    def email(self):
+    def email_from_form_data(self):
         email_field = next((k for k in self.form_data if k in ["email", "email_address"]))
         return self.form_data[email_field]
 
-    @property
-    def name(self):
+    def name_from_form_data(self):
         return self.form_data["name"]
 
     @property
@@ -803,6 +822,8 @@ class PDFFormSubmission(AbstractFormSubmission):
 
     def save(self, *args, **kwargs):
         is_new = not self.id
+        self.name = self.name_from_form_data()
+        self.email = self.email_from_form_data()
         super().save(*args, **kwargs)
         if is_new:
             self.reset_token()
