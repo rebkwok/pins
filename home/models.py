@@ -762,6 +762,14 @@ class PDFFormSubmission(AbstractFormSubmission):
                 return ""
             if isinstance(value, list):
                 value = ", ".join([str(v) for v in value])
+            
+            try:
+                return (
+                    datetime.datetime.strptime(value, "%Y-%m-%d").strftime("%d %b %Y")
+                )
+            except (ValueError, TypeError):
+                ...
+        
             formatted_value = {
                 True: "Confirmed",
                 False: "Not answered"
@@ -773,6 +781,7 @@ class PDFFormSubmission(AbstractFormSubmission):
             clean_name__in=["name", "email", "email_address", "wagtailcaptcha", "reference"]
             ).values_list("clean_name", flat=True)
         valid_fields = [field for field in  fields_in_order if field in self.form_data]
+
         return {
             _format_key(field): _format_value(self.form_data[field]) for field in valid_fields
         }
