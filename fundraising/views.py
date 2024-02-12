@@ -65,7 +65,7 @@ class RecipeBookSubmissionCreateView(CreateView):
                 f"{title}"
             ),
             settings.DEFAULT_FROM_EMAIL,
-            [settings.CC_EMAIL],
+            [settings.DEFAULT_ADMIN_EMAIL],
             fail_silently=False,
         )
     

@@ -630,8 +630,7 @@ class PDFFormPage(FormPage):
     def render_email_for_user(self, submission):
         content = "{self.title}\n======================="
         content = "Thank you for submitting your form. A member of our team will be in touch shortly\n"
-        content += f"\n\nA PDF copy is attached."
-        content += f"You can also view your responses at https://{settings.DOMAIN}{submission.get_absolute_url()}."
+        content += f"You can view your responses at https://{settings.DOMAIN}{submission.get_absolute_url()}."
         return content
     
     def render_email(self, form):
@@ -650,14 +649,13 @@ class PDFFormPage(FormPage):
             [submission.email]
         )
 
-    def send_mail_to_user(self, submission):
-        self.send_mail_with_pdf(
-            submission,
-            f"{self.subject} has been submitted",
-            self.render_email_for_user(submission),
+    def send_mail_to_user(self, submission, subject, content):
+        send_mail(
+            subject,
+            content,
             [submission.email], 
-            settings.DEFAULT_FROM_EMAIL, 
-            [settings.CC_EMAIL]
+            from_email=settings.DEFAULT_FROM_EMAIL, 
+            reply_to=[settings.DEFAULT_ADMIN_EMAIL]
         )
         
     def send_mail_with_pdf(
@@ -709,11 +707,10 @@ class PDFFormPage(FormPage):
             if new:
                 # Send email to user if this is the first time the draft is saved
                 # Don't sent repeated emails for each save
-                send_mail(
-                    f"{self.subject} has been saved",
-                    self.render_save_draft_email_for_user(submission),
-                    [submission.email],
-                    settings.DEFAULT_FROM_EMAIL,
+                self.send_mail_to_user(
+                    submission, 
+                    subject=f"{self.subject} has been saved", 
+                    content=self.render_save_draft_email_for_user(submission),
                 )
         else:
             form.clean(submit=True)
@@ -728,7 +725,11 @@ class PDFFormPage(FormPage):
             if self.to_address:
                 self.send_mail_to_admin(submission)
             # send email to user
-            self.send_mail_to_user(submission)
+            self.send_mail_to_user(
+                submission, 
+                f"{self.subject} has been submitted",
+                content=self.render_email_for_user(submission),
+            )    
         return submission, form
 
 
@@ -1423,7 +1424,7 @@ class OrderFormPage(WagtailCaptchaEmailForm):
             self.render_email_for_purchaser(form, submission),
             [submission.email],
             settings.DEFAULT_FROM_EMAIL,
-            reply_to=[settings.CC_EMAIL],
+            reply_to=[settings.DEFAULT_ADMIN_EMAIL],
         )
 
         return submission

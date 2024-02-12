@@ -313,7 +313,7 @@ else:  # pragma: no cover
 
 DEFAULT_FROM_EMAIL = 'pins.scot.web+no-reply@gmail.com'
 SUPPORT_EMAIL = 'rebkwok@gmail.com'
-CC_EMAIL = "pinscotland16@gmail.com"
+DEFAULT_ADMIN_EMAIL = "pinscotland16@gmail.com"
 SERVER_EMAIL = SUPPORT_EMAIL
 
 # MAILCATCHER
