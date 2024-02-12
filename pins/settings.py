@@ -121,6 +121,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.forms",
+    "encrypted_json_fields",
     "wagtail_json_widget",
     "dogs",
     "fundraising",
@@ -505,3 +506,8 @@ PAYPAL_EMAIL = env.str("PAYPAL_EMAIL")
 # A key we define ourselves, to verify paypal return items
 PAYPAL_CUSTOM_KEY = env.str("PAYPAL_CUSTOM_KEY")
 PAYPAL_BUY_BUTTON_IMAGE = "/static/images/paypal-button.png"
+
+
+# Encrypted models
+FIELD_ENCRYPTION_KEY=env.str("FIELD_ENCRYPTION_KEY")
+EJF_ENCRYPTION_KEYS = FIELD_ENCRYPTION_KEY

@@ -6,6 +6,7 @@ from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.core.mail import EmailMultiAlternatives
+from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import validate_slug
 from django.db import models
 from django.template.response import TemplateResponse
@@ -44,6 +45,10 @@ from wagtail.models import (
 from wagtail.contrib.forms.utils import get_field_clean_name
 
 from wagtailcaptcha.models import WagtailCaptchaEmailForm, WagtailCaptchaFormBuilder
+
+from encrypted_json_fields.fields import EncryptedJSONField, EncryptedCharField, EncryptedEmailField
+
+
 
 from payments.utils import get_paypal_form
 from .generate_form_submission_pdf import generate_pdf
@@ -731,10 +736,11 @@ class PDFFormSubmission(AbstractFormSubmission):
     reference = ShortUUIDField(
         editable = False
     )
+    form_data = EncryptedJSONField(encoder=DjangoJSONEncoder)
     is_draft = models.BooleanField(default=True)
 
-    name = models.CharField(blank=True)
-    email = models.EmailField(blank=True)
+    name = EncryptedCharField(blank=True)
+    email = EncryptedEmailField(blank=True)
 
     token = models.UUIDField(null=True)
     token_expiry = models.DateTimeField(null=True)
@@ -1427,10 +1433,12 @@ class OrderFormSubmission(AbstractFormSubmission):
     reference = ShortUUIDField(
         editable = False
     )
+    form_data = EncryptedJSONField(encoder=DjangoJSONEncoder)
     paid = models.BooleanField(default=False)
     date_paid = models.DateTimeField(null=True, blank=True)
     shipped = models.BooleanField(default=False)
     cost = models.DecimalField(max_digits=10, decimal_places=2, null=True)
+
 
     @property
     def email(self):
