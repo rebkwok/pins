@@ -555,6 +555,13 @@ class PDFFormPage(FormPage):
         return {**params, "page": self}
 
     @property
+    def required_for_draft_fields(self):
+        return [
+            "reference", "name", "email", "email_address",
+            *[field.clean_name for field in self.get_form_fields() if field.required_for_draft]
+        ]
+
+    @property
     def form_field_info_texts(self):
         return {
             field.label: {

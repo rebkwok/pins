@@ -59,7 +59,7 @@
                                     {% for error in field.errors %}{{ error }}{% endfor %}
                                 </span><br/>
                             {% endif %}
-                            {% if field.name not in 'reference,name,email,address,phone_numbers,wagtailcaptcha' %}
+                            {% if field.name not in page.required_for_draft_fields %}
                             <input type="submit" class="btn-draft" value="Save draft" name="save_as_draft"><br/>
                             {% endif %}
                         </div>
