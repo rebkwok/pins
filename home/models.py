@@ -507,10 +507,15 @@ class PDFFormField(AbstractFormField):
     after_info_text = RichTextField(blank=True)
     required_for_draft = models.BooleanField(default=False, help_text="Required in order to save as draft")
 
-    panels = AbstractFormField.panels + [
+    panels = panels = [
+        FieldPanel("label"),
+        FieldPanel("help_text"),
         FieldPanel("before_info_text"),
         FieldPanel("after_info_text"),
         FieldPanel("required_for_draft"),
+        FieldPanel("field_type", classname="formbuilder-type"),
+        FieldPanel("choices", classname="formbuilder-choices"),
+        FieldPanel("default_value", classname="formbuilder-default"),
     ]
     def save(self, *args, **kwargs):
         self.required = self.required_for_draft
