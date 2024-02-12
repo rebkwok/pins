@@ -1,21 +1,26 @@
 import io
 
+from django.conf import settings
+
 from html2text import html2text
 
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import pdfencrypt
 
 
 def generate_pdf(submission):
     # Create a file-like buffer to receive PDF data.
     buffer = io.BytesIO()
+    encryption = pdfencrypt.StandardEncryption(settings.PDF_ENCRYPTION_KEY, canPrint=0)
 
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
         rightMargin=30,leftMargin=30,
-        topMargin=30,bottomMargin=15
+        topMargin=30,bottomMargin=15,
+        encrypt=encryption,
     )
 
     styles = getSampleStyleSheet()
