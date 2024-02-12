@@ -56,7 +56,8 @@ def test_pdf_form_page_required_fields(home_page):
         label="Email address", 
         field_type="email", 
         page=pdfformpage,
-        required=False
+        required=False,
+        required_for_draft=True
     )
     form_field = baker.make(
         "home.PDFFormField", 

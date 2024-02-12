@@ -505,16 +505,15 @@ class PDFFormField(AbstractFormField):
     page = ParentalKey("PDFFormPage", related_name="pdf_form_fields", on_delete=models.CASCADE)
     before_info_text = RichTextField(blank=True)
     after_info_text = RichTextField(blank=True)
+    required_for_draft = models.BooleanField(default=False, help_text="Required in order to save as draft")
 
     panels = AbstractFormField.panels + [
         FieldPanel("before_info_text"),
         FieldPanel("after_info_text"),
+        FieldPanel("required_for_draft"),
     ]
     def save(self, *args, **kwargs):
-        if self.clean_name in ["email", "email_address", "name"]:
-            self.required = True
-        else:
-            self.required = False
+        self.required = self.required_for_draft
         super().save(*args, **kwargs)
 
 
@@ -546,6 +545,10 @@ class PDFFormPage(FormPage):
     def get_form_fields(self):
         return self.pdf_form_fields.all()
 
+    def get_form_parameters(self):
+        params = super().get_form_parameters()
+        return {**params, "page": self}
+
     @property
     def form_field_info_texts(self):
         return {
@@ -567,15 +570,12 @@ class PDFFormPage(FormPage):
                 except PDFFormSubmission.DoesNotExist:
                     ...
             form = self.get_form(
-                request.POST, request.FILES, page=self, user=request.user,
-                instance=instance
+                request.POST, request.FILES, instance=instance, user=request.user,
             )
             if form.is_valid():                
                 form_submission, form = self.process_form_submission(form, save_as_draft=save_as_draft)
                 if save_as_draft:
-                    form = self.get_form(
-                        page=self, user=request.user, instance=form_submission, initial=request.POST
-                    )
+                    form = self.get_form(instance=form_submission, user=request.user, initial=request.POST)
                     messages.success(request, "Draft saved!")
                     context = self.get_context(request)
                     context["form"] = form
@@ -612,10 +612,7 @@ class PDFFormPage(FormPage):
                     # Can access if token is valid, even if it's expired
                     if not instance.token_valid(token):
                         return redirect(instance.get_absolute_url() + token_qs)
-            form = self.get_form(
-                page=self, user=request.user, instance=instance,
-                initial=initial
-            )
+            form = self.get_form(instance=instance, user=request.user, initial=initial)
 
         context = self.get_context(request)
         context["form"] = form
@@ -1264,7 +1261,7 @@ class OrderFormPage(WagtailCaptchaEmailForm):
 
     def get_form_fields(self):
         return self.order_form_fields.all()
-    
+ 
     def get_form_class(self):
         fb = self.form_builder(self.get_form_fields(), page=self)
         return fb.get_form_class()
