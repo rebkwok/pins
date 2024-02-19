@@ -590,9 +590,9 @@ class DogPage(Page):
     def page_status(self):
         return mark_safe(f"<span class='w-status w-status--primary'>{self.status_string.title()}</span>")
 
-    def update_facebook_info(self):
+    def update_facebook_info(self, new=False):
         tracker = FacebookAlbumTracker()
-        tracker.create_or_update_album(self.facebook_album_id)
+        tracker.create_or_update_album(self.facebook_album_id, force_update=new)
 
     @property
     def album_info(self):
@@ -663,9 +663,10 @@ class DogPage(Page):
         super().save(*args, **kwargs)
         albums_obj = FacebookAlbums.instance()
         if self.facebook_album_id and not albums_obj.is_rate_limited:
+            new = False if not self.id else True
             try:
                 logger.info("Checking fb info for album id %s, dog %s", self.facebook_album_id, self.title)
-                self.update_facebook_info()
+                self.update_facebook_info(new=new)
             except GraphAPIError as e:
                 logger.error(e)
                 if "Unsupported get request" in str(e):
