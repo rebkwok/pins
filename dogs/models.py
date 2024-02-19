@@ -395,12 +395,17 @@ class FacebookAlbumTracker:
             logger.info("Album %s is up to date", album_id)
     
     def get_album_metadata(self, album_id):
-        return self.api.get_object(album_id, fields="name,link,description,updated_time,count,photos")
+        return self.api.get_object(album_id, fields="name,link,description,updated_time,count")
 
     def get_album_images(self, album_id):
         # get images (max 50) for album
-        url = f"https://graph.facebook.com/v18.0/{album_id}/photos/?fields=images&access_token={self.api.access_token}&limit=50"
-        return requests.get(url).json()["data"]
+        url = f"https://graph.facebook.com/v18.0/{album_id}/photos/?fields=images&access_token={self.api.access_token}"
+        resp_json = requests.get(url).json()
+        while True:
+            yield from resp_json["data"]
+            if 'next' not in resp_json['paging']:
+                break
+            resp_json = requests.get(resp_json["paging"]["next"]).json()
 
     def create_gallery_image(self, page, collection, image_id, image_url):
         # create the gallery image
@@ -436,35 +441,31 @@ class FacebookAlbumTracker:
             collection = None
             page_image_ids = []
 
-        album_data = album_metadata or self.get_album_metadata(album_id)
+        album_metadata = album_metadata or self.get_album_metadata(album_id)
         if (
             not force_update 
-            and self.albums_obj.get_album(album_id).get("updated_time") == album_data.get("updated_time")
+            and self.albums_obj.get_album(album_id).get("updated_time") == album_metadata.get("updated_time")
         ):
             return self.albums_obj.get_album(album_id)
         
-        if album_data["id"] in IDS_TO_IGNORE:
-            logger.info("Ignoring album '%s'", album_data["name"])
+        if album_metadata["id"] in IDS_TO_IGNORE:
+            logger.info("Ignoring album '%s'", album_metadata["name"])
             return
 
-        del album_data["id"]
+        del album_metadata["id"]
         
         # Get photo data and urls for album photos
-        album_data["images"] = []
-        photos = self.get_album_images(album_id)
-        
-        if not photos:
-            return album_data
+        album_metadata["images"] = []
 
-        for photo in photos:
+        for photo in self.get_album_images(album_id):
             images = photo.pop("images")
             photo["image_url"] = images[0]["source"]
-            album_data["images"].append(photo)
+            album_metadata["images"].append(photo)
 
             if page and (photo["id"] not in page_image_ids):
                 self.create_gallery_image(page, collection, photo["id"], photo["image_url"])
                 
-        return album_data
+        return album_metadata
 
     def fetch_all(self, force_update=False):
         """Retrieve all album data from facebook"""
@@ -601,17 +602,23 @@ class DogPage(Page):
             albums_obj = FacebookAlbums.instance()
             self._album_info = albums_obj.get_album(self.facebook_album_id)
         return self._album_info
-
+    
     def images(self):
         return self.album_info.get("images")
 
+    def get_gallery_images(self):
+        if hasattr(self, "dogpage"):
+            return self.dogpage.gallery_images.all()
+        return self.gallery_images.all()
+
     def cover_image(self):
-        if self.gallery_images.exists():
-            index = self.cover_image_index if self.gallery_images.count() >= self.cover_image_index + 1 else 0
+        gallery_images = self.get_gallery_images()
+        if gallery_images.exists():
+            index = self.cover_image_index if gallery_images.count() >= self.cover_image_index + 1 else 0
             if index == 0:
-                gallery_image = self.gallery_images.first()
+                gallery_image = gallery_images.first()
             else:
-                gallery_image = list(self.gallery_images.all())[index]
+                gallery_image = list(gallery_images.all())[index]
             return gallery_image.image
 
     @property
@@ -633,9 +640,9 @@ class DogPage(Page):
     # Pagination for the dog page. We use the `django.core.paginator` as any
     # standard Django app would, but the difference here being we have it as a
     # method on the model rather than within a view function
-    def paginate(self, request, *args):
+    def paginate(self, request, gallery_images):
         page = request.GET.get("page")
-        paginator = Paginator(self.gallery_images.all(), self.paginate_by)
+        paginator = Paginator(gallery_images, self.paginate_by)
         try:
             pages = paginator.page(page)
         except PageNotAnInteger:
@@ -648,12 +655,8 @@ class DogPage(Page):
     # template
     def get_context(self, request):
         context = super().get_context(request)
-        gallery_images = self.paginate(request, self.gallery_images.all())
-
-        context["gallery_images"] = gallery_images
-
+        context["gallery_images"] = self.paginate(request, self.get_gallery_images())
         context["paginate_by"] = self.paginate_by
-
         return context
 
     def save(self, *args, **kwargs):
