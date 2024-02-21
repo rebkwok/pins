@@ -470,11 +470,10 @@ class FacebookAlbumTracker:
     def fetch_all(self, force_update=False):
         """Retrieve all album data from facebook"""
         # get all albums for page
-        all_current_albums = self.api.get_connections(
+        all_current_albums = list(self.api.get_all_connections(
             id=settings.FB_PAGE_ID, connection_name="albums", 
             fields="name,link,description,updated_time,count",
-            limit=100,
-        )["data"]
+        ))
 
         total = len(all_current_albums)
         albums_data = {}
