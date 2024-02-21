@@ -6,6 +6,7 @@ from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.core.mail import EmailMultiAlternatives
+from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import validate_slug
 from django.db import models
 from django.template.response import TemplateResponse
@@ -44,6 +45,10 @@ from wagtail.models import (
 from wagtail.contrib.forms.utils import get_field_clean_name
 
 from wagtailcaptcha.models import WagtailCaptchaEmailForm, WagtailCaptchaFormBuilder
+
+from encrypted_json_fields.fields import EncryptedJSONField, EncryptedCharField, EncryptedEmailField
+
+
 
 from payments.utils import get_paypal_form
 from .generate_form_submission_pdf import generate_pdf
@@ -500,16 +505,20 @@ class PDFFormField(AbstractFormField):
     page = ParentalKey("PDFFormPage", related_name="pdf_form_fields", on_delete=models.CASCADE)
     before_info_text = RichTextField(blank=True)
     after_info_text = RichTextField(blank=True)
+    required_for_draft = models.BooleanField(default=False, help_text="Required in order to save as draft")
 
-    panels = AbstractFormField.panels + [
+    panels = panels = [
+        FieldPanel("label"),
+        FieldPanel("help_text"),
         FieldPanel("before_info_text"),
         FieldPanel("after_info_text"),
+        FieldPanel("required_for_draft"),
+        FieldPanel("field_type", classname="formbuilder-type"),
+        FieldPanel("choices", classname="formbuilder-choices"),
+        FieldPanel("default_value", classname="formbuilder-default"),
     ]
     def save(self, *args, **kwargs):
-        if self.clean_name in ["email", "email_address", "name"]:
-            self.required = True
-        else:
-            self.required = False
+        self.required = self.required_for_draft
         super().save(*args, **kwargs)
 
 
@@ -541,6 +550,17 @@ class PDFFormPage(FormPage):
     def get_form_fields(self):
         return self.pdf_form_fields.all()
 
+    def get_form_parameters(self):
+        params = super().get_form_parameters()
+        return {**params, "page": self}
+
+    @property
+    def required_for_draft_fields(self):
+        return [
+            "reference", "name", "email", "email_address",
+            *[field.clean_name for field in self.get_form_fields() if field.required_for_draft]
+        ]
+
     @property
     def form_field_info_texts(self):
         return {
@@ -562,15 +582,12 @@ class PDFFormPage(FormPage):
                 except PDFFormSubmission.DoesNotExist:
                     ...
             form = self.get_form(
-                request.POST, request.FILES, page=self, user=request.user,
-                instance=instance
+                request.POST, request.FILES, instance=instance, user=request.user,
             )
             if form.is_valid():                
                 form_submission, form = self.process_form_submission(form, save_as_draft=save_as_draft)
                 if save_as_draft:
-                    form = self.get_form(
-                        page=self, user=request.user, instance=form_submission, initial=request.POST
-                    )
+                    form = self.get_form(instance=form_submission, user=request.user, initial=request.POST)
                     messages.success(request, "Draft saved!")
                     context = self.get_context(request)
                     context["form"] = form
@@ -607,10 +624,7 @@ class PDFFormPage(FormPage):
                     # Can access if token is valid, even if it's expired
                     if not instance.token_valid(token):
                         return redirect(instance.get_absolute_url() + token_qs)
-            form = self.get_form(
-                page=self, user=request.user, instance=instance,
-                initial=initial
-            )
+            form = self.get_form(instance=instance, user=request.user, initial=initial)
 
         context = self.get_context(request)
         context["form"] = form
@@ -625,8 +639,7 @@ class PDFFormPage(FormPage):
     def render_email_for_user(self, submission):
         content = "{self.title}\n======================="
         content = "Thank you for submitting your form. A member of our team will be in touch shortly\n"
-        content += f"\n\nA PDF copy is attached."
-        content += f"You can also view your responses at https://{settings.DOMAIN}{submission.get_absolute_url()}."
+        content += f"You can view your responses at https://{settings.DOMAIN}{submission.get_absolute_url()}."
         return content
     
     def render_email(self, form):
@@ -645,14 +658,13 @@ class PDFFormPage(FormPage):
             [submission.email]
         )
 
-    def send_mail_to_user(self, submission):
-        self.send_mail_with_pdf(
-            submission,
-            f"{self.subject} has been submitted",
-            self.render_email_for_user(submission),
+    def send_mail_to_user(self, submission, subject, content):
+        send_mail(
+            subject,
+            content,
             [submission.email], 
-            settings.DEFAULT_FROM_EMAIL, 
-            [settings.CC_EMAIL]
+            from_email=settings.DEFAULT_FROM_EMAIL, 
+            reply_to=[settings.DEFAULT_ADMIN_EMAIL]
         )
         
     def send_mail_with_pdf(
@@ -704,11 +716,10 @@ class PDFFormPage(FormPage):
             if new:
                 # Send email to user if this is the first time the draft is saved
                 # Don't sent repeated emails for each save
-                send_mail(
-                    f"{self.subject} has been saved",
-                    self.render_save_draft_email_for_user(submission),
-                    [submission.email],
-                    settings.DEFAULT_FROM_EMAIL,
+                self.send_mail_to_user(
+                    submission, 
+                    subject=f"{self.subject} has been saved", 
+                    content=self.render_save_draft_email_for_user(submission),
                 )
         else:
             form.clean(submit=True)
@@ -723,7 +734,11 @@ class PDFFormPage(FormPage):
             if self.to_address:
                 self.send_mail_to_admin(submission)
             # send email to user
-            self.send_mail_to_user(submission)
+            self.send_mail_to_user(
+                submission, 
+                f"{self.subject} has been submitted",
+                content=self.render_email_for_user(submission),
+            )    
         return submission, form
 
 
@@ -731,10 +746,11 @@ class PDFFormSubmission(AbstractFormSubmission):
     reference = ShortUUIDField(
         editable = False
     )
+    form_data = EncryptedJSONField(encoder=DjangoJSONEncoder)
     is_draft = models.BooleanField(default=True)
 
-    name = models.CharField(blank=True)
-    email = models.EmailField(blank=True)
+    name = EncryptedCharField(blank=True)
+    email = EncryptedEmailField(blank=True)
 
     token = models.UUIDField(null=True)
     token_expiry = models.DateTimeField(null=True)
@@ -1257,7 +1273,7 @@ class OrderFormPage(WagtailCaptchaEmailForm):
 
     def get_form_fields(self):
         return self.order_form_fields.all()
-    
+ 
     def get_form_class(self):
         fb = self.form_builder(self.get_form_fields(), page=self)
         return fb.get_form_class()
@@ -1417,7 +1433,7 @@ class OrderFormPage(WagtailCaptchaEmailForm):
             self.render_email_for_purchaser(form, submission),
             [submission.email],
             settings.DEFAULT_FROM_EMAIL,
-            reply_to=[settings.CC_EMAIL],
+            reply_to=[settings.DEFAULT_ADMIN_EMAIL],
         )
 
         return submission
@@ -1427,10 +1443,12 @@ class OrderFormSubmission(AbstractFormSubmission):
     reference = ShortUUIDField(
         editable = False
     )
+    form_data = EncryptedJSONField(encoder=DjangoJSONEncoder)
     paid = models.BooleanField(default=False)
     date_paid = models.DateTimeField(null=True, blank=True)
     shipped = models.BooleanField(default=False)
     cost = models.DecimalField(max_digits=10, decimal_places=2, null=True)
+
 
     @property
     def email(self):

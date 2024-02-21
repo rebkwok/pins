@@ -3,6 +3,7 @@ wagtail
 pip-tools
 crispy-bootstrap3
 django-crispy-forms
+django-encrypted-json-fields
 django-environ
 django-extensions
 psycopg2

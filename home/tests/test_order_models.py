@@ -353,7 +353,7 @@ def test_order_form_process_form_submission(order_form_page):
 
     assert mail.outbox[1].to == ["m@mouse.com"]
     assert mail.outbox[1].subject == "test order"
-    assert mail.outbox[1].reply_to == [settings.CC_EMAIL]
+    assert mail.outbox[1].reply_to == [settings.DEFAULT_ADMIN_EMAIL]
 
     assert mail.outbox[1].body == (
         "Thank you for your order!\n\n"
@@ -403,7 +403,7 @@ def test_order_form_process_form_submission_with_voucher_code(order_form_page):
 
     assert mail.outbox[1].to == ["m@mouse.com"]
     assert mail.outbox[1].subject == "test order"
-    assert mail.outbox[1].reply_to == [settings.CC_EMAIL]
+    assert mail.outbox[1].reply_to == [settings.DEFAULT_ADMIN_EMAIL]
 
     assert mail.outbox[1].body == (
         "Thank you for your order!\n\n"
