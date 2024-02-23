@@ -2,7 +2,11 @@
 
 <div class="container-fluid hero">
     {% if page.cover_image %}
-        {% image page.cover_image fill-1920x600 class="hero-image" alt="" %}
+        {% if page.cover_image.height > page.cover_image.width %}
+            {% image page.cover_image fill-600x600 class="hero-image-portrait" alt="" %}
+        {% else %}
+            {% image page.cover_image fill-1920x600 class="hero-image" alt="" %}
+        {% endif %}
         <div class="hero__container">
             <h1 class="hero__title">{{ page.title }}</h1>
         </div>
