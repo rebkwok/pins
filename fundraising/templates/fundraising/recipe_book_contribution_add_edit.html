@@ -19,12 +19,16 @@
 
     <div class="container">
         <div class="row">
-            <div class="col form-page" id="submission-form">
-                {% if form.errors %}
-                    <div class="message alert-danger">Please correct the errors below.</div>
-                {% endif %}
-                {% crispy form %}
-            </div>
+            {% if recipe_submissions_open %}
+                <div class="col form-page" id="submission-form">
+                    {% if form.errors %}
+                        <div class="message alert-danger">Please correct the errors below.</div>
+                    {% endif %}
+                    {% crispy form %}
+                </div>
+            {% else %}
+                Recipe book submissions are now closed.
+            {% endif %}
         </div>
     </div>
 {% endblock content %}
