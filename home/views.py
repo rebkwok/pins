@@ -157,3 +157,7 @@ def pdf_form_download(request, pk):
         content_type="application/pdf",
         filename=submission.get_download_filename()
     )
+
+
+def merch_info(request):
+    return TemplateResponse(request, "home/merch_info.html")

@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags navigation_tags wagtailimages_tags static%}
+
+{% block content %}
+
+<div class="container">
+    <div class="row">
+        <div class="col-7">
+            <h1 id="top">Merchandise Information</h1>
+                    </div>
+        <a href="{{request.META.HTTP_REFERER}}" class="btn btn-sm">Back</a>
+    </div>
+</div>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 index-header__body-introduction">
+            <p class="intro">
+                Available merchandise and sizing information. 
+            </p>
+            <p>
+                <a href="#hoodies">Hoodies</a> | <a href="#zoodies">Zoodies</a> | <a href="#tshirts">T-shirts</a>
+            </p>
+
+        </div>
+    </div>
+    <div class="row">
+        <div>
+            <h2 id="hoodies">Hoodies <small><a href="#top" class="small pull-right">Back to top</a></small></h2>
+            <h3>Sizing</h3>
+            See <a href="#size-guide">size guide.</a>
+
+            <h3>Variations</h3>
+            <ul>
+                <li>Choose Podencos in Need or PINS logo</li>
+                <li>Available in White or Grey (Podencos in Need logo)</li>
+                <li>Available in White, Grey or Black (PINS logo)</li>
+            </ul>
+        </div> 
+    </div>
+    <div class="row image-gallery-container">
+        <ul class="image-gallery">
+            <li><img src={% static "images/merch/hoodie_white_pins_logo.jpg" %} /></li>
+            <li><img src={% static "images/merch/hoodie_grey_pins_logo.jpg" %} /></li>
+            <li><img src={% static "images/merch/hoodie_black_pins_logo.jpg" %} /></li>
+        </ul>
+    </div> 
+    <div class="row"> 
+        <div>
+            <h3>Product details</h3>
+            <ul>
+                <li>Made from ringspun cotton and polyester mix</li>
+                <li>Kangaroo pouch pocket.</li>
+                <li>Ribbed cuffs and hem.</li>
+                <li>Brushed inner fabric.</li>
+                <li>WRAP certified.</li>
+                <li>SEDEX certified.</li>
+                <li>Vegan certified.</li>
+            </ul>
+            <h3>Care instructions</h3>
+            <ul>
+                <li>Machine wash 30°</li>
+                <li>Do not bleach</li>
+                <li>Tumble dry low heat</li>
+                <li>Low iron</li>
+                <li>Do not dry clean</li>
+                <li>Do not iron on print</li>
+            </ul>
+        </div>
+    </div>
+    </div>
+</div>
+<div class="container">
+    <div class="row">
+        <div>
+            <h2 id="zoodies">Zoodies - zip-up hoodies <small><a href="#top" class="small pull-right">Back to top</a></small></h2>
+            <h3>Sizing</h3>
+            See <a href="#size-guide">size guide.</a>
+            <h3>Variations</h3>
+            <ul>
+                <li>Choose Podencos in Need or PINS logo</li>
+                <li>Available in White or Grey (Podencos in Need logo)</li>
+                <li>Available in White, Grey or Black (PINS logo)</li>
+            </ul>
+        </div>
+        <div class="row image-gallery-container">
+            <ul class="image-gallery">
+                <li><img src={% static "images/merch/zoodie_white_podencos_logo.png" %} /></li>
+                <li><img src={% static "images/merch/zoodie_grey_podencos_logo.png" %} /></li>
+            </ul>
+        </div>
+        <div> 
+            <h3>Product details</h3>
+            <ul>
+                <li>Made from ringspun cotton and polyester mix</li>
+                <li>Full zip hoodie with a covered main zip with self fabric</li>
+                <li>Kangaroo pouch pocket.</li>
+                <li>Ribbed cuffs and hem.</li>
+                <li>Brushed inner fabric.</li>
+                <li>WRAP certified.</li>
+                <li>SEDEX certified.</li>
+                <li>Vegan certified.</li>
+            </ul>
+            <h3>Care instructions</h3>
+            <ul>
+                <li>Machine wash 30°</li>
+                <li>Do not bleach</li>
+                <li>Tumble dry low heat</li>
+                <li>Low iron</li>
+                <li>Do not dry clean</li>
+                <li>Do not iron on print</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="row">
+        <div>
+            <h2 id="tshirts">T-shirts <small><a href="#top" class="small pull-right">Back to top</a></small></h2>
+            <h3>Sizing</h3>
+            See <a href="#size-guide">size guide.</a>
+            <h3>Variations</h3>
+            <ul>
+                <li>Choose Podencos in Need or PINS logo</li>
+                <li>Available in White</li>
+            </ul>
+        </div>
+        <div class="row image-gallery-container">
+            <ul class="image-gallery">
+                <li><img src={% static "images/merch/tshirt_podencos_logo.png" %} /></li>
+                <li><img src={% static "images/merch/tshirt_pins_logo.png" %} /></li>
+            </ul>
+        </div>
+        <div>
+            <h3>Product details</h3>
+            <ul>
+                <li>100% Organic compact ringspun cotton single Jersey 180gsm</li>
+                <li>Vegan certified</li>
+                <li>GOTS certified</li>
+                <li>Fair Wear certified</li>
+                <li>OEKO-TEX® certified.</li>
+            </ul>
+            <h3>Care instructions</h3>
+            <ul>
+                <li>Machine wash 30˚C</li>
+                <li>Wash similar colours together</li>
+                <li>Was and iron inside out</li>
+                <li>Do not iron on print</li>
+                <li>Do not tumble dry</li>
+            </ul>
+        </div>
+    </div>
+</div>
+<div class="container">
+    <div class="row" id="size-guide">
+        <div>
+            <h2>Size Guide <small><a href="#top" class="small pull-right">Back to top</a></small></h2>
+            <div class="col-md-8">
+                <h3>Hoodies and Zoodies</h3>
+                <table class="table">
+                    <thead>
+                        <th>XS</th>
+                        <th>S</th>
+                        <th>M</th>
+                        <th>L</th>
+                        <th>XL</th>
+                        <th>2XL</th>
+                        <th>3XL</th>
+                    </thead>
+                    <tbody>
+                        <td>34"</td>
+                        <td>36"</td>
+                        <td>40"</td>
+                        <td>44"</td>
+                        <td>48"</td>
+                        <td>52"</td>
+                        <td>56"</td>
+                    </tbody>
+                </table>
+            </div> 
+            <div class="col-md-8">  
+                <h3>T-shirts</h3>
+                <table class="table">
+                    <thead>
+                        <th>XS</th>
+                        <th>S</th>
+                        <th>M</th>
+                        <th>L</th>
+                        <th>XL</th>
+                        <th>2XL</th>
+                        <th>3XL</th>
+                    </thead>
+                    <tbody>
+                        <td>34/36"</td>
+                        <td>36/38"</td>
+                        <td>38/40"</td>
+                        <td>41/43"</td>
+                        <td>43/45"</td>
+                        <td>46/47"</td>
+                        <td>48/50"</td>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="mb-4">
+    <a href="{{request.META.HTTP_REFERER}}" class="btn btn-sm">Back</a>
+    </div>
+</div>
+
+
+{% endblock content %}

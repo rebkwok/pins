@@ -35,6 +35,11 @@ urlpatterns = [
         home_views.pdf_form_download, 
         name="pdf_form_download"
     ),
+    path(
+        "merchandise-information/",
+        home_views.merch_info,
+        name="merch_info"
+    )
 ]
 
 
