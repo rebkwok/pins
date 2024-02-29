@@ -39,10 +39,10 @@
         </div> 
     </div>
     <div class="row image-gallery-container">
-        <ul class="image-gallery">
-            <li><img src={% static "images/merch/hoodie_white_pins_logo.jpg" %} /></li>
-            <li><img src={% static "images/merch/hoodie_grey_pins_logo.jpg" %} /></li>
-            <li><img src={% static "images/merch/hoodie_black_pins_logo.jpg" %} /></li>
+        <ul class="merch-image-gallery">
+            <li><a data-toggle="modal" data-target="#hoodie-white"><img src={% static "images/merch/hoodie_white_pins_logo.png" %} /></a></li>
+            <li><a data-toggle="modal" data-target="#hoodie-grey"><img src={% static "images/merch/hoodie_grey_pins_logo.png" %} /></a></li>
+            <li><a data-toggle="modal" data-target="#hoodie-black"><img src={% static "images/merch/hoodie_black_pins_logo.png" %} /></a></li>
         </ul>
     </div> 
     <div class="row"> 
@@ -84,11 +84,12 @@
             </ul>
         </div>
         <div class="row image-gallery-container">
-            <ul class="image-gallery">
-                <li><img src={% static "images/merch/zoodie_white_podencos_logo.png" %} /></li>
-                <li><img src={% static "images/merch/zoodie_grey_podencos_logo.png" %} /></li>
+            <ul class="merch-image-gallery">
+                <li><a data-toggle="modal" data-target="#zoodie-white"><img src={% static "images/merch/zoodie_white_podencos_logo.png" %} /></a></li>
+                <li><a data-toggle="modal" data-target="#zoodie-grey"><img src={% static "images/merch/zoodie_grey_podencos_logo.png" %} /></a></li>
             </ul>
         </div>
+
         <div> 
             <h3>Product details</h3>
             <ul>
@@ -127,9 +128,9 @@
             </ul>
         </div>
         <div class="row image-gallery-container">
-            <ul class="image-gallery">
-                <li><img src={% static "images/merch/tshirt_podencos_logo.png" %} /></li>
-                <li><img src={% static "images/merch/tshirt_pins_logo.png" %} /></li>
+            <ul class="merch-image-gallery">
+                <li><a data-toggle="modal" data-target="#tshirt-pod"><img src={% static "images/merch/tshirt_podencos_logo.png" %} /></li>
+                <li><a data-toggle="modal" data-target="#tshirt-pins"><img src={% static "images/merch/tshirt_pins_logo.png" %} /></li>
             </ul>
         </div>
         <div>
@@ -210,4 +211,111 @@
 </div>
 
 
+<!-- Image modals -->
+<div class="modal fade" id="hoodie-white" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <img src={% static "images/merch/hoodie_white_pins_logo.jpg" %} />
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="hoodie-grey" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <img src={% static "images/merch/hoodie_grey_pins_logo.jpg" %} />
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="hoodie-black" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <img src={% static "images/merch/hoodie_black_pins_logo.jpg" %} />
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="zoodie-white" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <img src={% static "images/merch/zoodie_white_podencos_logo_lg.png" %} />
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="zoodie-grey" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <img src={% static "images/merch/zoodie_grey_podencos_logo_lg.png" %} />
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="tshirt-pins" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <img src={% static "images/merch/tshirt_pins_logo_lg.png" %} />
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="tshirt-pod" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <img src={% static "images/merch/tshirt_podencos_logo_lg.png" %} />
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
 {% endblock content %}
+
+
+{% block extra_js %}
+<!-- Initialize Bootstrap functionality -->
+<!-- Bootstrap JS -->
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+<script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+<script>
+    // Initialize tooltip component
+    $(function () {
+      $('[data-toggle="tooltip"]').tooltip()
+    })
+    
+    // Initialize popover component
+    $(function () {
+      $('[data-toggle="popover"]').popover()
+    })
+    </script>
+{% endblock %}
