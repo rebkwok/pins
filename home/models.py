@@ -44,6 +44,7 @@ from wagtail.models import (
 )
 from wagtail.contrib.forms.utils import get_field_clean_name
 
+from wagtailcaptcha.forms import remove_captcha_field
 from wagtailcaptcha.models import WagtailCaptchaEmailForm, WagtailCaptchaFormBuilder
 
 from encrypted_json_fields.fields import EncryptedJSONField, EncryptedCharField, EncryptedEmailField
@@ -1372,24 +1373,50 @@ class OrderFormPage(WagtailCaptchaEmailForm):
             validation_error_msg  = f"Quantity selected is unavailable; select a maximum of {rem_stock} total items."
         return valid, validation_error_msg
 
-    def _render_extra_email(self, form):
-        _, total, discount = self.get_variant_quantities_and_total(form.cleaned_data)
-        content = f"\nTotal items ordered: {self.quantity_ordered_by_submission(form.cleaned_data)}"
+    def _render_extra_email(self,  submission):
+        content = "\nOrder summary:\n"
+        content += "\n".join([f"  - {variant.group_and_name} ({quantity})" for variant, quantity in submission.items_ordered()])
+        content += f"\n\nTotal items ordered: {self.quantity_ordered_by_submission(submission.form_data)}"
+        _, total, discount = self.get_variant_quantities_and_total(submission.form_data)
         if discount:
             content += f"\nDiscount: £{discount}"
         content += f"\nTotal amount due: £{total}"
         return content
 
-    def render_email(self, form):
-        content = super().render_email(form)
-        content += self._render_extra_email(form)
+    def render_email(self, form, submission):
+        # Everything here is identical to the base class, except we
+        # skip andy fields that are product variants, and render them
+        # in the order summary at the end
+        content = []
+
+        cleaned_data = form.cleaned_data
+        for field in form:
+            if field.name not in cleaned_data:
+                continue
+            if field.name in self.product_quantity_field_names:
+                continue
+
+            value = cleaned_data.get(field.name)
+
+            if isinstance(value, list):
+                value = ", ".join(value)
+
+            # Format dates and datetime(s) with SHORT_DATE(TIME)_FORMAT
+            if isinstance(value, datetime.datetime):
+                value = date_format(value, settings.SHORT_DATETIME_FORMAT)
+            elif isinstance(value, datetime.date):
+                value = date_format(value, settings.SHORT_DATE_FORMAT)
+
+            content.append(f"{field.label}: {value}")
+
+        content = "\n".join(content)
+        content += "\n"
+        content += self._render_extra_email(submission)
         return content
 
-    def render_email_for_purchaser(self, form, submission):
+    def render_email_for_purchaser(self, submission):
         content = "Thank you for your order!\n"
-        content += self._render_extra_email(form)
-        content += "\nOrder summary:\n"
-        content += "\n".join([f"  - {variant.group_and_name} ({quantity})" for variant, quantity in submission.items_ordered()])
+        content += self._render_extra_email(submission)
         content += f"\n\nView your order at https://{settings.DOMAIN}{submission.get_absolute_url()}."
         content += f"\nIf you haven't made your payment yet, you'll also find a link there."
         return content
@@ -1412,7 +1439,16 @@ class OrderFormPage(WagtailCaptchaEmailForm):
 
     def get_submission_class(self):
         return OrderFormSubmission
-        
+
+    def send_mail(self, form, submission):
+        addresses = [x.strip() for x in self.to_address.split(",")]
+        send_mail(
+            self.subject,
+            self.render_email(form, submission),
+            addresses,
+            self.from_address,
+        )
+
     def process_form_submission(self, form):
         """
         Accepts form instance with submitted data, user and page.
@@ -1421,8 +1457,15 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         Set cost here to set the cost at the time of submission (in case prices)
         changed or voucher codes were deactivated
         """
-        # Super() sends the email to the to_address
-        submission = super().process_form_submission(form)
+        # Don't call super to send the email to the to_address, as we want to use
+        # the saved submission for email context
+        remove_captcha_field(form)
+        submission =  self.get_submission_class().objects.create(
+            form_data=form.cleaned_data,
+            page=self,
+        )
+        if self.to_address:
+            self.send_mail(form, submission)
         _, total, _ = self.get_variant_quantities_and_total(form.cleaned_data)
         submission.cost = total
         submission.save()
@@ -1430,7 +1473,7 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         # Send email to purchaser
         send_mail(
             self.subject,
-            self.render_email_for_purchaser(form, submission),
+            self.render_email_for_purchaser(submission),
             [submission.email],
             settings.DEFAULT_FROM_EMAIL,
             reply_to=[settings.DEFAULT_ADMIN_EMAIL],

@@ -238,13 +238,13 @@ def test_order_form_page_disallowed_variants(order_form_page, order_form_pre_sub
     order_form_pre_submission({"pv__test_product": 1, "pv__test_product_x5": 1})
     assert order_form_page.get_total_quantity_ordered() == 6
 
-    assert order_form_page.disallowed_variants() == [variant5, variant10]
+    assert set(order_form_page.disallowed_variants()) == {variant5, variant10}
     # sell out
     order_form_pre_submission({"pv__test_product": 1})
     assert order_form_page.sold_out()
-    assert sorted(
-        pv.id for pv in order_form_page.disallowed_variants()
-    ) == sorted([order_form_page.product_variants.first().id, variant5.id, variant10.id])
+    assert set(
+        order_form_page.disallowed_variants()
+    ) == {order_form_page.product_variants.first(), variant5, variant10}
 
 def test_order_form_submission(order_form_submission):
     submission = order_form_submission()
@@ -344,23 +344,22 @@ def test_order_form_process_form_submission(order_form_page):
     assert mail.outbox[0].reply_to == []
     assert mail.outbox[0].body == (
         "name: Minnie Mouse\n"
-        "email_address: m@mouse.com\n"
-        "test product: 1\n"
-        "test product x5: 0\n"
+        "email_address: m@mouse.com\n\n"
+        "Order summary:\n"
+        "  - test product (1)\n\n"
         "Total items ordered: 1\n"
-        "Total amount due: £12.00"
+        "Total amount due: £12.00"      
     )
 
     assert mail.outbox[1].to == ["m@mouse.com"]
     assert mail.outbox[1].subject == "test order"
     assert mail.outbox[1].reply_to == [settings.DEFAULT_ADMIN_EMAIL]
-
     assert mail.outbox[1].body == (
         "Thank you for your order!\n\n"
+        "Order summary:\n"
+        "  - test product (1)\n\n"
         "Total items ordered: 1\n"
         "Total amount due: £12.00\n"
-        "Order summary:\n"
-        "  - test product (1)\n"
         f"\nView your order at https://{settings.DOMAIN}{order_form_page.orderformsubmission_set.first().get_absolute_url()}.\n"
         "If you haven't made your payment yet, you'll also find a link there."
     )
@@ -394,8 +393,9 @@ def test_order_form_process_form_submission_with_voucher_code(order_form_page):
     assert mail.outbox[0].body == (
         "name: Minnie Mouse\n"
         "email_address: m@mouse.com\n"
-        "test product: 1\n"
-        "Voucher code: foo\n"
+        "Voucher code: foo\n\n"
+        "Order summary:\n"
+        "  - test product (1)\n\n"
         "Total items ordered: 1\n"
         "Discount: £2.00\n"
         "Total amount due: £10.00"
@@ -403,15 +403,14 @@ def test_order_form_process_form_submission_with_voucher_code(order_form_page):
 
     assert mail.outbox[1].to == ["m@mouse.com"]
     assert mail.outbox[1].subject == "test order"
-    assert mail.outbox[1].reply_to == [settings.DEFAULT_ADMIN_EMAIL]
-
+    assert mail.outbox[1].reply_to == [settings.DEFAULT_ADMIN_EMAIL]   
     assert mail.outbox[1].body == (
         "Thank you for your order!\n\n"
+        "Order summary:\n"
+        "  - test product (1)\n\n"
         "Total items ordered: 1\n"
         "Discount: £2.00\n"
         "Total amount due: £10.00\n"
-        "Order summary:\n"
-        "  - test product (1)\n"
         f"\nView your order at https://{settings.DOMAIN}{order_form_page.orderformsubmission_set.first().get_absolute_url()}.\n"
         "If you haven't made your payment yet, you'll also find a link there."
     )
