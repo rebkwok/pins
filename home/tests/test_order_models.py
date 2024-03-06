@@ -246,6 +246,7 @@ def test_order_form_page_disallowed_variants(order_form_page, order_form_pre_sub
         order_form_page.disallowed_variants()
     ) == {order_form_page.product_variants.first(), variant5, variant10}
 
+
 def test_order_form_submission(order_form_submission):
     submission = order_form_submission()
     assert not submission.paid
@@ -424,8 +425,9 @@ def test_order_form_render_landing_page(rf, order_form_page, order_form_submissi
     assert request.session["paypal_item_reference"] == submission.reference
     assert resp.context_data["total"] == 22
     paypal_form = resp.context_data["paypal_form"]
-    assert paypal_form.initial["amount"] == 22
-    assert paypal_form.initial["item_name"] == 'Order form submission: Test Order Form'
+    assert paypal_form.initial["amount"] == 20
+    assert paypal_form.initial["shipping"] == 2
+    assert paypal_form.initial["item_name"] == 'Website order: Test Order Form (2 items)'
     assert paypal_form.initial["invoice"] == submission.reference
 
 

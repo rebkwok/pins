@@ -10,7 +10,7 @@ def signature(reference):
     return sha512((str(reference) + settings.PAYPAL_CUSTOM_KEY).encode("utf-8")).hexdigest()
 
 
-def get_paypal_form(request, amount, item_name, reference):
+def get_paypal_form(request, amount, item_name, reference, shipping=None):
     request.session["paypal_item_reference"] = reference
     if settings.PAYPAL_TEST and settings.PAYPAL_TEST_CALLBACK_DOMAIN:
         paypal_urls = {
@@ -34,4 +34,7 @@ def get_paypal_form(request, amount, item_name, reference):
         "custom": signature(reference),
         **paypal_urls
     }
+    if shipping:
+        paypal_dict["shipping"] = shipping
+
     return PayPalPaymentsForm(initial=paypal_dict)

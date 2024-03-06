@@ -1427,11 +1427,14 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         _, total, _ = self.get_variant_quantities_and_total(form_submission.get_data())
         
         context["total"] = total
+        total_quantity = self.quantity_ordered_by_submission(form_submission.form_data)
+        shipping = self.get_shipping_cost(total_quantity)
         context["paypal_form"] = get_paypal_form(
             request=request,
-            amount=total, 
-            item_name=f"Order form submission: {self.title}",
-            reference=form_submission.reference
+            amount=total - shipping, 
+            item_name=f"Website order: {self.title} ({total_quantity} item{'s' if total_quantity > 0 else ''})",
+            reference=form_submission.reference,
+            shipping=shipping,
         )
         return TemplateResponse(
             request, self.get_landing_page_template(request), context
