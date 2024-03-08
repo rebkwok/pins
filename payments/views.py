@@ -12,10 +12,11 @@ def _get_context(request):
         context["item"] = RecipeBookSubmission.objects.get(pk=paypal_item_reference)
         context["item_type"] = "submission"
     except RecipeBookSubmission.DoesNotExist:
-        context["item"] = OrderFormSubmission.objects.get(reference=paypal_item_reference)
-        context["item_type"] = "order"
-    except OrderFormSubmission.DoesNotExist:
-        ...
+        try:
+            context["item"] = OrderFormSubmission.objects.get(reference=paypal_item_reference)
+            context["item_type"] = "order"
+        except OrderFormSubmission.DoesNotExist:
+            ...
     return context
 
 @csrf_exempt
