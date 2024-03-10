@@ -114,23 +114,22 @@ def test_order_form_submission_list_view(rf, admin_user, order_form_page, order_
     assert heading_names_labels == [
         # default
         ("submit_time", "Submission date"),
-        ("name", "name"),
-        ("email_address", "email_address"),
+        ("form_data__name", "name"),
+        ("form_data__email_address", "email_address"),
         # reformatted product variant
         ("pv__test_product", "test product"),
         # extra fields
-        ("reference", "Reference"),
-        ("total", "Total (£)"),
         ("total_items", "Total items"),
+        ("total", "Total (£)"),
+        ("reference", "Reference"),
         ("paid", "Paid"),
         ("shipped", "Shipped")
     ]
-
     data_rows = resp.context_data["data_rows"]
     assert len(data_rows) == 2
     for i, row in enumerate(data_rows):
         assert row["fields"][1:] == [
-            "Mickey Mouse", "mickey.mouse@test.com", "2", submissions[i].reference, Decimal("22.00"), 2, "-", "-"
+            "Mickey Mouse", "mickey.mouse@test.com", "2", 2, Decimal("22.00"), submissions[i].reference, "-", "-"
         ]
 
 

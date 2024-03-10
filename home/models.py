@@ -418,7 +418,14 @@ class PDFFormBuilder(FormBuilder):
         return type("WagtailForm", (PDFBaseForm,), self.formfields)
 
 
-class PDFFormSubmissionsListView(SubmissionsListView):
+class OrderingMixin:
+
+    def _get_order_label(self, ordering_by_field, field):
+        order = ordering_by_field.get(field)
+        return order[1] if order else "orderable"
+
+
+class PDFFormSubmissionsListView(OrderingMixin, SubmissionsListView):
     # Template shows name/email/submission date and link to PDF/page
     template_name = "home/pdf_list_submissions_index.html"
 
@@ -453,10 +460,6 @@ class PDFFormSubmissionsListView(SubmissionsListView):
         row_dict["reference"] = item.reference
         row_dict["status"] = item.status
         return row_dict
-    
-    def _get_order_label(self, ordering_by_field, field):
-        order = ordering_by_field.get(field)
-        return order[1] if order else "orderable"
 
     def get_context_data(self, **kwargs):
         context_data = super().get_context_data(**kwargs)
@@ -468,7 +471,7 @@ class PDFFormSubmissionsListView(SubmissionsListView):
             context_data["data_headings"] = [
                 context_data["data_headings"][0],
                 {"name": "name", "label": "Name", "order": self._get_order_label(ordering_by_field, "name")},
-                {"name": "email", "label": "Email", "order": self._get_order_label(ordering_by_field, "email")},
+                {"name": "form_data__email", "label": "Email", "order": self._get_order_label(ordering_by_field, "email")},
                 {"name": "reference", "label": "Reference", "order": self._get_order_label(ordering_by_field, "reference")},
                 {'name': 'status', 'label': 'Status', 'order': None},
                 {'name': 'download', 'label': 'Download', 'order': None},
@@ -901,9 +904,19 @@ class ProductVariant(Orderable):
         return self.name
 
 
-class OrderFormSubmissionsListView(SubmissionsListView):
+class OrderFormSubmissionsListView(OrderingMixin, SubmissionsListView):
 
     template_name = "home/order_list_submissions_index.html"
+
+    orderable_fields = (
+        "id",
+        "submit_time",
+        "form_data__email",
+        "form_data__name",
+        "reference",
+        "shipped",
+        "paid",
+    )
 
     def _export_headings(self):
         self.list_export += ["reference", "total", "total_items", "paid", "shipped"]
@@ -946,11 +959,7 @@ class OrderFormSubmissionsListView(SubmissionsListView):
             return name
     
     def get_context_data(self, **kwargs):
-
-        def _reformat_pv_name(heading):
-            heading["label"] = self._get_heading_label(heading["name"], heading["label"])
-            return heading
-
+        ordering_by_field = self.get_validated_ordering()
         context_data = super().get_context_data(**kwargs)
         if not self.is_export:
             total_ordered_so_far = self.form_page.get_total_quantity_ordered()
@@ -959,17 +968,31 @@ class OrderFormSubmissionsListView(SubmissionsListView):
             else:
                 remaining_stock = "N/A"
             context_data["description"] = f"Total sold: {total_ordered_so_far} | Remaining stock: {remaining_stock}"
-            extra_cols = [
-                {"name": "reference", "label": "Reference", "order": 0},
-                {'name': 'total', 'label': 'Total (£)', 'order': None},
-                {'name': 'total_items', 'label': 'Total items', 'order': None},
-                {'name': 'paid', 'label': 'Paid', 'order': None},
-                {'name': 'shipped', 'label': 'Shipped', 'order': None},
-            ]
+            def _reformat_field(heading):
+                heading["label"] = self._get_heading_label(heading["name"], heading["label"])
+                if heading["name"] in ["name", "email", "email_address"]:
+                    form_data_name = f"form_data__{heading['name']}"
+                    heading["name"] = form_data_name
+                    heading["order"] = self._get_order_label(ordering_by_field, form_data_name)
+                return heading
+        
             data_headings = [
-                _reformat_pv_name(heading) for heading in context_data["data_headings"]
+                _reformat_field(heading) for heading in context_data["data_headings"]
             ]
-            data_headings.extend(extra_cols)
+
+            email_from_form = {data_heading["name"] for data_heading in data_headings} & {"form_data__email", "form_data__email_address"}
+            if not email_from_form:
+                data_headings.append(
+                    {"name": "form_data__email", "label": "Email", "order": self._get_order_label(ordering_by_field, "form_data__email")}
+                )
+            data_headings.extend([
+                {'name': 'total_items', 'label': 'Total items', 'order': None},
+                {'name': 'total', 'label': 'Total (£)', 'order': None},
+                {"name": "reference", "label": "Reference", "order": self._get_order_label(ordering_by_field, "reference")},
+                {'name': 'paid', 'label': 'Paid', 'order': self._get_order_label(ordering_by_field, "paid")},
+                {'name': 'shipped', 'label': 'Shipped', 'order': self._get_order_label(ordering_by_field, "shipped")},
+            ])
+
             context_data["data_headings"] = data_headings
 
             fields = self.form_page.get_data_fields()
@@ -977,20 +1000,24 @@ class OrderFormSubmissionsListView(SubmissionsListView):
             submissions = OrderFormSubmission.objects.filter(
                 id__in=[row["model_id"] for row in context_data["data_rows"]]
             )
-            submission_reference = {sub.id: sub.reference for sub in submissions}
-            submission_cost = {sub.id: sub.cost for sub in submissions}
-            submission_paid_shipped = {
-                sub.id: ("Y" if sub.paid else "-", "Y" if sub.shipped else "-") 
-                for sub in submissions
+            submission_data = {
+                submission.id: {
+                    "total": submission.cost,
+                    "reference": submission.reference,
+                    "email": submission.email,
+                    "paid": "Y" if submission.paid else "-",
+                    "shipped": "Y" if submission.shipped else "-",
+                } for submission in submissions
             }
 
             for row in context_data["data_rows"]:
                 form_data = row["fields"]
                 form_data_dict = {field[0]: form_data[i] for i, field in enumerate(fields)}
                 total_items = self.form_page.quantity_ordered_by_submission(form_data_dict)
-                extra_form_data = [
-                    submission_reference[row["model_id"]], submission_cost[row["model_id"]], total_items, *submission_paid_shipped[row["model_id"]]
-                ]
+                email = submission_data[row["model_id"]].pop("email")
+                if not email_from_form:
+                    form_data.append(email)
+                extra_form_data = [total_items, *submission_data[row["model_id"]].values()]
                 form_data.extend(extra_form_data)
 
         return context_data
