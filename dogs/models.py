@@ -506,7 +506,7 @@ class FacebookAlbumTracker:
             dog_name = album_name.strip().split("-")[0].strip().title()
             if len(dog_name) == 1:
                 dog_name = album_name.strip().split(",")[0].strip().title()
-            dog_page = DogPage(title=dog_name, location="Spain", faceboook_album_id=album_id)
+            dog_page = DogPage(title=dog_name, location="Spain", facebook_album_id=album_id)
             new_pages[album_id] = {"facebook_album_name": album_name, "page_title": dog_name}
             needs_offer_page.add_child(instance=dog_page)
 
