@@ -10,5 +10,4 @@ def facebook_connect(request):
 
 
 def facebook_connect_success(request):
-    import ipdb; ipdb.set_trace()
     return HttpResponse("ok")

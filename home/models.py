@@ -761,7 +761,7 @@ class PDFFormSubmission(AbstractFormSubmission):
 
     @property
     def form_page(self):
-        return self.page.formpage.pdfformpage
+        return self.page.specific
     
     def email_from_form_data(self):
         email_field = next((k for k in self.form_data if k in ["email", "email_address"]))
@@ -1542,7 +1542,7 @@ class OrderFormSubmission(AbstractFormSubmission):
         self.save()
 
     def items_ordered(self):
-        variant_quantities, _, _ = self.page.orderformpage.get_variant_quantities_and_total(self.form_data)
+        variant_quantities, _, _ = self.page.specific.get_variant_quantities_and_total(self.form_data)
         return [variant for variant in variant_quantities.values() if variant[1] > 0]
 
     def status(self):

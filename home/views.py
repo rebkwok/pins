@@ -74,8 +74,8 @@ def _change_order_form_submission_status(request, update_function):
 def order_detail(request, reference):
     submission = get_object_or_404(OrderFormSubmission, reference=reference)
     context = {
-        "page": submission.page.orderformpage, 
-        "title": submission.page.orderformpage.subject_title, 
+        "page": submission.page.specific, 
+        "title": submission.page.specific.subject_title, 
         "form_submission": submission, 
         "total": submission.cost
     }
@@ -105,7 +105,7 @@ def pdf_form_detail(request, reference):
             request, 
             "This form has not yet been submitted."
         )
-    context = {"page": submission.page.formpage.pdfformpage, "submission": submission}
+    context = {"page": submission.page.specific, "submission": submission}
     return TemplateResponse(request, "home/pdf_form_detail.html", context)
 
 

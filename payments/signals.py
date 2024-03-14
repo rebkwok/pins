@@ -48,7 +48,7 @@ def process_paypal(sender, **kwargs):
             payment_item = "submission"
         except RecipeBookSubmission.DoesNotExist:
             obj = OrderFormSubmission.objects.get(reference=ipn_obj.invoice)
-            subject = f"{obj.page.orderformpage.subject_title} order"
+            subject = f"{obj.page.specific.subject_title} order"
             payment_item = "order"
         # ALSO: for the same reason, you need to check the amount
         # received, `custom` etc. are all what you expect or what
