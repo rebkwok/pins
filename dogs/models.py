@@ -626,9 +626,7 @@ class DogPage(Page):
         return self.album_info.get("images")
 
     def get_gallery_images(self):
-        if hasattr(self, "dogpage"):
-            return self.dogpage.gallery_images.all()
-        return self.gallery_images.all()
+        return self.specific.gallery_images.all()
 
     def cover_image(self):
         gallery_images = self.get_gallery_images()
@@ -661,7 +659,7 @@ class DogPage(Page):
     # method on the model rather than within a view function
     def paginate(self, request, gallery_images):
         page = request.GET.get("page")
-        paginator = Paginator(gallery_images, self.paginate_by)
+        paginator = Paginator(gallery_images, self.specific.paginate_by)
         try:
             pages = paginator.page(page)
         except PageNotAnInteger:
