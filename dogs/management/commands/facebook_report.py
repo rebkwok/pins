@@ -47,7 +47,7 @@ class Command(BaseCommand):
                 if change == "custom_albums":
                     mail_content.append(f"{key}: {val.get('link', '')}")
                 elif change == "added":
-                    mail_content.append(f"{key}: Album name - {val['facebook_album_name']}, page title - {val['page_title']}")
+                    mail_content.append(f"{key}: \n\tAlbum name: {val['facebook_album_name']}\n\tPage title: {val['page_title']}")
                 else:
                     mail_content.append(f"{key}: {val}")
                     
