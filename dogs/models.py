@@ -488,9 +488,29 @@ class FacebookAlbumTracker:
     def update_all(self, new_data=None, force_update=False):  
         new_data = new_data or self.fetch_all(force_update=force_update)
         changes = self.report_changes(new_data)
+        new_pages = self.create_new_pages(changes["added"])
+        changes["added"] = new_pages
         self.albums_obj.update_all(new_data)
         logger.info("All album data updated")
         return changes
+
+    def create_new_pages(self, new_fb_albums):
+        # For new albums, we assume the dog is in Spain and needs offer
+        needs_offer_page = DogStatusPage.objects.get(title__iexact="Needs Offer")
+
+        new_pages = {}
+        for album_id, album_name in new_fb_albums.items():
+            # FB album title is usually in the format "<Name> - in Spain, needs offer"
+            # Split on - and take the first element. If that doesn't work, try splitting
+            # on commas.
+            dog_name = album_name.strip().split("-")[0].strip().title()
+            if len(dog_name) == 1:
+                dog_name = album_name.strip().split(",")[0].strip().title()
+            dog_page = DogPage(title=dog_name, location="Spain", faceboook_album_id=album_id)
+            new_pages[album_id] = {"facebook_album_name": album_name, "page_title": dog_name}
+            needs_offer_page.add_child(instance=dog_page)
+
+        return new_pages
 
     def update_albums(self, album_ids, force_update=False):
         for i, album_id in enumerate(album_ids, start=1):
