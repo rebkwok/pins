@@ -17,15 +17,15 @@
                 <table class="listing-card__meta">
                     {% if page.location %}
                         <tr>
-                            <td class="listing-card__meta-category">Location:</td>
-                            <td class="listing-card__meta-content">{{ page.location }}</td>
+                            <td class="listing-card__meta-category">Location: 
+                            <span class="listing-card__meta-content">{{ page.location|truncatewords:1 }}</span></td>
                         </tr>
                     {% endif %}
                         <tr>
                             {% if page.caption %}
-                                <td class="listing-card__meta-content" colspan=2>{{ page.caption }}</td>
+                                <td class="listing-card__meta-content" colspan=2>{{ page.caption|truncatechars:60 }}</td>
                             {% else %}
-                                <td class="listing-card__meta-content" colspan=2>{{ page.fb_caption }}</td>
+                                <td class="listing-card__meta-content" colspan=2>{{ page.fb_caption|truncatechars:60 }}</td>
                             {% endif %}
                         </tr>
                </table>

@@ -1254,7 +1254,19 @@ footer {
   padding-bottom: 40px;
 }
 
-@media (min-width: 992px) {
+
+@media (min-width: 767px) {
+  .dog-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    padding-top: 30px;
+    padding-bottom: 80px;
+  }
+}
+
+
+@media (min-width: 1400px) {
   .dog-list {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
@@ -1262,6 +1274,22 @@ footer {
     padding-top: 30px;
     padding-bottom: 80px;
   }
+}
+
+
+/* @media (min-width: 992px) {
+  .dog-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 30px;
+    padding-top: 30px;
+    padding-bottom: 80px;
+  }
+} */
+
+
+.dog-list > li {
+  border-bottom: solid 1px var(--border-grey);
 }
 
 /* ---- Dog Detail Page ---- */
@@ -1660,6 +1688,10 @@ input[type='radio'] {
   padding-left: 0;
 }
 
+.homepage .featured-cards__list > li {
+  border-bottom: solid 1px var(--border-grey);
+}
+
 .homepage .featured-cards__title {
   margin-top: 0;
   margin-bottom: 40px;
@@ -1925,7 +1957,8 @@ input[type='radio'] {
 
 /* #region ---- Listing Card ---- */
 .listing-card {
-  margin-bottom: 40px;
+  margin-bottom: 20px;
+  margin-top: 20px;
 }
 
 .listing-card__meta {
@@ -1936,8 +1969,8 @@ input[type='radio'] {
 .listing-card__link {
   display: flex;
   flex-direction: row;
-  padding-bottom: 30px;
-  border-bottom: 1px solid var(--border-grey);
+  /* padding-bottom: 30px;
+  border-bottom: 1px solid var(--border-grey); */
 }
 
 .listing-card__contents {
@@ -1964,6 +1997,7 @@ input[type='radio'] {
   font-size: 1rem;
   line-height: 1.57;
   vertical-align: top;
+  font-weight: normal;
 }
 
 .listing-card__meta-row:last-child {
