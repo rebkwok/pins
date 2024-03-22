@@ -15,3 +15,5 @@ media/
 pins/.fb_*
 .scraped_album_data*
 .coverage
+
+*for_postage.csv

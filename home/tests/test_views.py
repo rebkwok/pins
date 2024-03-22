@@ -173,8 +173,8 @@ def test_order_form_submission_list_view_write_xlsx(rf, admin_user, tmp_path, or
     sheet = wb.active
     values = [v for v in sheet.values]
     assert values == [
-        ('Submission date', 'name', 'email_address', 'test product', 'Reference', 'Total (£)', 'Total items', 'Paid', 'Shipped'), 
-        (datetime(2020, 1, 1), 'Mickey Mouse', 'mickey.mouse@test.com', '2', submission.reference, 22, 2, '-', '-')
+        ('Submission date', 'name', 'email_address', 'test product', 'Email', 'Reference', 'Total (£)', 'Total items', 'Paid', 'Shipped'), 
+        (datetime(2020, 1, 1), 'Mickey Mouse', 'mickey.mouse@test.com', '2', None, submission.reference, 22, 2, '-', '-')
     ]
 
 
@@ -187,6 +187,6 @@ def test_order_form_submission_list_view_write_csv(rf, admin_user, tmp_path, ord
     csv_data = csv.reader(io.StringIO((b"".join(resp.streaming_content)).decode()))
     values = list(csv_data)
     assert values == [
-        ['Submission date', 'name', 'email_address', 'test product', 'Reference', 'Total (£)', 'Total items', 'Paid', 'Shipped'], 
-        ['2020-01-01 00:00:00+00:00', 'Mickey Mouse', 'mickey.mouse@test.com', '2', submission.reference, "22.00", "2", '-', '-']
+        ['Submission date', 'name', 'email_address', 'test product', 'Email', 'Reference', 'Total (£)', 'Total items', 'Paid', 'Shipped'], 
+        ['2020-01-01 00:00:00+00:00', 'Mickey Mouse', 'mickey.mouse@test.com', '2', '', submission.reference, "22.00", "2", '-', '-']
     ]

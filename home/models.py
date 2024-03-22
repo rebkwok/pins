@@ -919,12 +919,13 @@ class OrderFormSubmissionsListView(OrderingMixin, SubmissionsListView):
     )
 
     def _export_headings(self):
-        self.list_export += ["reference", "total", "total_items", "paid", "shipped"]
+        self.list_export += ["email", "reference", "total", "total_items", "paid", "shipped"]
         self.export_headings = {
             k: self._get_heading_label(k, v) for k, v in self.export_headings.items()
         }
         self.export_headings.update(
-            {
+            {   
+                "email": "Email",
                 "reference": "Reference",
                 "total": "Total (£)", 
                 "total_items": "Total items", 
