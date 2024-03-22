@@ -552,6 +552,9 @@ class DogPageGalleryImage(Orderable):
         'wagtailimages.Image', on_delete=models.CASCADE, related_name='+'
     )
 
+    class Meta:
+        ordering = ("-fb_image_id",)
+
 
 class DogPage(Page):
 
