@@ -66,7 +66,15 @@ def main(xlsx_file):
                     if header_indicies[i] == "Submission date":
                         val = val.strftime("%Y%m%d")
                     if header_indicies[i] == "Total items":
-                        row_data["Weight"] = val * 0.7
+                        weights = {
+                            1: 0.7,
+                            2: 1.3,
+                            3: 1.9,
+                            4: 2.5,
+                            5: 3.1,
+                            20: 12,
+                        }
+                        row_data["Weight"] = weights[val]
                     row_data[header_indicies[i]] = val
         data.append(row_data)
     
