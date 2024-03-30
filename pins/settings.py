@@ -490,6 +490,8 @@ if not TESTING:  # pragma: no cover
     RECAPTCHA_PRIVATE_KEY = env.str("RECAPTCHA_PRIVATE_KEY", "")
     NOCAPTCHA = True
 
+# silence the test key check for management commands
+SILENCED_SYSTEM_CHECKS = ['captcha.recaptcha_test_key_error']
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap3"
 
