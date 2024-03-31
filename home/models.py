@@ -29,7 +29,8 @@ from wagtail.admin.panels import (
     MultiFieldPanel,
     PublishingPanel,
 )
-from wagtail.contrib.forms.forms import BaseForm, FormBuilder
+from wagtail.contrib.forms.forms import BaseForm, FormBuilder, SelectDateForm
+
 from wagtail.contrib.forms.models import AbstractEmailForm, AbstractFormField, AbstractFormSubmission
 from wagtail.contrib.forms.views import SubmissionsListView
 
@@ -904,6 +905,13 @@ class ProductVariant(Orderable):
         return self.name
 
 
+class OrderSubmissionsFilterForm(SelectDateForm):
+    status = forms.ChoiceField(
+        choices=(("paid", "paid"), ("shipped", "shipped")),
+        required=False
+    )
+
+
 class OrderFormSubmissionsListView(OrderingMixin, SubmissionsListView):
 
     template_name = "home/order_list_submissions_index.html"
@@ -934,6 +942,36 @@ class OrderFormSubmissionsListView(OrderingMixin, SubmissionsListView):
             }
         )
 
+    def get_filtering(self):
+        """
+        Return filering as a dict for submissions queryset
+        This is identical to the base class, except that we substitute our
+        OrderSubmissionsFilterForm to add in the extra status field.
+        """
+        self.select_date_form = OrderSubmissionsFilterForm(self.request.GET)
+        result = {}
+        if self.select_date_form.is_valid():
+            date_from = self.select_date_form.cleaned_data.get("date_from")
+            date_to = self.select_date_form.cleaned_data.get("date_to")
+            status = self.select_date_form.cleaned_data.get("status")
+            if date_to:
+                # careful: date_to must be increased by 1 day
+                # as submit_time is a time so will always be greater
+                date_to += datetime.timedelta(days=1)
+                if date_from:
+                    result["submit_time__range"] = [date_from, date_to]
+                else:
+                    result["submit_time__lte"] = date_to
+            elif date_from:
+                result["submit_time__gte"] = date_from
+
+            if status:
+                if status == "paid":
+                    result["paid"] = True
+                elif status == "shipped":
+                    result["shipped"] = True
+        return result
+    
     def stream_csv(self, queryset):
         self._export_headings()
         return super().stream_csv(queryset)
