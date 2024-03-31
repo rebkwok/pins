@@ -43,6 +43,8 @@ class Command(BaseCommand):
             vals = [col[row].value for col in sheet.iter_cols(1, sheet.max_column)]
             if "Becky Smith" in vals:
                 continue
+            if not vals[headers.index("Submission date")]:
+                continue
             if vals[headers.index("Total items")] == 0:
                 continue
             for i, val in enumerate(vals):
@@ -80,7 +82,7 @@ class Command(BaseCommand):
                             val = val.strftime("%Y%m%d")
                         if header_indicies[i] == "Total items":
                             weights = {
-                                1: 0.7,
+                                1: 0.8,
                                 2: 1.3,
                                 3: 1.9,
                                 4: 2.5,
