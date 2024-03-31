@@ -907,8 +907,9 @@ class ProductVariant(Orderable):
 
 class OrderSubmissionsFilterForm(SelectDateForm):
     status = forms.ChoiceField(
-        choices=(("paid", "paid"), ("shipped", "shipped")),
-        required=False
+        choices=(("---", ""), ("paid", "paid"), ("shipped", "shipped"), ("not_paid", "not paid"), ("not_shipped", "not shipped")),
+        required=False,
+        initial="---"
     )
 
 
@@ -965,11 +966,16 @@ class OrderFormSubmissionsListView(OrderingMixin, SubmissionsListView):
             elif date_from:
                 result["submit_time__gte"] = date_from
 
-            if status:
-                if status == "paid":
+            match status:
+                case "paid":
                     result["paid"] = True
-                elif status == "shipped":
+                case "not_paid":
+                    result["paid"] = False
+                case "shipped":
                     result["shipped"] = True
+                case "not_shipped":
+                    result["shipped"] = False
+
         return result
     
     def stream_csv(self, queryset):
