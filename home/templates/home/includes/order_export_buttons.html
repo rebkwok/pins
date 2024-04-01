@@ -1,0 +1,38 @@
+{% load i18n wagtailadmin_tags %}
+
+<div class="dropdown dropdown-button match-width col">
+    <a href="{{ view.xlsx_export_url }}" class="button bicolor button--icon">{% icon name="download" wrapped=1 %}{% trans 'Download XLSX' %}</a>
+    <div class="dropdown-toggle">{% icon name="arrow-down" %}</div>
+    <ul>
+        <li><a class="button bicolor button--icon" href="{{ view.csv_export_url }}">{% icon name="download" wrapped=1 %}{% trans 'Download CSV' %}</a></li>
+    </ul>
+</div>
+<div class="dropdown dropdown-button match-width col">  
+    <span class="button">
+    Change order status
+    </span>
+    <div class="dropdown-toggle">{% icon name="arrow-down" %}</div>
+    <ul>
+        <li
+            class="button match-width"
+            hx-get="{% url 'orders:mark_order_form_submissions_paid' %}" 
+            hx-include="[name='selected-submissions']"
+            >
+            Paid
+        </li>
+        <li
+            class="button" style="margin: 0;"
+            hx-get="{% url 'orders:mark_order_form_submissions_shipped' %}" 
+            hx-include="[name='selected-submissions']"
+            >
+            Shipped
+        </li>
+        <li 
+            class="button" style="margin: 0;"
+            hx-get="{% url 'orders:reset_order_form_submissions' %}" 
+            hx-include="[name='selected-submissions']"
+            >
+            Reset
+        </li>
+    </ul>
+</div>
