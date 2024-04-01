@@ -1,14 +1,26 @@
 """
-First fix up xlsx file for shipping address so that city, county, postcode 
-are the last items. County can be an empty line.
+First fix up xlsx file for shipping address so that city, [county], postcode 
+are the last items. County is optional.
 """
 import csv
 import openpyxl
+import re
 
 from pathlib import Path
 
 from django.core.management.base import BaseCommand
 
+
+
+POSTCODE_RE = re.compile('[A-Z]{1,2}[0-9]{1,2}[A-Z]? ?[0-9][A-Z]{2}', flags=re.I)
+
+
+def find_postcode(address):
+    """Return a normalised postcode if valid, or None if not."""
+    found = POSTCODE_RE.findall(address)
+    if found:
+        return found[0]
+    return None
 
 
 class Command(BaseCommand):
@@ -38,7 +50,7 @@ class Command(BaseCommand):
         
         data = []
 
-        for row in range(1, sheet.max_row):
+        for row_num, row in enumerate(range(1, sheet.max_row), start=1):
             row_data = {}
             vals = [col[row].value for col in sheet.iter_cols(1, sheet.max_column)]
             if "Becky Smith" in vals:
@@ -50,26 +62,43 @@ class Command(BaseCommand):
             for i, val in enumerate(vals):
                 if i in header_indicies:
                     if header_indicies[i] == "Shipping address":
-                        address = val.strip().split("\n")
+                        
+                        # First find postcode
+                        postcode = find_postcode(val)
+                        if postcode:
+                            val = val.replace(postcode, "")
+                            postcode = postcode.upper()
+
+                        # strip any possible trailing commas or spaces and split by new lines
+                        address = val.split("\n")
+                        address = [line.strip(",").strip() for line in address if line]
+
+                        # if we only have one line, it wasn't entered as a multiline address, 
+                        # try splitting by commas
                         if len(address) == 1:
                             address = val.strip().split(",")
                             address = [v.strip() for v in address]
                         
+                        # still one line, it was entered as a single line with no delimiter
+                        # raise exception, can't determine address from here
                         if len(address) == 1:
-                            split_address = val.strip().split(" ")
-                            address = split_address[:-2]
-                            address.append(" ".join(split_address[-2:]))
+                            raise ValueError(f"Can't parse address on row {row_num}: {val}")
 
-                        postcode = address[-1]
-                        county = address[-2]
-                        city = address[-3]
-                        address_lines = address[0:-3]
-                        if len(address_lines) > 3:
-                            last = ", ".join(address_lines[2:])
-                            address_lines = [*address_lines[:2], last]
+                        if len(address) == 2:
+                            address_lines = [address[0]]
+                            city = address[1]
+                            county = ""
+                        else:
+                            county = address[-1]
+                            city = address[-2]
+                            address_lines = address[0:-2]
+                        
                         for i in range(3):
                             if len(address_lines) > i:
-                                line = address_lines[i]
+                                if i == 2:
+                                    line = ", ".join(address_lines[i:])
+                                else:
+                                    line = address_lines[i]
                             else:
                                 line = ""
                             row_data[f"Address line {i + 1}"] = line
