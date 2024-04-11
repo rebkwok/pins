@@ -116,6 +116,7 @@ class Command(BaseCommand):
                                 3: 1.9,
                                 4: 2.5,
                                 5: 3.1,
+                                10: 7,
                                 20: 12,
                             }
                             row_data["Weight"] = weights[val]
