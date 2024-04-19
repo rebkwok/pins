@@ -19,14 +19,36 @@ class Command(BaseCommand):
 
     def handle(self, email, **kwargs):
         tracker = FacebookAlbumTracker()
-        changes = tracker.update_all(force_update=True)
-
+    
         mail_content = [f"Facebook album changes as of {datetime.now(UTC)}"]
         
         token = tracker.get_current_access_token()
-        if tracker.get_token_status(token) == "session_expires_soon":
-            mail_content.append("\nWARNING! Access token session expires in <7 days\n")
-        
+        status = tracker.get_token_status(token)
+        msg = (
+            "Generate a new Page token at https://developers.facebook.com/tools/explorer/ "
+            "and extend it using the Access Token Tool. Then update the FB_ACCESS_TOKEN "
+            "env variable.\n"
+            "Check it works by running\n"
+            "./manage.py check_token"
+        )
+        if status == "expired":
+            send_mail(
+                subject="Facebook token error!",
+                message=f"Access token has expired.\n{msg}",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[settings.SUPPORT_EMAIL]
+            )
+            return
+        elif status == "session_expires_soon":
+            send_mail(
+                subject="Facebook token warning!",
+                message=f"WARNING! Access token session expires in <7 days.\n{msg}",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[settings.SUPPORT_EMAIL]
+            )
+
+        changes = tracker.update_all(force_update=True)
+    
         if not any(list(changes.values())):
             mail_content.append("==================\nNo changes")
     
