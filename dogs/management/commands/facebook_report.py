@@ -63,6 +63,10 @@ class Command(BaseCommand):
                 mail_content.append(
                     "Note: New dog pages are created as Need Offer, location Spain"
                 )
+            elif change == "changes":
+                mail_content.append(
+                    "Note: changes to album title only"
+                )
             if not changed_data:
                 mail_content.append("None")
             for key, val in changed_data.items():

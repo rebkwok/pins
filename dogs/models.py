@@ -532,11 +532,13 @@ class FacebookAlbumTracker:
                 album_id: saved_data[album_id]["name"] for album_id in removed_albums
             }
             
-            same_albums = set(new_data) & set(saved_data) 
+            same_albums = set(new_data) & set(saved_data)
+            # Only report changes to name (may require moving to different status page)
+            # description and images are updated automatically
             changes["changed"] = {
-                album_id: new_data[album_id]["name"] for album_id in same_albums
-                if new_data[album_id]["updated_time"] != saved_data[album_id].get("updated_time")
-                
+                album_id: f"{new_data[album_id]['name']} (previously {saved_data[album_id]['name']})"
+                for album_id in same_albums
+                if new_data[album_id]["name"] != saved_data[album_id]["name"]
             }
 
         return changes
