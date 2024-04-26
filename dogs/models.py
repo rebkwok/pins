@@ -403,7 +403,7 @@ class FacebookAlbumTracker:
         resp_json = requests.get(url).json()
         while True:
             yield from resp_json["data"]
-            if 'next' not in resp_json['paging']:
+            if 'next' not in resp_json.get('paging', {}):
                 break
             resp_json = requests.get(resp_json["paging"]["next"]).json()
 
@@ -479,7 +479,7 @@ class FacebookAlbumTracker:
         albums_data = {}
         for i, album_metadata in enumerate(all_current_albums, start=1):
             album_id = album_metadata["id"]
-            logger.info("Fetching album %d of %d", i, total)
+            logger.info("Fetching album %d of %d (%s)", i, total, album_id)
             album_data = self.get_album_data(album_id, force_update=force_update)
             if album_data is not None:      
                 albums_data[album_id] = album_data
