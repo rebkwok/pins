@@ -1095,6 +1095,11 @@ class OrderBaseForm(BaseForm):
             self.page.voucher_codes.filter(code=voucher_code, active=True).values_list("code", flat=True)
         ):
             del self.cleaned_data["voucher_code"]
+
+        total_items = self.page.quantity_ordered_by_submission(self.cleaned_data)
+        if total_items == 0:
+            self.add_error("__all__", "Select at least one item")
+
         allowed, validation_error_msg = self.page.quantity_submitted_is_valid(self.cleaned_data)
         if not allowed:
             self.add_error("__all__", validation_error_msg)
