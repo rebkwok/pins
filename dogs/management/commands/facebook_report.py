@@ -28,6 +28,7 @@ class Command(BaseCommand):
             "Generate a new Page token at https://developers.facebook.com/tools/explorer/ "
             "and extend it using the Access Token Tool. Then update the FB_ACCESS_TOKEN "
             "env variable.\n"
+            "If existing token has expired, also delete .fb_access_token\n"
             "Check it works by running\n"
             "./manage.py check_token"
         )

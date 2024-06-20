@@ -361,11 +361,14 @@ class FacebookAlbumTracker:
         token_resp = requests.get(url).json()
         # error if rate limited
         if token_resp.get("error"):
-            if "Session has expired" in token_resp["error"].get("message", ""):
+            error_msg = token_resp["error"].get("message", "")
+            if "Session has expired" in error_msg:
                 return "expired"    
-            else:
+            elif "limit" in error_msg:
                 self.albums_obj.set_rate_limit()
                 return "rate_limited"
+            else:
+                return f"Error: {error_msg}"
 
         expiry = datetime.fromtimestamp(token_resp["data"]["expires_at"])
         if expiry < datetime.now() + timedelta(days=1):
