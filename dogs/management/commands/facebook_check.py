@@ -23,6 +23,6 @@ class Command(BaseCommand):
             for page in dog_pages:
                 saved_data = tracker.albums_obj.get_album(page.specific.facebook_album_id)
                 if not saved_data:
-                    self.stdout.write(f"Site: {page} - {page.get_parent().title} / Facenook: removed")
+                    self.stdout.write(f"Site: {page} - {page.get_parent().title} / Facebook: removed")
                 else:
-                    self.stdout.write(f"Site: {page.title} - {page.get_parent().title} / Facebook: - {saved_data['name']}")
+                    self.stdout.write(f"Site: {page.title} - {page.get_parent().title} ({page.specific.location})/ Facebook: - {saved_data['name']}")
