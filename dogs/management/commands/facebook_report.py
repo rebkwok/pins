@@ -82,10 +82,8 @@ class Command(BaseCommand):
         self.stdout.write(mail_content)
         if email:
             send_mail(
-                subject="Facebook album report",
+                subject=f"album report - {datetime.now(UTC)}",
                 message=mail_content,
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[settings.SUPPORT_EMAIL]
             )
-
-
