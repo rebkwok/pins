@@ -1,6 +1,9 @@
+from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from dogs.models import FacebookAlbumTracker, DogPage, DogStatusPage
+
+from django.core.mail import send_mail
 
 
 class Command(BaseCommand):
@@ -17,12 +20,24 @@ class Command(BaseCommand):
     def handle(self, email, **kwargs):
         tracker = FacebookAlbumTracker()
 
+        message = []
         for status_page in DogStatusPage.objects.all():
-            self.stdout.write(f"============{status_page.title}===========")
+            message.append(f"============{status_page.title}===========")
+            
             dog_pages = status_page.get_children()
             for page in dog_pages:
                 saved_data = tracker.albums_obj.get_album(page.specific.facebook_album_id)
                 if not saved_data:
-                    self.stdout.write(f"Site: {page} - {page.get_parent().title} / Facebook: removed")
+                    message.append(f"Site: {page} - {page.get_parent().title} / Facebook: removed")
                 else:
-                    self.stdout.write(f"Site: {page.title} - {page.get_parent().title} ({page.specific.location})/ Facebook: - {saved_data['name']}")
+                    message.append(f"Site: {page.title} - {page.get_parent().title} ({page.specific.location})/ Facebook: - {saved_data['name']}")
+
+        self.stdout.write('\n'.join(message)) 
+        
+        self.stdout.write("Sending email")
+        send_mail(
+            subject="album report",
+            message='\n'.join(message),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[settings.SUPPORT_EMAIL]
+        )
