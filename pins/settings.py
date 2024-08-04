@@ -56,29 +56,9 @@ else:  # pragma: no cover
     DEBUG = False
 
 DOMAIN = "podencosinneed.org"
-ALLOWED_HOSTS = [
-    DOMAIN, 
-    f'www.{DOMAIN}', 
-    f"vagrant.{DOMAIN}",
-    f"www.vagrant.{DOMAIN}",
-    'pins.rebkwok.co.uk', 
-    'www.pins.rebkwok.co.uk',
-    'pins-orders.rebkwok.co.uk', 
-    'www.pins-orders.rebkwok.co.uk', 
-    'vagrant.podencosinneed.org',
-]
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[DOMAIN, f'www.{DOMAIN}'])
 # https://docs.djangoproject.com/en/4.0/ref/settings/#std:setting-CSRF_TRUSTED_ORIGINS
-CSRF_TRUSTED_ORIGINS = [
-    f'https://{DOMAIN}', 
-    f'https://*.{DOMAIN}', 
-    f'https://vagrant.{DOMAIN}',
-    f'https://*.vagrant.{DOMAIN}',
-    'https://pins.rebkwok.co.uk',
-    'https://*.pins.rebkwok.co.uk', 
-    'https://pins-orders.rebkwok.co.uk', 
-    'https://pins-orders.rebkwok.co.uk',
-]
-
+CSRF_TRUSTED_ORIGINS = [f'https://{host}' for host in ALLOWED_HOSTS]
 
 if env('LOCAL'):  # pragma: no cover
     ALLOWED_HOSTS = ['*']
