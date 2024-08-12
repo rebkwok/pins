@@ -29,7 +29,7 @@ coverage
 pytest-django
 pytest-cov
 pytest-env
-pytest-freezegun
+pytest-freezer
 pytest-xdist
 wagtail-factories
 ipython

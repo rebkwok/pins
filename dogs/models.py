@@ -17,7 +17,7 @@ from django.utils.safestring import mark_safe
 from facebook import GraphAPI, GraphAPIError
 
 from modelcluster.fields import ParentalKey
-from wagtail.models.collections import Collection
+from wagtail.models.media import Collection
 from wagtail.models import Orderable, Page
 from wagtail.fields import RichTextField
 from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, Panel
