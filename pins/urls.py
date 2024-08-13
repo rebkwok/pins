@@ -12,6 +12,7 @@ from home import views as home_views
 from fundraising import urls
 
 urlpatterns = [
+    path("", include('allauth.urls')),
     path("django-admin/", admin.site.urls),
     path("admin/", include(wagtailadmin_urls)),
     path("documents/", include(wagtaildocs_urls)),

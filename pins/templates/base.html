@@ -35,10 +35,12 @@
 
         <link rel="shortcut icon" href="{% static 'images/favicon.png' %}" />
 
+        {% block extrahead %}{% endblock %}
     </head>
 
     <body class="{% block body_class %}template-{{ self.get_verbose_name|slugify }}{% endblock %}">
         {% wagtailuserbar %}
+        
         {% block header %}
             {% include "includes/header.html" with parent=site_root calling_page=self %}
         {% endblock header %}
@@ -53,16 +55,13 @@
         {% block messages %}
             {% include "includes/messages.html" %}
         {% endblock messages %}
-
         <main>
-            {% block content %}
-            {% endblock content %}
+            {% block content %}{% endblock content %}
         </main>
 
         <hr>
 
         {% include "includes/footer.html" %}
-
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" />
         <script src="https://unpkg.com/htmx.org@1.9.2" integrity="sha384-L6OqL9pRWyyFU3+/bjdSri+iIphTN/bvYyM37tICVyOJkWZLpP2vGn6VUEXgzg6h" crossorigin="anonymous" defer></script>
         <script type="module" src="{% static 'js/main.js' %}"></script>

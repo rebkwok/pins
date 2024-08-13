@@ -73,6 +73,7 @@ django==5.1
     # via
     #   -r requirements.in
     #   crispy-bootstrap3
+    #   django-allauth
     #   django-crispy-forms
     #   django-encrypted-json-fields
     #   django-extensions
@@ -89,6 +90,8 @@ django==5.1
     #   laces
     #   model-bakery
     #   wagtail
+django-allauth==64.0.0
+    # via -r requirements.in
 django-crispy-forms==2.3
     # via
     #   -r requirements.in

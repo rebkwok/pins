@@ -32,6 +32,7 @@ each detail view
   --dark-brown: #553801;
   --orange: #c55302;
   --dark-orange: #833701;
+  --pins: rgba(207, 148, 131);
   --font--primary: 'Marcellus', serif;
   /* stylelint-disable */
   --font--secondary: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui,
@@ -2460,4 +2461,17 @@ div.info-text ul, div.info-text p {
 div.info-text li {
   list-style: disc;
   margin: 0 0 0 30px;
+}
+
+button.account-nav-button {
+  background-color: transparent;
+  border: none;
+  color: var(--pins);
+  margin-bottom: 0;
+}
+
+@media (min-width: 1150px) {
+  .dropdown-item.account-nav-button {
+    margin-left: 20px;
+  }
 }
