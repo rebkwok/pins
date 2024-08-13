@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     "dashboard",
     "django_extensions",
     "django_ses",
+    "wagtail.contrib.search_promotions",
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
     "wagtail.contrib.settings",

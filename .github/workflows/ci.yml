@@ -55,8 +55,13 @@ jobs:
         run: |
           source ${{ github.workspace }}/venv/bin/activate
           pytest --cov-config=.coveragerc --cov=. -n auto
+    
+      - name: Run coverage 
+        run: |
+          source ${{ github.workspace }}/venv/bin/activate
+          coverage report
 
-      - name: Coveralls
-        uses: AndreMiras/coveralls-python-action@develop
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Coveralls
+      #   uses: AndreMiras/coveralls-python-action@develop
+      #   with:
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
