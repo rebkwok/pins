@@ -6,6 +6,7 @@ venv/
 __pycache__/
 .pyc
 
+cache/
 media/
 
 .env
