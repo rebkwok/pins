@@ -1,4 +1,5 @@
 import random
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator
 from django.db import models
@@ -7,6 +8,13 @@ from django.urls import reverse
 from django.utils import timezone
 
 from shortuuid.django_fields import ShortUUIDField
+
+from modelcluster.fields import ParentalKey
+from wagtail.models.media import Collection
+from wagtail.models import Orderable, Page
+from wagtail.fields import RichTextField
+from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, Panel, MultipleChooserPanel
+from wagtail.images.models import Image
 
 
 PAGE_TYPE_COSTS = {
@@ -194,3 +202,76 @@ class RecipeBookSubmission(models.Model):
         if self.paid and not self.date_paid:
             self.date_paid = timezone.now()
         super().save(*args, **kwargs)
+
+
+class Auction(Page):
+
+    body = RichTextField(blank=True, help_text="Optional content to display in the body of the Auction page.")
+    
+    open_at = models.DateTimeField()
+    close_at = models.DateTimeField()
+
+    content_panels = Page.content_panels + [
+        FieldPanel('body'),
+        FieldPanel('open_at'),
+        FieldPanel('close_at'),
+    ]
+
+    subpage_types = []
+    parent_page_types = ["home.HomePage"]
+
+    paginate_by = 20
+
+
+class AuctionCategory(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+
+
+class AuctionItemPhoto(Orderable):
+    page = ParentalKey("AuctionItem", on_delete=models.CASCADE, related_name='photos')
+    image = models.ForeignKey(
+        'wagtailimages.Image', on_delete=models.CASCADE, related_name='+'
+    )
+    caption = models.CharField(blank=True, max_length=250)
+
+    panels = [
+        FieldPanel('image'),
+        FieldPanel('caption'),
+    ]
+
+
+class AuctionItem(Page):
+    parent_page_types = ["Auction"]
+
+    category = models.ForeignKey(AuctionCategory, on_delete=models.CASCADE)
+    description = RichTextField(blank=True, help_text="Optional description of item.")
+
+    donor = models.CharField(max_length=255, help_text="Name of person who donated this item")
+    donor_email = models.CharField(max_length=255, help_text="Email address of donor")
+    
+    starting_bid = models.FloatField()
+    postage = models.FloatField(default=0)
+
+    content_panels = Page.content_panels + [
+        FieldPanel("category"),
+        FieldPanel("description"),
+        FieldPanel("donor"),
+        FieldPanel("donor_email"),
+        FieldPanel("starting_bid"),
+        FieldPanel("postage"),
+        MultipleChooserPanel(
+            'photos',
+            label="Photos",
+            chooser_field_name="photo",
+        )
+    ]
+
+    def current_winning_bid(self):
+        ...
+
+
+class Bid(models.Model):
+    auction_item = models.ForeignKey(AuctionItem, on_delete=models.CASCADE, related_name="bids")
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    amount = models.FloatField()
+    notify = models.BooleanField(default=True)
