@@ -8,13 +8,14 @@ from wagtail.admin.panels import Panel, FieldPanel, TabbedInterface, ObjectList
 from wagtail_modeladmin.options import ModelAdmin, ModelAdminGroup, modeladmin_register
 
 
-from .models import RecipeBookSubmission
+from .models import RecipeBookSubmission, AuctionCategory
 from paypal.standard.ipn.models import PayPalIPN
 
 
 # ensure our modeladmin is created
 class RecipeBookSubmissionViewSet(SnippetViewSet):
     model = RecipeBookSubmission
+    template_prefix = "recipe_book_"
     list_display = (
         "reference", "date_submitted", "name", "page_type_verbose",
         "title", "category", "formatted_cost",
@@ -93,8 +94,7 @@ class PayPalIPNViewSet(SnippetViewSet):
     model = PayPalIPN
     list_display = ("invoice", "txn_id", "payment_status", "payment_date", BooleanColumn("flag"), "flag_info")
     search_fields = ("invoice",)
-    fields = ("invoice", "payment_status", "flag", "flag_info")
-
+    fields = ("invoice", "payment_status", "flag", "flag_info")    
     edit_handler = TabbedInterface([
         ObjectList(
             [
@@ -191,4 +191,12 @@ class MarkComplete(BulkAction):
         return count, count  # return the count of updated objects
 
 
+class AuctionCategoryViewSet(SnippetViewSet):
+    model = AuctionCategory
+    list_display = (
+        "name",
+    )
+
+
 register_snippet(RecipeBookGroup)
+register_snippet(AuctionCategory)

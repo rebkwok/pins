@@ -217,7 +217,7 @@ class Auction(Page):
         FieldPanel('close_at'),
     ]
 
-    subpage_types = []
+    subpage_types = ["AuctionItem"]
     parent_page_types = ["home.HomePage"]
 
     paginate_by = 20
@@ -225,6 +225,12 @@ class Auction(Page):
 
 class AuctionCategory(models.Model):
     name = models.CharField(max_length=255, unique=True)
+
+    class Meta:
+        verbose_name_plural = "Auction categories"
+
+    def __str__(self) -> str:
+        return self.name
 
 
 class AuctionItemPhoto(Orderable):
@@ -243,7 +249,7 @@ class AuctionItemPhoto(Orderable):
 class AuctionItem(Page):
     parent_page_types = ["Auction"]
 
-    category = models.ForeignKey(AuctionCategory, on_delete=models.CASCADE)
+    category = models.ForeignKey(AuctionCategory, on_delete=models.PROTECT)
     description = RichTextField(blank=True, help_text="Optional description of item.")
 
     donor = models.CharField(max_length=255, help_text="Name of person who donated this item")
@@ -262,7 +268,7 @@ class AuctionItem(Page):
         MultipleChooserPanel(
             'photos',
             label="Photos",
-            chooser_field_name="photo",
+            chooser_field_name="image",
         )
     ]
 

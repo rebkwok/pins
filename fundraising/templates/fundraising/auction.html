@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags navigation_tags wagtailimages_tags %}
+
+{% block body_class %}{% endblock %}
+
+
+{% block content %}
+
+    <div class="container">
+
+        <h1>{{ page.title }}</h1>
+        <p class="mt-4">Opens at: {{ page.open_at }}</p>
+        <p>Closes at: {{ page.close_at }}</p>
+
+        {{ page.body|richtext }}
+
+        {% if categories %}
+            <ul>
+                {% for category in categories %}
+                    <li>
+                        {% include "includes/card/listing-card.html" with page=dog %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>Coming soon</p>
+        {% endif %}
+    </div>
+
+{% endblock content %}

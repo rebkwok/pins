@@ -46,7 +46,7 @@ class Migration(migrations.Migration):
                 ('donor_email', models.CharField(help_text='Email address of donor', max_length=255)),
                 ('starting_bid', models.FloatField()),
                 ('postage', models.FloatField(default=0)),
-                ('category', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='fundraising.auctioncategory')),
+                ('category', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='fundraising.auctioncategory')),
             ],
             options={
                 'abstract': False,

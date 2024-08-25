@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags navigation_tags wagtailimages_tags %}
+
+{% block body_class %}{% endblock %}
+
+
+{% block content %}
+
+    <div class="container">
+        {{ page.body|richtext }}
+
+            <ul>
+                {% for auction_item in auction_items %}
+                    <li>
+                        {% include "includes/card/listing-card.html" with page=auction_item %}
+                    </li>
+                {% endfor %}
+            </ul>
+        
+    </div>
+
+{% endblock content %}
