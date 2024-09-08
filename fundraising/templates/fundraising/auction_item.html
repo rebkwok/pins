@@ -7,19 +7,63 @@
 {% block content %}
 
     <div class="container">
-        <h1>{{ page.title }}</h1>
+        <h1 class="mb-4">{{ page.get_parent.specific.title }}</h1>
+        <hr/>
+        <h2 class="mt-4">{{ page.title }}</h2>
 
         {{ page.description |richtext }}
+        
+        <!-- Button trigger modal -->
+        <div class=" row image-gallery-container">
+            <ul class="image-gallery">
+                {% for photo in page.photos.all %}
+                    <li>
+                        <a data-bs-toggle="modal" data-bs-target="#Modal-{{ photo.id }}">
+                            {% image photo.image original %}
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
 
         {% for photo in page.photos.all %}
-            {{ photo.image }}
+        <!-- Modal -->
+        <div class="modal fade" id="Modal-{{ photo.id }}" tabindex="-1" aria-labelledby="Modal-{{ photo.id }}Label" aria-hidden="true">
+            <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                <h5 class="modal-title" id="Modal-{{ photo.id }}Label">{{ page.title }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    {% image photo.image original loading="lazy" %}
+                </div>
+            </div>
+            </div>
+        </div>
         {% endfor %}
 
-        <p>Starting bid: £{{ page.starting_bid }}</p>
+        <p>Postage: {% if page.postage %}£{{ page.postage|floatformat:2 }}{% else %}covered by donor{% endif %}</p>
 
-        <p>Postage: £{{ page.postage }}</p>
         
-        
+        <h3>Bid on this item</h3>
+
+        <p>
+            {% if page.current_winning_bid %}
+            <strong>Current highest bid:</strong> £{{ page.current_winning_bid|floatformat:2 }}
+            {% else %}
+            <strong>Starting bid:</strong> £{{ page.starting_bid|floatformat:2 }}
+            {% endif %}<br/>
+
+            <strong>Bids so far:</strong> {{ page.bids.count }}
+        </p>
+
+
+        {% if request.user.is_authenticated %}
+            PLACEHOLDER - YOUR BID FORM
+        {% else %}
+        <p><a href={% url 'account_login' %}>Log in</a> to bid on this item.
+        {% endif %}
     </div>
 
 {% endblock content %}

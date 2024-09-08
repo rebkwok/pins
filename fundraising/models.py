@@ -222,6 +222,18 @@ class Auction(Page):
 
     paginate_by = 20
 
+    def is_open(self):
+        return self.open_at <= timezone.now()
+    
+    def is_closed(self):
+        return self.close_at <= timezone.now()
+    
+    @classmethod
+    def open(cls):
+        return cls.objects.filter(
+            open_at__lte=timezone.now(), close_at__gte=timezone.bow()
+        )
+
 
 class AuctionCategory(models.Model):
     name = models.CharField(max_length=255, unique=True)
