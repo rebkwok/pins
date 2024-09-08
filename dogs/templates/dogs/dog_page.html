@@ -34,15 +34,36 @@
                         </div>
                     </div>
 
-                <div class=" row image-gallery-container">
+                <div class="row image-gallery-container">
                     <ul class="image-gallery">
                         {% for image in gallery_images %}
                             <li>
+                                <a data-bs-toggle="modal" data-bs-target="#Modal-{{ image.id }}">
                                 {% image image.image original loading="lazy" %}
+                                </a>
                             </li>
                         {% endfor %}
                     </ul>
                 </div>
+
+
+            {% for image in gallery_images %}
+            <!-- Modal -->
+            <div class="modal fade" id="Modal-{{ image.id }}" tabindex="-1" aria-labelledby="Modal-{{ image.id }}Label" aria-hidden="true">
+                <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                    <h5 class="modal-title" id="Modal-{{ image.id }}Label">{{ page.title }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        {% image image.image original loading="lazy" %}
+                    </div>
+                </div>
+                </div>
+            </div>
+            {% endfor %}
+
 
                 {% if gallery_images.paginator.count > paginate_by %}
                     <div class="container">
