@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags navigation_tags wagtailimages_tags %}
+
+{% block body_class %}{% endblock %}
+
+
+{% block content %}
+
+    <div class="container">
+
+        <h1>Your bids in <a href={{  auction.get_url }}>{{ auction.title }}</a></h1>
+        
+        {% if bids %}
+            {% for bid in bids %}
+                <div class="mb-2">
+                <h3><a href={{  bid.auction_item.get_url }}>{{ bid.auction_item.title }}</a></h3>
+                <strong>Your bid: </strong> 
+                £{{ bid.amount|floatformat:2 }} <br/>
+                {% if bid.amount == bid.auction_item.current_winning_bid %}
+                <span class="text-success">You have the current highest bid.</span>
+                {% else %}
+                <span class="text-danger">Current highest bid: {{ bid.auction_item.current_winning_bid }}</span>
+                {% endif %}
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>You have no bids yet.</p>
+        {% endif %}
+    </div>
+
+{% endblock content %}

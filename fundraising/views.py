@@ -2,7 +2,7 @@ from typing import Any
 from django import http
 from django.conf import settings
 from django.core.mail import send_mail
-from django.shortcuts import render, redirect, HttpResponse
+from django.shortcuts import render, redirect, HttpResponse, get_object_or_404
 from django.urls import reverse
 from django.template.response import TemplateResponse
 from django.template.context_processors import csrf
@@ -15,7 +15,7 @@ from payments.utils import get_paypal_form
 from payments.utils import signature
 
 from .forms import RecipeBookContrbutionForm, RecipeBookContrbutionEditForm
-from .models import RecipeBookSubmission
+from .models import RecipeBookSubmission, Bid, Auction
 
 
 class RecipeBookSubmissionCreateView(CreateView):
@@ -141,4 +141,15 @@ def submitted_recipes(request):
         request, 
         "fundraising/recipe_list.html", 
         {"dog_recipes": dog_recipes, "human_recipes": human_recipes}
+    )
+
+
+def user_bids(request, auction_slug):
+    auction = get_object_or_404(Auction, slug=auction_slug)
+    auction_item_ids = auction.get_children().specific().values_list('id', flat=True)
+    bids = request.user.bids.filter(auction_item__id__in=auction_item_ids)
+    return TemplateResponse(
+        request, 
+        "fundraising/user_bids.html", 
+        {"auction": auction, "bids": bids}
     )

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags navigation_tags wagtailimages_tags %}
+
+{% block body_class %}{% endblock %}
+
+
+{% block content %}
+
+    <div class="container">
+
+        <h1>{{ page.title }}</h1>
+        <a href={% url 'fundraising:user_bids' page.slug %}>View your bids in this auction</a>
+
+        <hr/>
+
+        <p class="mt-4">
+            Opens at: {{ page.open_at }}<br/>
+            Closes at: {{ page.close_at }}
+        </p>
+
+       
+        {{ page.body|richtext }}
+
+        {% if page.categories %}
+            {% for category, auction_items in page.categories.items %}
+                <h3>{{ category.name }}</h3>
+                <div class="row image-gallery-container">
+                    <ul class="image-gallery">
+                    {% for auction_item in auction_items %}
+                        <li>{% include "fundraising/includes/auction_item_card.html" with page=auction_item %}</li>
+                    {% endfor %}
+                    </ul>
+                </div>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>Coming soon</p>
+        {% endif %}
+    </div>
+
+{% endblock content %}

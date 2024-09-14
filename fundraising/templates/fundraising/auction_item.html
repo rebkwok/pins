@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags navigation_tags wagtailimages_tags %}
+{% load crispy_forms_tags %}
+
+{% block body_class %}{% endblock %}
+
+
+{% block content %}
+
+    <div class="container mb-4">
+        <h1 class="mb-4"><a href={{  page.get_parent.get_url }}>{{ page.get_parent.specific.title }}</a></h1>
+        <a href={% url 'fundraising:user_bids' page.get_parent.slug %}>View your bids in this auction</a>
+        <hr/>
+        <h2 class="mt-4">{{ page.title }}</h2>
+
+        {{ page.description |richtext }}
+        
+        <!-- Button trigger modal -->
+        <div class=" row image-gallery-container">
+            <ul class="image-gallery">
+                {% for photo in page.photos.all %}
+                    <li>
+                        <a data-bs-toggle="modal" data-bs-target="#Modal-{{ photo.id }}">
+                            {% image photo.image original %}
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        {% for photo in page.photos.all %}
+        <!-- Modal -->
+        <div class="modal fade" id="Modal-{{ photo.id }}" tabindex="-1" aria-labelledby="Modal-{{ photo.id }}Label" aria-hidden="true">
+            <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                <h5 class="modal-title" id="Modal-{{ photo.id }}Label">{{ page.title }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    {% image photo.image original loading="lazy" %}
+                </div>
+            </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <p>Postage: {% if page.postage %}£{{ page.postage|floatformat:2 }}{% else %}covered by donor{% endif %}</p>
+
+        
+        <h3>Bid on this item</h3>
+
+        <p>
+            <strong>Starting bid:</strong> £{{ page.starting_bid|floatformat:2 }}
+            {% if current_winning_bid %}
+            <br/>
+            <strong>Current highest bid:</strong> £{{ current_winning_bid|floatformat:2 }}
+            {% endif %}<br/>
+
+            <strong>Bids so far:</strong> {{ page.bids.count }}
+            {% if user_bid %}
+                <br/>
+                <strong>Your bid: </strong> 
+                <span {% if user_bid.amount == current_winning_bid %}class="text-success"{% else %}class="text-secondary"{% endif %}>
+                    £{{ user_bid.amount|floatformat:2 }}
+                </span>
+                {% if user_bid.amount == current_winning_bid %}
+                <br/>
+                <span class="text-success">You have the current highest bid. You can increase your bid if you want.</span>
+                <form method="post" action="">
+                    {% csrf_token %}
+                    <input type="hidden" name="id" value={{ user_bid.id }} />
+                    <input class="btn btn-danger btn-sm" type="submit" name="delete_bid" value="Delete my bid" />
+                </form>
+                {% endif %}
+            {% endif %}
+        </p>
+
+
+        <p>Enter your bid (minimum £{{ page.minimum_bid|floatformat:2 }})</p>
+        {% if request.user.is_authenticated %}
+            <form method="post" action="">
+                {% csrf_token %}
+                <div>
+                {%  crispy form %}
+                </div>
+            </form>    
+        {% else %}
+        <p><a href={% url 'account_login' %}?next={{ request.build_absolute_uri}}>Log in</a> to bid on this item.
+        {% endif %}
+    </div>
+
+{% endblock content %}

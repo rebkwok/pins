@@ -102,12 +102,14 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.forms",
+    "allauth",
+    "allauth.account",
     "encrypted_json_fields",
     "wagtail_json_widget",
     "dogs",
     "fundraising",
     "crispy_forms",
-    "crispy_bootstrap3",
+    "crispy_bootstrap5",
     "paypal.standard.ipn",
     "payments",
 ]
@@ -123,7 +125,37 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
 ]
+
+# Auth stuff
+
+SITE_ID = 1
+
+AUTHENTICATION_BACKENDS = (
+    # Needed to login by username in Django admin, regardless of `allauth`
+    'django.contrib.auth.backends.ModelBackend',
+    # `allauth` specific authentication methods, such as login by e-mail
+    'allauth.account.auth_backends.AuthenticationBackend',
+)
+
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/'
+ACCOUNT_AUTHENTICATION_METHOD = "username_email"
+ACCOUNT_CONFIRM_EMAIL_ON_GET = True
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_EMAIL_VERIFICATION = "optional"
+ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
+ACCOUNT_LOGOUT_ON_GET = True
+ACCOUNT_LOGIN_ON_PASSWORD_RESET = True
+ACCOUNT_LOGOUT_REDIRECT_URL = '/'
+ACCOUNT_PRESERVE_USERNAME_CASING = False
+ACCOUNT_SESSION_REMEMBER = True
+ACCOUNT_SIGNUP_PASSWORD_ENTER_TWICE = True
+ACCOUNT_USERNAME_BLACKLIST = ["admin", "god"]
+# We're going to want to collect extra info
+# ACCOUNT_SIGNUP_FORM_CLASS = 'accounts.forms.SignupForm'
+
 
 ROOT_URLCONF = "pins.urls"
 
@@ -472,9 +504,9 @@ if not TESTING:  # pragma: no cover
 # silence the test key check for management commands
 SILENCED_SYSTEM_CHECKS = ['captcha.recaptcha_test_key_error']
 
-CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap3"
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 
-CRISPY_TEMPLATE_PACK = "bootstrap3"
+CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 FORM_RENDERER = 'django.forms.renderers.TemplatesSetting'
 
