@@ -427,7 +427,7 @@ class BidForm(forms.ModelForm):
             PrependedText("amount", "£"),
             "notify",
             Fieldset(
-                "Shipping information (optional)",
+                "Shipping information",
                 HTML("<small>This information is required for shipping the item if you win the auction.</small>"),
                 "name", 
                 "address_line_1", 

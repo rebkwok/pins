@@ -656,6 +656,7 @@ blockquote .attribute-name {
   list-style: none;
   margin: 0;
   padding: 20px 0 0;
+  display: inline-flex;
 }
 
 .navigation__desktop {
@@ -691,7 +692,7 @@ blockquote .attribute-name {
 
 @media (min-width: 1150px) {
   .navigation__items {
-    display: block;
+    display: inline-flex;
   }
 
   .navigation__items>li {
@@ -844,6 +845,7 @@ hr {
 
 ul.list-inline.social-list {
   margin-bottom: 5px;
+  display: inline-flex;
 }
 
 footer {
