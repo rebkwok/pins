@@ -2,13 +2,13 @@ from wagtail import hooks
 from wagtail.admin.ui.tables import BooleanColumn
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
+from wagtail.admin.filters import WagtailFilterSet
 from wagtail.admin.views.bulk_action import BulkAction
 from wagtail.admin.panels import Panel, FieldPanel, TabbedInterface, ObjectList
 
-from wagtail_modeladmin.options import ModelAdmin, ModelAdminGroup, modeladmin_register
+from django_filters.filters import ChoiceFilter
 
-
-from .models import RecipeBookSubmission, AuctionCategory
+from .models import RecipeBookSubmission, AuctionCategory, Bid, Auction
 from paypal.standard.ipn.models import PayPalIPN
 
 
@@ -198,5 +198,48 @@ class AuctionCategoryViewSet(SnippetViewSet):
     )
 
 
+class BidFilterSet(WagtailFilterSet):
+
+    auction = ChoiceFilter(choices=Auction.objects.values_list("id", "title"), method="filter_by_auction", label="Auction")
+
+    class Meta:
+        model = Bid
+        fields = [
+            "auction",
+            "auction_item",
+        ]
+    
+    def filter_by_auction(self, queryset, name, value):
+        auction_item_ids = Auction.objects.get(id=value).get_children().specific().values_list('id', flat=True)
+        return queryset.filter(auction_item__id__in=auction_item_ids)
+
+
+class BidViewSet(SnippetViewSet):
+    model = Bid
+    template_prefix = "bid_"
+    list_display = (
+        "auction_item", "user", "amount", "placed_at"
+    )
+    fields = ("auction_item", "user", "amount")
+    filterset_class = BidFilterSet
+
+    edit_handler = TabbedInterface([
+        ObjectList(
+            [
+                FieldPanel("auction_item"), 
+                FieldPanel("user"),
+                FieldPanel("amount"),
+            ],
+            heading='Bid Details'),
+    ])
+
+
+class AuctionGroup(SnippetViewSetGroup):
+    menu_label = "Auctions"
+    menu_icon = "tablet-alt"
+    items = (AuctionCategoryViewSet, BidViewSet)
+    menu_order = 300
+
+
 register_snippet(RecipeBookGroup)
-register_snippet(AuctionCategory)
+register_snippet(AuctionGroup)

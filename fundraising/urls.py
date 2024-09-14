@@ -2,7 +2,7 @@ from django.urls import include, path
 
 from .views import (
     RecipeBookSubmissionCreateView, RecipeBookSubmissionDetailView, RecipeBookSubmissionUpdateView, 
-    update_form_fields, method_char_count, profile_caption_char_count, submitted_recipes
+    update_form_fields, method_char_count, profile_caption_char_count, submitted_recipes, user_bids
 )
 app_name = "fundraising"
 urlpatterns = [
@@ -20,6 +20,9 @@ urlpatterns = [
         "recipe-book/contribution/<str:pk>/edit/", 
         RecipeBookSubmissionUpdateView.as_view(), 
         name="recipe_book_contribution_edit"
+    ),
+    path(
+        "bids/<slug:auction_slug>", user_bids, name="user_bids"
     ),
     path(
         "recipe-book/recipes", submitted_recipes, name="submitted_recipes"

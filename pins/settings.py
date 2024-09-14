@@ -109,7 +109,7 @@ INSTALLED_APPS = [
     "dogs",
     "fundraising",
     "crispy_forms",
-    "crispy_bootstrap3",
+    "crispy_bootstrap5",
     "paypal.standard.ipn",
     "payments",
 ]
@@ -144,7 +144,7 @@ LOGIN_REDIRECT_URL = '/'
 ACCOUNT_AUTHENTICATION_METHOD = "username_email"
 ACCOUNT_CONFIRM_EMAIL_ON_GET = True
 ACCOUNT_EMAIL_REQUIRED = True
-ACCOUNT_EMAIL_VERIFICATION = "mandatory"
+ACCOUNT_EMAIL_VERIFICATION = "optional"
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 ACCOUNT_LOGOUT_ON_GET = True
 ACCOUNT_LOGIN_ON_PASSWORD_RESET = True
@@ -504,9 +504,9 @@ if not TESTING:  # pragma: no cover
 # silence the test key check for management commands
 SILENCED_SYSTEM_CHECKS = ['captcha.recaptcha_test_key_error']
 
-CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap3"
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 
-CRISPY_TEMPLATE_PACK = "bootstrap3"
+CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 FORM_RENDERER = 'django.forms.renderers.TemplatesSetting'
 

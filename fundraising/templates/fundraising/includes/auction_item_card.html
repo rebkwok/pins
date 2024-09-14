@@ -1,0 +1,22 @@
+{% load wagtailcore_tags wagtailimages_tags %}
+{% load static %}
+
+<div class="listing-card">
+    <a class="listing-card__link" href="{{ page.url }}">
+        {% if page.image %}
+            <figure class="listing-card__image">
+                {% image page.image fill-180x180-c100 loading="lazy" %}
+            </figure>
+        {% else %}
+            <figure class="listing-card__image">
+                <img src={% static 'images/logo.png' %} height="180" width="180" loading="lazy">
+                <div class="layer"></div>
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">No photo available</div>
+            </figure>
+        {% endif %}
+    </a>
+    <small>
+        {{ page.title|truncatechars:15 }}<br/>
+        <em>{{ page.bids.count }} bids</em>
+    </small>
+</div>
