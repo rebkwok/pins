@@ -5,27 +5,29 @@
     <div class="homepage">
 
         <div class="container-fluid hero">
-            <div class="hero-gradient-mask"></div>
-            <div class="container">
-                <div class="row">
-                    <div class="col-md-10 offset-md-1 col-lg-12 home-hero">
-                        <div class="hero__image">
-                        {% image page.image max-400x400 loading="lazy" %}
-                        </div>
-                        <h1>{{ page.title }}</h1>
-                        <p class="lead">{{ page.hero_text }}</p>
-                        {% if page.hero_cta_link %}
-                            <a href="{% slugurl page.hero_cta_link.slug %}" class="hero-cta-link">
+            <div class="hero-gradient-mask">
+                <div>
+                    <div class="row">
+                        <div class="col-md-10 offset-md-1 col-lg-12 home-hero">
+                            <div class="hero__image">
+                            {% image page.image max-400x400 loading="lazy" %}
+                            </div>
+                            <h1>{{ page.title }}</h1>
+                            <p class="lead">{{ page.hero_text }}</p>
+                            {% if page.hero_cta_link %}
+                                <a href="{% slugurl page.hero_cta_link.slug %}" class="hero-cta-link">
+                                    {{ page.hero_cta }}
+                                </a>
+                            {% else %}
                                 {{ page.hero_cta }}
-                            </a>
-                        {% else %}
-                            {{ page.hero_cta }}
-                        {% endif %}
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
+          
         <div class="container">
             <div class="row promo-row">
                 <div class="featured-cards col-sm-6 offset-sm-1">
@@ -129,7 +131,7 @@
         
         {% if page.hero_footer_text or page.hero_footer_link or page.hero_footer %}
         <div class="container-fluid hero">
-            <div class="hero-footer-mask"></div>
+            <div class="hero-footer-mask">
             <div class="container">
                 <div class="row">
                     <div class="col-md-10 offset-md-1 home-hero">
@@ -144,6 +146,7 @@
                     </div>
                 </div>
             </div>
+        </div>
         </div>
         {% endif %}
     </div>

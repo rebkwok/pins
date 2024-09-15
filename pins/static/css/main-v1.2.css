@@ -325,13 +325,26 @@ figure img {
   }
 }
 
-.hero-gradient-mask {
+/* .hero-gradient-mask {
   position: absolute;
   width: 100%;
   height: 100%;
   bottom: 0;
   background-image: url("/static/images/background.jpg");
   background-size: auto;
+} */
+
+.hero-gradient-mask {
+  /* background-color: var(--mid-brown); */
+  background-image: url("/static/images/background.jpg");
+  background-size: cover;
+  background-position: center;
+  background-blend-mode: multiply;
+  /* position: absolute; */
+  width: 100%;
+  height: 100%;
+  bottom: 0;
+  color: #fff;
 }
 
 @media (min-width: 768px) {
@@ -342,7 +355,7 @@ figure img {
 }
 
 .hero-footer-mask {
-  position: absolute;
+  /* position: absolute; */
   width: 100%;
   height: 100%;
   bottom: 0;
@@ -1664,7 +1677,7 @@ input[type='radio'] {
 
 @media (min-width: 768px) {
   .homepage .promo {
-    margin-top: -180px;
+    margin-top: -100px;
     margin-right: -120px;
     padding: 60px 60px 40px;
   }
