@@ -58,7 +58,7 @@
             <strong>Starting bid:</strong> £{{ page.starting_bid|floatformat:2 }}
             {% if current_winning_bid %}
             <br/>
-            <strong>Current highest bid:</strong> £{{ current_winning_bid|floatformat:2 }}
+            <mark class="text-danger fs-5"><strong>Current highest bid: £{{ current_winning_bid|floatformat:2 }}</strong></mark>
             {% endif %}<br/>
 
             <strong>Bids so far:</strong> {{ page.bids.count }}
