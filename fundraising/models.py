@@ -19,6 +19,7 @@ from crispy_forms.layout import Layout, Hidden, Submit, Fieldset, HTML
 
 from shortuuid.django_fields import ShortUUIDField
 
+from modelcluster.models import ClusterableModel
 from modelcluster.fields import ParentalKey
 from wagtail.models.media import Collection
 from wagtail.models import Orderable, Page
@@ -278,6 +279,7 @@ class AuctionItemPhoto(Orderable):
 
 class AuctionItem(Page):
     parent_page_types = ["Auction"]
+    subpage_types = []
 
     category = models.ForeignKey(AuctionCategory, on_delete=models.PROTECT)
     description = RichTextField(blank=True, help_text="Optional description of item.")
@@ -316,14 +318,16 @@ class AuctionItem(Page):
             if request.method == "POST":
                 instance = self.bids.filter(id=request.POST.get("id")).first()
                 if "delete_bid" in request.POST:
+                    amount = instance.amount
                     instance.delete()
+                    AuctionItemLog.objects.create(auction_item=self, log=f"User {request.user} ({request.user.id}) deleted bid: £{amount}")
                     messages.success(request, "Your bid was deleted")
                     return redirect(self.get_url())
                 else:
                     form = self.get_form(request, request.POST, instance=instance)
                     if form.is_valid():
                         bid = form.save()
-                        messages.success(request, "Your bid was logged")
+                        messages.success(request, "Thank you for your bid! Winners will be notified by email after the auction has closed.")
 
                         # Email next highest bidder if they have requested notification that their bid has
                         # been exceeded. Don't notify the one lower than that, as they should have been notified
@@ -379,7 +383,16 @@ class AuctionItem(Page):
         return context
 
 
-class Bid(models.Model):
+class AuctionItemLog(Orderable):
+    auction_item = models.ForeignKey(AuctionItem, on_delete=models.CASCADE, related_name="logs")
+    log = models.TextField()
+    timestamp = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ("-timestamp",)
+
+
+class Bid(ClusterableModel):
     auction_item = models.ForeignKey(AuctionItem, on_delete=models.CASCADE, related_name="bids")
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="bids")
     amount = models.DecimalField(max_digits=6, decimal_places=2)
@@ -399,6 +412,20 @@ class Bid(models.Model):
     town_city = models.CharField(null=True, blank=True, verbose_name="Town/City")
     county = models.CharField(null=True, blank=True)
     postcode = models.CharField(null=True, blank=True)
+
+    def write_bid_log(self, new=False):
+        action = "created" if new else "updated"
+        AuctionItemLog.objects.create(auction_item=self.auction_item, log=f"User {self.user} ({self.user.id}) {action} bid: £{self.amount}")
+
+    def save(self):
+        if self.id:
+            pre_save = Bid.objects.get(id=self.id)
+            if pre_save.amount != self.amount:
+                self.placed_at = timezone.now()
+                self.write_bid_log()
+        else:
+            self.write_bid_log(new=True)
+        super().save()
 
 
 class BidForm(forms.ModelForm):
@@ -443,6 +470,7 @@ class BidForm(forms.ModelForm):
     def clean_amount(self):
         value = self.cleaned_data["amount"]
         auction_item = AuctionItem.objects.get(id=self.auction_item)
-        if value < auction_item.minimum_bid():
-            raise ValidationError(f"Please enter an amount of at least £{auction_item.minimum_bid():.2f}")
+        if self.instance.id and value < self.instance.amount:
+            if value < auction_item.minimum_bid():
+                raise ValidationError(f"Please enter an amount of at least £{auction_item.minimum_bid():.2f}")
         return value

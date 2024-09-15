@@ -4,11 +4,11 @@ from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 from wagtail.admin.filters import WagtailFilterSet
 from wagtail.admin.views.bulk_action import BulkAction
-from wagtail.admin.panels import Panel, FieldPanel, TabbedInterface, ObjectList
+from wagtail.admin.panels import FieldPanel, TabbedInterface, ObjectList, InlinePanel
 
 from django_filters.filters import ChoiceFilter
 
-from .models import RecipeBookSubmission, AuctionCategory, Bid, Auction
+from .models import RecipeBookSubmission, AuctionCategory, Bid, Auction, AuctionItemLog
 from paypal.standard.ipn.models import PayPalIPN
 
 
@@ -197,10 +197,13 @@ class AuctionCategoryViewSet(SnippetViewSet):
         "name",
     )
 
+from django.db.models import Max, Q
 
 class BidFilterSet(WagtailFilterSet):
 
     auction = ChoiceFilter(choices=Auction.objects.values_list("id", "title"), method="filter_by_auction", label="Auction")
+    limit_to = ChoiceFilter(choices=(("all", "All bids"), ("winning", "Winning bids only")), method="filter_by_limit_to", label="Limit to")
+
 
     class Meta:
         model = Bid
@@ -213,31 +216,51 @@ class BidFilterSet(WagtailFilterSet):
         auction_item_ids = Auction.objects.get(id=value).get_children().specific().values_list('id', flat=True)
         return queryset.filter(auction_item__id__in=auction_item_ids)
 
+    def filter_by_limit_to(self, queryset, name, value):
+        if value == "winning":
+            max_bids = queryset.values('auction_item').annotate(max_bid=Max('amount')).order_by()
+            q_statement = Q()
+            for pair in max_bids:
+                q_statement |= (Q(auction_item__id=pair['auction_item']) & Q(amount=pair['max_bid']))
+            return queryset.filter(q_statement)
+        return queryset
+
 
 class BidViewSet(SnippetViewSet):
     model = Bid
-    template_prefix = "bid_"
+    # template_prefix = "bid_"
     list_display = (
         "auction_item", "user", "amount", "placed_at"
     )
     fields = ("auction_item", "user", "amount")
     filterset_class = BidFilterSet
 
-    edit_handler = TabbedInterface([
+    handler = TabbedInterface([
         ObjectList(
             [
                 FieldPanel("auction_item"), 
                 FieldPanel("user"),
                 FieldPanel("amount"),
             ],
-            heading='Bid Details'),
+            heading='Bid Details'
+        ),
     ])
+
+
+class AuctionItemLogViewSet(SnippetViewSet):
+    model = AuctionItemLog
+    list_display = (
+        "timestamp", "log", "auction_item"
+    )
+    fields = ("timestamp", "log", "auction_item")
+
+    filterset_class = BidFilterSet
 
 
 class AuctionGroup(SnippetViewSetGroup):
     menu_label = "Auctions"
     menu_icon = "tablet-alt"
-    items = (AuctionCategoryViewSet, BidViewSet)
+    items = (AuctionCategoryViewSet, AuctionItemLogViewSet, BidViewSet)
     menu_order = 300
 
 

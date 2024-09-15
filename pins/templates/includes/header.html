@@ -28,7 +28,7 @@
                 </ul>
                 <ul class="navigation__items nav-pills">
                     {% if not user.is_authenticated %}
-                        <a class="dropdown-item account-nav-button" href={% url 'account_login' %}>Login</a>
+                        <a class="dropdown-item account-nav-button" href="{% url 'account_login' %}?next={{ request.build_absolute_uri}}">Login</a>
                     {% else %}
                         <div class="dropdown">
                             <button class="account-nav-button dropdown-toggle" type="button" id="accountMenuButton" data-bs-toggle="dropdown"  aria-expanded="false">
