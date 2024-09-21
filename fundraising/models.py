@@ -28,6 +28,8 @@ from wagtail.admin.mail import send_mail
 from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, Panel, MultipleChooserPanel
 from wagtail.images.models import Image
 
+from .utils import user_address_choices
+
 
 PAGE_TYPE_COSTS = {
     "single": 5,
@@ -453,14 +455,59 @@ class Bid(ClusterableModel):
                 self.write_bid_log()
         else:
             self.write_bid_log(new=True)
+        
+        for field in [self.name, self.address_line_1, self.address_line_2, self.address_line_3, self.town_city, self.county, self.postcode]:
+            if field is not None:
+                field = field.strip()
+
+        UserShippingAddress.objects.get_or_create(
+            user=self.user,
+            name=self.name,
+            address_line_1=self.address_line_1,
+            address_line_2=self.address_line_2,
+            address_line_3=self.address_line_3,
+            town_city=self.town_city,
+            county=self.county,
+            postcode=self.postcode,
+        )
+
         super().save()
+
+
+class UserShippingAddress(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="addresses")
+    name = models.CharField()
+    address_line_1 = models.CharField(verbose_name="Street address (1)")
+    address_line_2 = models.CharField(null=True, blank=True, verbose_name="Street address (2)")
+    address_line_3 = models.CharField(null=True, blank=True, verbose_name="Street address (3)")
+    town_city = models.CharField(verbose_name="Town/City")
+    county = models.CharField()
+    postcode = models.CharField()
+
+    def parse_address(self):
+        return ", ".join(
+            [
+                line 
+                for line in [self.name, self.address_line_1, self.address_line_2, self.address_line_3, self.town_city, self.county, self.postcode]
+                if line
+            ]
+        )
 
 
 class BidForm(forms.ModelForm):
 
+    existing_address = forms.CharField(
+        required=False,
+        label="Select an existing address",
+    )
     class Meta:
         fields = ("amount", "auction_item", "user", "notify", "name", "address_line_1", "address_line_2", "address_line_3", "town_city", "county", "postcode")
         model = Bid
+        labels = {
+            "address_line_1": "Street address",
+            "address_line_2": "Street address (optional)",
+            "address_line_3": "Street address (optional)",
+        }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -475,6 +522,13 @@ class BidForm(forms.ModelForm):
         for field in ["name", "address_line_1", "town_city", "county", "postcode"]:
             self.fields[field].required = True
 
+        user = User.objects.get(id=self.initial["user"]) if self.initial["user"] else None
+        user_addresses = user_address_choices(user)
+        self.fields["existing_address"].widget = forms.Select(choices=user_addresses)
+        if user_addresses:
+            for field in ["name", "address_line_1", "town_city", "county", "postcode"]:
+                self.fields[field].required = False
+
         self.helper.layout = Layout(
             Hidden("user", self.initial["user"]),
             Hidden("auction_item", self.auction_item),
@@ -484,6 +538,8 @@ class BidForm(forms.ModelForm):
             Fieldset(
                 "Shipping information",
                 HTML("<small>This information is required for shipping the item if you win the auction.</small>"),
+                "existing_address",
+                HTML("<p>OR enter a new address:</p>"),
                 "name", 
                 "address_line_1", 
                 "address_line_2", 
@@ -502,3 +558,22 @@ class BidForm(forms.ModelForm):
             if value < auction_item.minimum_bid():
                 raise ValidationError(f"Please enter an amount of at least £{auction_item.minimum_bid():.2f}")
         return value
+
+    def clean(self):
+        if self.cleaned_data.get("existing_address"):
+            address = UserShippingAddress.objects.get(id=self.cleaned_data['existing_address'])
+            for field in [
+                "name", 
+                "address_line_1", 
+                "address_line_2", 
+                "address_line_3", 
+                "town_city", 
+                "county", 
+                "postcode"
+            ]:
+                self.cleaned_data[field] = getattr(address, field)
+        else:
+            for field in ["name", "address_line_1", "town_city", "county", "postcode"]:
+                field_data = self.cleaned_data.get(field)
+                if not field_data:
+                    self.add_error(field, "This field is required.")
