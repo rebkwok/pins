@@ -16,6 +16,14 @@
         {% endif %}
         <hr/>
 
+        {% if page.is_closed %}
+            <hr/>
+            <h3 class="mt-4">The auction is now closed.</h3>
+        {% elif not page.is_open %}
+            <hr/>
+            <h3 class="mt-4">The auction is not yet open.</h3>
+        {% endif %}
+
         <p class="mt-4">
             Opens at: {{ page.open_at }}<br/>
             Closes at: {{ page.close_at }}

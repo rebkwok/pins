@@ -216,6 +216,23 @@ class RecipeBookSubmission(models.Model):
         super().save(*args, **kwargs)
 
 
+class AuctionsPage(Page):
+
+    body = RichTextField(blank=True, help_text="Optional content to display in the body of the Auction page.")
+
+    content_panels = Page.content_panels + [
+        FieldPanel('body'),
+    ]
+
+    subpage_types = ["Auction"]
+    parent_page_types = ["home.HomePage"]
+
+    paginate_by = 20
+
+    def auctions(self):
+        return Auction.objects.live().descendant_of(self).order_by("-close_at")
+
+
 class Auction(Page):
 
     body = RichTextField(blank=True, help_text="Optional content to display in the body of the Auction page.")
@@ -230,9 +247,12 @@ class Auction(Page):
     ]
 
     subpage_types = ["AuctionItem"]
-    parent_page_types = ["home.HomePage"]
+    parent_page_types = ["AuctionsPage"]
 
     paginate_by = 20
+
+    class Meta:
+        ordering = ("close_at",)
 
     def is_open(self):
         return self.open_at <= timezone.now()
@@ -309,7 +329,8 @@ class AuctionItem(Page):
             return self.photos.first().image
 
     def get_form(self, request, data=None, *, instance=None):
-        return BidForm(data, initial={"auction_item": self.id, "user": request.user.id}, instance=instance)
+        user = request.user.id if request.user.is_authenticated else None
+        return BidForm(data, initial={"auction_item": self.id, "user": user}, instance=instance)
 
     def serve(self, request, *args, **kwargs):
         request.is_preview = False
@@ -373,13 +394,20 @@ class AuctionItem(Page):
 
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
-        if request.user.is_authenticated:
-            form =  kwargs.pop("form", None)
-            form = form or self.get_form(request)
-            context["form"] = form
-            if request.user.bids.exists():
-                context["user_bid"] = request.user.bids.filter(auction_item=self).order_by("-amount").first()
+        form =  kwargs.pop("form", None)
+        form = form or self.get_form(request)
+        context["form"] = form
+
+        if request.user.is_authenticated and request.user.bids.exists():
+            context["user_bid"] = request.user.bids.filter(auction_item=self).order_by("-amount").first()
+            
+        if self.id:
             context["current_winning_bid"] = self.current_winning_bid()
+            context["bid_count"] = self.bids.count()
+            context["minimum_bid"] = self.minimum_bid()
+            context["auction_closed"] = self.get_parent().specific.is_closed()
+            context["auction_open"] = self.get_parent().specific.is_open()
+            
         return context
 
 

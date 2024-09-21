@@ -51,7 +51,35 @@
 
         <p>Postage: {% if page.postage %}£{{ page.postage|floatformat:2 }}{% else %}covered by donor{% endif %}</p>
 
-        
+        {% if auction_closed %}
+            <hr/>
+            <h3 class="mt-4">The auction is now closed.</h3>
+
+            <strong>Total bids:</strong> {{ bid_count }}
+            {% if current_winning_bid %}
+                <br/>
+                <mark class="text-danger fs-5"><strong>Highest bid: £{{ current_winning_bid|floatformat:2 }}</strong></mark>
+
+                {% if user_bid %}
+                    {% if user_bid.amount == current_winning_bid %}
+                    <br/>
+                    <span class="text-success">You have won this item!</span>
+                    {% else %}
+                        <br/>
+                        <span class="text-secondary">Your bid: £{{ user_bid.amount|floatformat:2 }}</span>
+                    {% endif %}
+                {% endif %}
+
+            {% endif %}<br/>
+
+        {% elif not auction_open %}
+        <p>
+            <strong>Starting bid:</strong> £{{ page.starting_bid|floatformat:2 }}
+            <br/>
+            The auction is not yet open for bidding.
+        </p>
+
+        {% else %}
         <h3>Bid on this item</h3>
 
         <p>
@@ -61,7 +89,7 @@
             <mark class="text-danger fs-5"><strong>Current highest bid: £{{ current_winning_bid|floatformat:2 }}</strong></mark>
             {% endif %}<br/>
 
-            <strong>Bids so far:</strong> {{ page.bids.count }}
+            <strong>Bids so far:</strong> {{ bid_count }}
             {% if user_bid %}
                 <br/>
                 <strong>Your bid: </strong> 
@@ -81,7 +109,7 @@
         </p>
 
 
-        <p>Enter your bid (minimum £{{ page.minimum_bid|floatformat:2 }})</p>
+        <p>Enter your bid (minimum £{{ minimum_bid|floatformat:2 }})</p>
         {% if request.user.is_authenticated %}
             <form method="post" action="">
                 {% csrf_token %}
@@ -93,5 +121,7 @@
         <p><a href="{% url 'account_login' %}?next={{ request.build_absolute_uri}}">Log in</a> to bid on this item.
         {% endif %}
     </div>
+
+    {% endif %}
 
 {% endblock content %}

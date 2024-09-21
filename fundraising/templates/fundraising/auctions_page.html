@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags navigation_tags %}
+
+{% block body_class %}{% endblock %}
+
+
+{% block content %}
+
+    <div class="container">
+
+        <h1>{{ page.title }}</h1>
+       
+        {{ page.body|richtext }}
+
+        {% if page.auctions %}
+            <ul>
+                {% for auction in page.auctions  %}
+                    {% if auction.is_closed %}
+                        <li><a href={{ auction.url }}>{{ auction.title }}</a> (closed)</li>
+                    {% elif auction.is_open %}
+                        <li><strong><a href={{ auction.url }}>{{ auction.title }}</a> <span class="text-success">(live)</span></strong></li>
+                    {% else %}
+                        <li><a href={{ auction.url }}>{{ auction.title }}</a> (not open yet)</li>
+                    {% endif %}
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>Coming soon</p>
+        {% endif %}
+    </div>
+
+{% endblock content %}
