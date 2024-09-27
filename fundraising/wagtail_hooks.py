@@ -1,3 +1,5 @@
+from django.urls import path, reverse
+
 from wagtail import hooks
 from wagtail.admin.ui.tables import BooleanColumn
 from wagtail.snippets.models import register_snippet
@@ -5,9 +7,11 @@ from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 from wagtail.admin.filters import WagtailFilterSet
 from wagtail.admin.views.bulk_action import BulkAction
 from wagtail.admin.panels import FieldPanel, TabbedInterface, ObjectList, InlinePanel
+from wagtail.admin.menu import Menu, MenuItem, SubmenuMenuItem
 
 from django_filters.filters import ChoiceFilter
 
+from .admin_views import auctions_index, auction_detail
 from .models import RecipeBookSubmission, AuctionCategory, Bid, Auction, AuctionItemLog
 from paypal.standard.ipn.models import PayPalIPN
 
@@ -196,6 +200,8 @@ class AuctionCategoryViewSet(SnippetViewSet):
     list_display = (
         "name",
     )
+    add_to_settings_menu = True
+
 
 from django.db.models import Max, Q
 
@@ -257,12 +263,22 @@ class AuctionItemLogViewSet(SnippetViewSet):
     filterset_class = BidFilterSet
 
 
-class AuctionGroup(SnippetViewSetGroup):
-    menu_label = "Auctions"
-    menu_icon = "tablet-alt"
-    items = (AuctionCategoryViewSet, AuctionItemLogViewSet, BidViewSet)
-    menu_order = 300
+@hooks.register('register_admin_urls')
+def register_auction_url():
+    return [
+        path('auctions/', auctions_index, name='auctions'),
+        path('auction/<pk>', auction_detail, name='auction_detail'),
+    ]
 
+
+@hooks.register('register_admin_menu_item')
+def register_auction_menu_item():
+    submenu = Menu(items=[
+        MenuItem('Auction Categories', reverse(AuctionCategoryViewSet().get_url_name("list")), icon_name='tablet-alt'),
+        MenuItem('Auctions', reverse('auctions'), icon_name='tablet-alt'),
+    ])
+
+    return SubmenuMenuItem('Auctions', submenu, icon_name='hammer')
 
 register_snippet(RecipeBookGroup)
-register_snippet(AuctionGroup)
+register_snippet(AuctionCategoryViewSet)

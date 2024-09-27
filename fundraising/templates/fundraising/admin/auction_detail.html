@@ -1,0 +1,18 @@
+{% extends "wagtailadmin/generic/listing.html" %}
+
+{% load i18n wagtailadmin_tags %}
+
+{% block titletag %}Auction Items{% endblock %}
+
+{% block header %}
+{% include "wagtailadmin/shared/header.html" with title=auction.title icon="date" %}
+{% endblock %}
+{% comment %} {% block content %}
+
+    {% include "wagtailadmin/shared/header.html" with title=auction.title icon="date" %}
+
+    {% for auction_item in auction.get_children.specific %}
+        <p>{{ auction_item.title }}</p>
+    {% endfor %}
+
+{% endblock %} {% endcomment %}

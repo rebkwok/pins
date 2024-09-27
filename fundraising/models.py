@@ -249,12 +249,12 @@ class Auction(Page):
     ]
 
     subpage_types = ["AuctionItem"]
-    parent_page_types = ["AuctionsPage"]
+    parent_page_types = ["AuctionsPage", "home.HomePage"]
 
     paginate_by = 20
 
     class Meta:
-        ordering = ("close_at",)
+        ordering = ("-close_at",)
 
     def is_open(self):
         return self.open_at <= timezone.now()
@@ -310,7 +310,7 @@ class AuctionItem(Page):
     donor_email = models.CharField(max_length=255, help_text="Email address of donor")
     
     starting_bid = models.DecimalField(max_digits=6, decimal_places=2)
-    postage = models.FloatField(default=0)
+    postage =models.DecimalField(max_digits=6, decimal_places=2, default=0.00)
 
     content_panels = Page.content_panels + [
         FieldPanel("category"),
@@ -391,8 +391,22 @@ class AuctionItem(Page):
     def current_winning_bid(self):
         return self.bids.aggregate(models.Max("amount", default=0))["amount__max"]
     
+    def total_due(self):
+        if self.bids.exists():
+            return self.current_winning_bid() + self.postage
+        return 0
+
+    def winner_name(self):
+        if self.bids.exists():
+            winner = self.bids.get(amount=self.current_winning_bid()).user
+            return f"{winner.first_name} {winner.last_name}"
+        return "-"
+
     def minimum_bid(self):
         return max(self.starting_bid, self.current_winning_bid() + Decimal(0.01))
+
+    def bid_count(self):
+        return self.bids.count()
 
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
@@ -405,7 +419,7 @@ class AuctionItem(Page):
             
         if self.id:
             context["current_winning_bid"] = self.current_winning_bid()
-            context["bid_count"] = self.bids.count()
+            context["bid_count"] = self.bid_count()
             context["minimum_bid"] = self.minimum_bid()
             context["auction_closed"] = self.get_parent().specific.is_closed()
             context["auction_open"] = self.get_parent().specific.is_open()
