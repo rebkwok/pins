@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404
 
 from wagtail.admin.ui.tables import Table, TitleColumn, Column
 
-from .models import Auction
+from .models import Auction, AuctionItem
 
 def auctions_index(request):
     auctions = Auction.objects.all()
@@ -25,7 +25,7 @@ def auction_detail(request, pk):
     object_list = auction.get_children().specific()
     table = Table(
         [
-            Column("__str__", label="Item"),
+            TitleColumn("__str__", label="Item", url_name="auction_item_log"),
             Column("starting_bid",),
             Column("postage",),
             Column("donor",),
@@ -43,3 +43,25 @@ def auction_detail(request, pk):
         "object_list": object_list,
         "table": table,
     })
+
+
+def auction_item_log(request, pk):
+    auction_item = get_object_or_404(AuctionItem, pk=pk)
+    object_list = auction_item.logs.all()
+    table = Table(
+        [
+            Column("timestamp"),
+            Column("log",),
+        ],
+        object_list,
+    )
+    
+    return render(request, 'fundraising/admin/auction_item_log.html', {
+        "object_list": object_list,
+        "table": table,
+        "title": f"Log of bids for {auction_item.title}"
+    })
+
+
+def auction_docs(request):
+    return render(request, 'fundraising/admin/auction_docs.html')

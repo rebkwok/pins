@@ -11,7 +11,7 @@ from wagtail.admin.menu import Menu, MenuItem, SubmenuMenuItem
 
 from django_filters.filters import ChoiceFilter
 
-from .admin_views import auctions_index, auction_detail
+from .admin_views import auctions_index, auction_detail, auction_docs, auction_item_log
 from .models import RecipeBookSubmission, AuctionCategory, Bid, Auction, AuctionItemLog
 from paypal.standard.ipn.models import PayPalIPN
 
@@ -268,6 +268,8 @@ def register_auction_url():
     return [
         path('auctions/', auctions_index, name='auctions'),
         path('auction/<pk>', auction_detail, name='auction_detail'),
+        path('auctions/docs/', auction_docs, name='auction_docs'),
+        path('auction/log/<pk>/', auction_item_log, name='auction_item_log'),
     ]
 
 
@@ -279,6 +281,12 @@ def register_auction_menu_item():
     ])
 
     return SubmenuMenuItem('Auctions', submenu, icon_name='hammer')
+
+
+@hooks.register('register_admin_menu_item')
+def register_auction_docs_menu_item():
+    return MenuItem('Auctions help', reverse('auction_docs'), icon_name='page', order=1000)
+
 
 register_snippet(RecipeBookGroup)
 register_snippet(AuctionCategoryViewSet)
