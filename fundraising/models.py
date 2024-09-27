@@ -249,7 +249,7 @@ class Auction(Page):
     ]
 
     subpage_types = ["AuctionItem"]
-    parent_page_types = ["AuctionsPage", "home.HomePage"]
+    parent_page_types = ["AuctionsPage"]
 
     paginate_by = 20
 
