@@ -32,7 +32,7 @@ def auction_detail(request, pk):
             Column("donor_email",),
             Column("bid_count", label="# bids"),
             Column("current_winning_bid",),
-            Column("winner_name"),
+            Column("winner"),
             Column("total_due"),
         ],
         object_list,

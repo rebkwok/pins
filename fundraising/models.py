@@ -396,10 +396,10 @@ class AuctionItem(Page):
             return self.current_winning_bid() + self.postage
         return 0
 
-    def winner_name(self):
+    def winner(self):
         if self.bids.exists():
             winner = self.bids.get(amount=self.current_winning_bid()).user
-            return f"{winner.first_name} {winner.last_name}"
+            return f"{winner.username} ({winner.email})"
         return "-"
 
     def minimum_bid(self):
