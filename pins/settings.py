@@ -322,7 +322,7 @@ else:  # pragma: no cover
     AWS_SES_REGION_NAME=env('AWS_SES_REGION_NAME')
     AWS_SES_REGION_ENDPOINT=env('AWS_SES_REGION_ENDPOINT')
 
-DEFAULT_FROM_EMAIL = 'pins.scot.web+no-reply@gmail.com'
+DEFAULT_FROM_EMAIL = 'web+no-reply@podencosinneed.org'
 SUPPORT_EMAIL = 'rebkwok@gmail.com'
 DEFAULT_ADMIN_EMAIL = "pinscotland16@gmail.com"
 SERVER_EMAIL = SUPPORT_EMAIL
