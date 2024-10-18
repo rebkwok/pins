@@ -1,17 +1,14 @@
 {% load i18n wagtailadmin_tags %}
 
-<div class="dropdown dropdown-button match-width col">
-    <a href="{{ view.xlsx_export_url }}" class="button bicolor button--icon">{% icon name="download" wrapped=1 %}{% trans 'Download XLSX' %}</a>
-    <div class="dropdown-toggle">{% icon name="arrow-down" %}</div>
-    <ul>
-        <li><a class="button bicolor button--icon" href="{{ view.csv_export_url }}">{% icon name="download" wrapped=1 %}{% trans 'Download CSV' %}</a></li>
-    </ul>
-</div>
-<div class="dropdown dropdown-button match-width col">  
+{% load i18n wagtailadmin_tags %}
+
+{% fragment as button %}
     <span class="button">
     Change order status
     </span>
-    <div class="dropdown-toggle">{% icon name="arrow-down" %}</div>
+{% endfragment %}
+
+{% dropdown_button button=button toggle_icon="arrow-down" %}
     <ul>
         <li
             class="button match-width"
@@ -35,4 +32,4 @@
             Reset
         </li>
     </ul>
-</div>
+{% enddropdown_button %}

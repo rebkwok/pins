@@ -916,7 +916,6 @@ class OrderSubmissionsFilterForm(SelectDateForm):
 class OrderFormSubmissionsListView(OrderingMixin, SubmissionsListView):
 
     template_name = "home/order_list_submissions_index.html"
-    export_buttons_template_name = "home/includes/order_export_buttons.html"
 
     orderable_fields = (
         "id",
