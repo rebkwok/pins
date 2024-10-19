@@ -109,9 +109,9 @@
         </p>
 
 
-        <p>Enter your bid (minimum £{{ minimum_bid|floatformat:2 }})</p>
         {% if request.user.is_authenticated %}
-            <form method="post" action="">
+        <p>Enter your bid (minimum £{{ minimum_bid|floatformat:2 }})</p>
+        <form method="post" action="">
                 {% csrf_token %}
                 <div>
                 {%  crispy form %}

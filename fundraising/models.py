@@ -270,7 +270,7 @@ class Auction(Page):
     
     def categories(self):
         categories = {}
-        for auction_item in self.get_children().specific():
+        for auction_item in self.get_children().specific().live():
             categories.setdefault(auction_item.category, []).append(auction_item)
         return categories
 
