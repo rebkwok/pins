@@ -11,8 +11,10 @@
         <h1>{{ page.title }}</h1>
         {% if request.user.is_authenticated %}
         <a href={% url 'fundraising:user_bids' page.slug %}>View your bids in this auction</a>
+        <br/><br/>
         {% else %}
-        <a href={% url 'account_login' %}?next={{ request.build_absolute_uri}}>Log in</a> to view your bids in this auction
+        <a href={% url 'account_login' %}?next={{ request.build_absolute_uri}}>Log in</a> to bid in this auction
+        <br/><br/>
         {% endif %}
         <hr/>
 

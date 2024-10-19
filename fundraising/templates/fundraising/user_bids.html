@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load wagtailcore_tags navigation_tags wagtailimages_tags %}
+{% load wagtailcore_tags navigation_tags wagtailimages_tags static %}
 
 {% block body_class %}{% endblock %}
 
@@ -10,17 +10,34 @@
 
         <h1>Your bids in <a href={{  auction.get_url }}>{{ auction.title }}</a></h1>
         
+        <hr/>
+
         {% if bids %}
             {% for bid in bids %}
-                <div class="mb-2">
-                <h3><a href={{  bid.auction_item.get_url }}>{{ bid.auction_item.title }}</a></h3>
-                <strong>Your bid: </strong> 
-                £{{ bid.amount|floatformat:2 }} <br/>
-                {% if bid.amount == bid.auction_item.current_winning_bid %}
-                <span class="text-success">You have the current highest bid.</span>
-                {% else %}
-                <span class="text-danger">Current highest bid: {{ bid.auction_item.current_winning_bid }}</span>
-                {% endif %}
+                <div class="row mt-4">
+                    <div class="col-3 col-md-2">
+                        {% if bid.auction_item.photos.exists %}
+                            <figure class="user-bid__image">
+                                {% image bid.auction_item.photos.first.image fill-180x180-c100 loading="lazy" %}
+                            </figure>
+                        {% else %}
+                            <figure class="user-bid__image">
+                                <img src={% static 'images/logo.png' %} height="180" width="180" loading="lazy">
+                                <div class="layer"></div>
+                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">No photo available</div>
+                            </figure>
+                        {% endif %}
+                    </div>
+                    <div class="col-9 col-md-10 mb-2">
+                    <h4><a href={{  bid.auction_item.get_url }}>{{ bid.auction_item.title }}</a></h4>
+                    <strong>Your bid: </strong> 
+                    £{{ bid.amount|floatformat:2 }} <br/>
+                    {% if bid.amount == bid.auction_item.current_winning_bid %}
+                    <span class="text-success">You have the current highest bid.</span>
+                    {% else %}
+                    <span class="text-danger">Current highest bid: {{ bid.auction_item.current_winning_bid }}</span>
+                    {% endif %}
+                    </div>
                 </div>
             {% endfor %}
         {% else %}

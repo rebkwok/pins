@@ -2505,3 +2505,29 @@ ul.errorlist {
   font-size: small;
   font-style: italic;
 }
+
+.user-bid__image {
+  width: 100%;
+  overflow: hidden;
+  margin: 0;
+  max-width: 100px;
+  max-height: 110px;
+}
+
+.user-bid__image img {
+  transition: transform ease 0.2s;
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  transform: scale(1.05);
+}
+
+@media (min-width: 768px) {
+  .user-bid__image {
+    width: 100%;
+    overflow: hidden;
+    margin: 0;
+    max-width: 100px;
+    max-height: 100px;
+  }
+}
