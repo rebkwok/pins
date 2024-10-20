@@ -5,6 +5,7 @@ from django.utils.safestring import mark_safe
 from wagtail.admin.ui.tables import (
     BooleanColumn, Table, TitleColumn, Column, StatusFlagColumn, UserColumn, ReferencesColumn
 )
+from wagtail.admin.ui.tables.pages import PageStatusColumn
 
 from .models import Auction, AuctionItem, Bid
 
@@ -13,6 +14,7 @@ def auctions_index(request):
     table = Table(
         [
             TitleColumn("__str__", label="Name", url_name="auction_detail",),
+            PageStatusColumn("status"),
             Column("open_at"),
             Column("close_at"),    
         ],
@@ -41,6 +43,7 @@ def auction_detail(request, pk):
     table = Table(
         [
             TitleColumn("title", label="Item (click name for details)", url_name="auction_item_result"),
+            PageStatusColumn("status"),
             Column("donor",),
             Column("bid_count", label="# bids"),
             Column("current_winning_bid", label="Winning bid", accessor=lambda x: _get_winning_bid(x)),
