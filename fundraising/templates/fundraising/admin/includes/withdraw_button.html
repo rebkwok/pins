@@ -1,0 +1,29 @@
+{% if auction.is_closed %}
+    <h3>
+        <svg class="icon icon-warning icon-auction font-danger" aria-hidden="true"><use href="#icon-warning"></use></svg>
+
+        {% if bid.withdrawn %}Reinstate{% else %}Withdraw{% endif %} this bid
+
+        <svg class="icon icon-warning icon-auction font-danger" aria-hidden="true"><use href="#icon-warning"></use></svg>
+    </h3>
+    <div class="font-danger">
+        {% if bid.withdrawn %}
+            Warning: this will reinstate the bid. If this is the highest amount, it will replace the current winning bid. Be sure
+            that this will not cause conflicts with the current winner.
+        {% elif winning_bid %}
+            Warning: this will withdraw the winning bid. The next highest bid will become the winning bid, and you will be able to
+            notify the new winner.
+        {% else %}
+            Warning: this will withdraw the bid. If this is the current winning bid, the next highest bid will become the new winning bid.
+            If the donor has already been notified of the winner, be sure to contact them to ensure they have not sent the item out already.
+        {% endif %}
+    </div>
+    <form action="{% url 'fundraising:toggle_withdrawn_bid' bid.id %}?next={{ request.build_absolute_uri }}" method="POST">
+        {% csrf_token %}
+        <div>
+        <input id="confirm" type="checkbox" required=True />
+        <label for="confirm">Tick to confirm you wish to {% if bid.withdrawn %}reinstate{% else %}withdraw{% endif %} this bid</label>
+        </div><br/>
+        <input type="submit" value="{% if bid.withdrawn %}Reinstate{% else %}Withdraw{% endif %} this bid" class="button serious ml-4" />
+    </form>
+{% endif %}

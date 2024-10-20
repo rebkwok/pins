@@ -1,10 +1,15 @@
 {% extends "wagtailadmin/generic/listing.html" %}
 
-{% load i18n wagtailadmin_tags %}
+{% load i18n static wagtailadmin_tags %}
 
-{% block titletag %}Auction Item log{% endblock %}
+{% block titletag %}Auction Item - all bids{% endblock %}
+
+{% block extra_css %}   
+    <link rel="stylesheet" href="{% static 'fundraising/css/admin.css' %}">
+{% endblock %}
 
 {% block header %}
 {% include "wagtailadmin/shared/header.html" with title=title icon="date" %}
 <a style="margin-left: 2rem;" href={% url "auction_item_result" auction_item.id %}>Back to auction item</a>
+
 {% endblock %}

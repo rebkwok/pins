@@ -274,6 +274,8 @@ class Auction(Page):
             categories.setdefault(auction_item.category, []).append(auction_item)
         return categories
 
+    def notify_winners_url(self):
+        return reverse("fundraising:notify_auction_winners", args=(self.pk,))
 
 
 class AuctionCategory(models.Model):
@@ -308,6 +310,7 @@ class AuctionItem(Page):
 
     donor = models.CharField(max_length=255, help_text="Name of person who donated this item")
     donor_email = models.CharField(max_length=255, help_text="Email address of donor")
+    show_donor = models.BooleanField(default=True, help_text="Display donor's name on item page")
     
     starting_bid = models.DecimalField(max_digits=6, decimal_places=2)
     postage =models.DecimalField(max_digits=6, decimal_places=2, default=0.00)
@@ -317,6 +320,7 @@ class AuctionItem(Page):
         FieldPanel("description"),
         FieldPanel("donor"),
         FieldPanel("donor_email"),
+        FieldPanel("show_donor"),
         FieldPanel("starting_bid"),
         FieldPanel("postage"),
         MultipleChooserPanel(
@@ -355,7 +359,7 @@ class AuctionItem(Page):
                         # Email next highest bidder if they have requested notification that their bid has
                         # been exceeded. Don't notify the one lower than that, as they should have been notified
                         # when their bid was first exceeded
-                        next_highest = self.bids.exclude(id=bid.id).order_by("-amount").first()
+                        next_highest = self.active_bids.exclude(id=bid.id).order_by("-amount").first()
                         if (
                             next_highest 
                             and next_highest.notify
@@ -377,7 +381,7 @@ class AuctionItem(Page):
                         messages.error(request, "Please correct the errors below")
             else:
                 # Does the user already have a bid? If so, use it in the form
-                instance = self.bids.filter(user=request.user).last()
+                instance = self.active_bids.filter(user=request.user).last()
                 form = self.get_form(request, instance=instance)
 
         context = self.get_context(request, *args, **kwargs, form=form)
@@ -388,19 +392,26 @@ class AuctionItem(Page):
             context,
         )    
 
+    @property
+    def active_bids(self):
+        return self.bids.filter(withdrawn=False)
+
     def current_winning_bid(self):
-        return self.bids.aggregate(models.Max("amount", default=0))["amount__max"]
+        return self.active_bids.aggregate(models.Max("amount", default=0))["amount__max"]
+
+    @property
+    def current_winning_bid_obj(self):
+        if self.active_bids.exists():
+            return self.active_bids.get(amount=self.current_winning_bid())
     
     def total_due(self):
-        if self.bids.exists():
+        if self.active_bids.exists():
             return self.current_winning_bid() + self.postage
         return 0
 
     def winner(self):
-        if self.bids.exists():
-            winner = self.bids.get(amount=self.current_winning_bid()).user
-            return f"{winner.username} ({winner.email})"
-        return "-"
+        if self.active_bids.exists():
+            return self.current_winning_bid_obj.user
 
     def minimum_bid(self):
         return max(self.starting_bid, self.current_winning_bid() + Decimal(0.01))
@@ -426,6 +437,83 @@ class AuctionItem(Page):
             
         return context
 
+    def winner_notified(self):
+        if self.active_bids.exists():
+            return self.current_winning_bid_obj.winner_notified
+        return False
+
+    def notify_winner(self, request):
+        if self.winner_notified():
+            return False
+        winning_bid = self.current_winning_bid_obj
+        if winning_bid:
+            send_mail(
+                f"PINS Auction: You have won! ({self.title})",
+                (
+                    "You have won the following PINS auction item:\n"
+                    f"{self.title} ({self.get_parent().title})\n"
+                    f"{self.get_full_url(request)}\n\n"
+                    f"Your total amount due, including shipping is £{self.total_due()}\n\n"
+                    "Please make your payment by bank transfer to PINS:\n"
+                    "Account name: Podencos in Need - PINS\n"
+                    "Account no: 13804187\n"
+                    "Sort code: 09-01-29\n\n"
+                    "To help us process your item as soon as possible, please include 'Auction' and your name in the "
+                    "reference, and send a screenshot of the transaction to {settings.DEFAULT_ADMIN_EMAIL}\n\n"
+                    "Thank you for your support!\n"
+                    "The PINS team"
+                ),
+                [winning_bid.user.email],
+                settings.DEFAULT_FROM_EMAIL,
+                reply_to=[settings.DEFAULT_ADMIN_EMAIL],
+            )
+            winning_bid.winner_notified = True
+            winning_bid.save()
+            winning_bid.write_bid_log(winner_notified=True, changed_by=request.user)
+            return True
+        return False
+
+    def donor_notified(self):
+        if self.active_bids.exists():
+            return self.current_winning_bid_obj.donor_notified
+        return False
+
+    def notify_donor(self, request):
+        if self.donor_notified():
+            return False
+        winning_bid = self.current_winning_bid_obj
+        if winning_bid:
+            send_mail(
+                f"PINS Auction: Your item has been won! ({self.title})",
+                (
+                    "Your item has been won and paid for by the winner:\n"
+                    f"{self.title} ({self.get_parent().title})\n"
+                    f"{self.get_full_url(request)}\n\n"
+                    f"Please ship it to:\n\n"
+                    f"{winning_bid.format_shipping_details()}\n\n"
+                    f"If you requested reimbursement for shipping costs, one of the admin team will be in contact shortly.\n\n"
+                    "Thank you for your support!\n"
+                    "The PINS team"
+                ),
+                [self.donor_email],
+                settings.DEFAULT_FROM_EMAIL,
+                reply_to=[settings.DEFAULT_ADMIN_EMAIL],
+            )
+            winning_bid.donor_notified = True
+            winning_bid.save()
+            winning_bid.write_bid_log(donor_notified=True, changed_by=request.user)
+            return True
+        return False
+
+    def get_logs_url(self):
+        return reverse("auction_item_log", args=(self.id,))
+
+    def notify_donor_url(self):
+        return reverse("fundraising:notify_auction_item_donor", args=(self.id,))
+
+    def notify_winner_url(self):
+        return reverse("fundraising:notify_auction_item_winner", args=(self.id,))
+    
 
 class AuctionItemLog(Orderable):
     auction_item = models.ForeignKey(AuctionItem, on_delete=models.CASCADE, related_name="logs")
@@ -457,9 +545,71 @@ class Bid(ClusterableModel):
     county = models.CharField(null=True, blank=True)
     postcode = models.CharField(null=True, blank=True)
 
-    def write_bid_log(self, new=False):
-        action = "created" if new else "updated"
-        AuctionItemLog.objects.create(auction_item=self.auction_item, log=f"User {self.user} ({self.user.id}) {action} bid: £{self.amount}")
+    # Admin use only
+    # User can delete bid until auction closes. After it closes, an admin can manually withdraw a winning bid
+    # if a user doesn't pay or changes their mind. Then the winning bid passes to the next highest.
+    withdrawn = models.BooleanField(default=False)
+    # This bid was a winning bid, and the user has been emailed notification of their win.
+    winner_notified = models.BooleanField(default=False)
+    # This bid was a winning bid, and the donor has been emailed shipping details for it.
+    donor_notified = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.user} - {self.auction_item} - £{self.amount}"
+
+    def is_winner(self):
+        return not self.withdrawn and self.amount == self.auction_item.current_winning_bid()
+
+    def toggle_withdrawn(self, request):
+        toggle_to = not self.withdrawn
+        action = "withdrawn" if toggle_to is True else "reinstated"
+        self.withdrawn = toggle_to
+        self.save()
+
+        send_mail(
+            "PINS Auction: Your bid has been withdrawn",
+            (
+                f"An admin has {action} your bid on the following PINS auction item:\n"
+                f"{self.auction_item.title} ({self.auction_item.get_parent().title})\n"
+                f"{self.auction_item.get_full_url(request)}\n\n"
+            ),
+            [self.user.email],
+            settings.DEFAULT_FROM_EMAIL,
+            reply_to=[settings.DEFAULT_ADMIN_EMAIL],
+        )
+        self.write_bid_log(new_withdrawn_status=toggle_to, changed_by=request.user)
+        return toggle_to
+
+    def write_bid_log(
+            self, 
+            new=False, 
+            new_withdrawn_status=None,
+            winner_notified=False,
+            donor_notified=False,
+            changed_by=None,
+        ):
+        changed_by_str = f" by user {changed_by}" if changed_by else ""
+        if winner_notified:
+            AuctionItemLog.objects.create(auction_item=self.auction_item, log=f"Winner {self.user} ({self.user.id}) notified{changed_by_str}")
+        elif donor_notified:
+            AuctionItemLog.objects.create(auction_item=self.auction_item, log=f"Donor {self.auction_item.donor} notified of {self.user}'s win{changed_by_str}") 
+        elif new_withdrawn_status is None:
+            action = "created" if new else "updated"
+            AuctionItemLog.objects.create(auction_item=self.auction_item, log=f"User {self.user} ({self.user.id}) {action} bid: £{self.amount}")
+        else:
+            match new_withdrawn_status:
+                case True:
+                    AuctionItemLog.objects.create(auction_item=self.auction_item, log=f"Bid withdrawn for User {self.user} ({self.user.id}){changed_by_str}")
+                case False:
+                    AuctionItemLog.objects.create(auction_item=self.auction_item, log=f"Bid reinstated for User {self.user} ({self.user.id}){changed_by_str}")
+                case _:
+                    ...
+
+    def admin_url(self):
+        return reverse("auction_item_bid", args=(self.id,))
+
+    def format_shipping_details(self):
+        return parse_shipping_address(self, delimiter="\n")
 
     def save(self):
         if self.id:
@@ -467,6 +617,8 @@ class Bid(ClusterableModel):
             if pre_save.amount != self.amount:
                 self.placed_at = timezone.now()
                 self.write_bid_log()
+            if pre_save.withdrawn != self.withdrawn:
+                self.write_bid_log(new_withdrawn_status=self.withdrawn)
         else:
             self.write_bid_log(new=True)
         
@@ -499,14 +651,17 @@ class UserShippingAddress(models.Model):
     postcode = models.CharField()
 
     def parse_address(self):
-        return ", ".join(
+        return parse_shipping_address(self)
+
+
+def parse_shipping_address(obj, delimiter=", "):
+    return delimiter.join(
             [
                 line 
-                for line in [self.name, self.address_line_1, self.address_line_2, self.address_line_3, self.town_city, self.county, self.postcode]
+                for line in [obj.name, obj.address_line_1, obj.address_line_2, obj.address_line_3, obj.town_city, obj.county, obj.postcode]
                 if line
             ]
         )
-
 
 class BidForm(forms.ModelForm):
 
@@ -553,6 +708,7 @@ class BidForm(forms.ModelForm):
                 "Shipping information",
                 HTML("<small>This information is required for shipping the item if you win the auction.</small>"),
                 "existing_address",
+                Submit('submit', f'Submit', css_class="btn btn-success"),
                 HTML("<p>OR enter a new address:</p>"),
                 "name", 
                 "address_line_1", 
@@ -562,7 +718,7 @@ class BidForm(forms.ModelForm):
                 "county", 
                 "postcode"
             ),
-            Submit('submit', f'Save', css_class="btn btn-success"),
+            Submit('submit', f'Submit', css_class="btn btn-success"),
         )
 
     def clean_amount(self):

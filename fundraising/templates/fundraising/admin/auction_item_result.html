@@ -1,0 +1,71 @@
+{% extends "wagtailadmin/generic/base.html" %}
+
+{% load i18n static wagtailadmin_tags %}
+
+{% block titletag %}Auction Item Results{% endblock %}
+
+{% block extra_css %}   
+    <link rel="stylesheet" href="{% static 'fundraising/css/admin.css' %}">
+{% endblock %}
+
+{% block main_content %}
+
+<a href={% url "auction_detail" auction_item.get_parent.id %}>Back to auction</a>
+
+<hr/>
+
+<dt>Item description</dt>
+<dd>{{ auction_item.description }}</dd>
+
+<dt>Donor</dt>
+<dd>{{ auction_item.donor }}</dd>
+
+<dt>Donor email</dt>
+<dd>{{ auction_item.donor_email }}</dd>
+
+<dt>Starting bid</dt>
+<dd>£{{ auction_item.starting_bid }}</dd>
+
+<dt>Postage</dt>
+<dd>£{{ auction_item.postage }}</dd>
+
+<dt>Total number of bids</dt>
+<dd>
+    {% with bid_count=auction_item.bid_count active_bid_count=auction_item.active_bids.count %}
+        {% if bid_count > 0 %}
+            <a href={% url "auction_item_bids" auction_item.id %}>{{ bid_count }} (click to view details)</a>
+            {% if bid_count > active_bid_count %}
+                <br/>Active bids: {{ active_bid_count }}
+            {% endif %}
+        {% else %}
+            {{ bid_count }}
+        {% endif %}
+    {% endwith %} 
+</dd>
+
+<dt>Logs</dt>
+<dd><a href={{ auction_item.get_logs_url }}>View bid logs</a></dd>
+
+{% if winning_bid %}
+    <hr/>
+    <h3>{% icon name="pick" classname="icon-auction winning-icon" %} {% if auction.is_closed %}Winning{% else %}Current winning{% endif %} bid {% icon name="pick" classname="icon-auction winning-icon" %}</h3>
+
+    
+    <div style="margin-bottom: 1rem;">
+        {% if auction.is_closed %}
+          {% include "fundraising/admin/includes/winning_bid_buttons.html" with bid=winning_bid %}
+        {% else %}
+            <em>When the auction is closed, you will be able to notify winners and donors of the results.</em>
+        {% endif %}
+    </div>
+    
+
+    {% include "fundraising/admin/includes/bid.html" with bid=winning_bid%}
+
+    <hr>
+
+    {% include 'fundraising/admin/includes/withdraw_button.html' with bid=winning_bid %}
+
+{% endif %}
+
+{% endblock %}

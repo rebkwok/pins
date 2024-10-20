@@ -1,0 +1,30 @@
+{% if bid.is_winner %}
+    {% if bid.winner_notified %}
+        <span class="font-success">The bidder has been notified of their win and has been sent payment information.</span>
+    {% else %}
+        <span class="font-danger">The bidder has not yet been notified of their win.</span>
+        <br/><br/>
+        <form action="{{ bid.auction_item.notify_winner_url }}?next={{ request.build_absolute_uri}}" method="POST">
+            {% csrf_token %}
+            <label>Email bidder with confirmation of win and request for payment.</label>
+            <input type="submit" value="Notify winner" class="button button-success ml-4" {% if not auction.is_closed %}disabled{% endif %} />
+        </form>
+    {% endif %}
+    <br/>
+    {% if bid.donor_notified %}
+        <span class="font-success">The donor has been notified of the win and has been sent shipping information.</span>
+    {% elif bid.winner_notified %}
+        <span class="font-danger">The donor has not yet been notified of the win.</span>
+        <br/><br/>
+        <form action="{{ bid.auction_item.notify_donor_url }}?next={{ request.build_absolute_uri}}" method="POST">
+            {% csrf_token %}
+            <div class="form-group">
+            <input id="confirm_payment" type="checkbox" required=True />
+            <label for="confirm_payment">Tick to confirm payment has been received from the winning bidder.</label>
+            </div>
+            <label>Email donor with confirmation of win and shipping information.</label>
+            <input type="submit" value="Notify donor" class="button button-success ml-4" {% if not auction.is_closed %}disabled{% endif %} />
+        </form>
+    {% endif %}
+{% endif%}
+<hr/>

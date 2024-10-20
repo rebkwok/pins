@@ -1,0 +1,37 @@
+{% extends "wagtailadmin/generic/base.html" %}
+
+{% load i18n static wagtailadmin_tags %}
+
+{% block titletag %}Auction Item Bid{% endblock %}
+
+{% block extra_css %}   
+    <link rel="stylesheet" href="{% static 'fundraising/css/admin.css' %}">
+{% endblock %}
+
+{% block main_content %}
+
+<a href={% url "auction_item_bids" auction_item.id %}>Back to auction item bids</a>
+
+<hr/>
+<div style="margin-bottom: 1rem;">
+{% if bid.withdrawn %}
+    <span class="font-danger">This bid has been withdrawn.</span>
+{% elif winning_bid %}
+    {% icon name="pick" classname="icon-auction winning-icon" %}
+    <strong>This is the {% if not auction.is_closed %}current {% endif %}winning bid.</strong>
+    {% icon name="pick" classname="icon-auction winning-icon" %}
+{% endif %}
+
+<br/>
+{% if auction.is_closed %}
+{% include "fundraising/admin/includes/winning_bid_buttons.html" %}
+{% endif %}
+
+</div>
+
+{% include "fundraising/admin/includes/bid.html" %}
+<hr/>
+
+{% include 'fundraising/admin/includes/withdraw_button.html' %}
+
+{% endblock %}

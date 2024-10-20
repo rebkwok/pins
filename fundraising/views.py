@@ -2,7 +2,11 @@ from typing import Any
 from django import http
 from django.conf import settings
 from django.core.mail import send_mail
+from wagtail.admin.mail import send_mail as wagtail_send_mail
+from django.contrib import messages
 from django.shortcuts import render, redirect, HttpResponse, get_object_or_404
+from django.views.decorators.http import require_POST
+
 from django.urls import reverse
 from django.template.response import TemplateResponse
 from django.template.context_processors import csrf
@@ -15,7 +19,7 @@ from payments.utils import get_paypal_form
 from payments.utils import signature
 
 from .forms import RecipeBookContrbutionForm, RecipeBookContrbutionEditForm
-from .models import RecipeBookSubmission, Bid, Auction
+from .models import RecipeBookSubmission, Bid, Auction, AuctionItem
 
 
 class RecipeBookSubmissionCreateView(CreateView):
@@ -153,3 +157,83 @@ def user_bids(request, auction_slug):
         "fundraising/user_bids.html", 
         {"auction": auction, "bids": bids}
     )
+
+
+def withdraw_bid(request, bid_id):
+    # called via htmx from admin bids page
+    bid = get_object_or_404(Bid, pk=bid_id)
+    bid.withdrawn = True
+    bid.save()
+    auction_item = bid.auction_item
+
+    send_mail(
+        "PINS Auction: Your bid has been withdrawn",
+        (
+            "An admin has withdrawn your bid on the following PINS auction item:\n"
+            f"{auction_item.title} ({auction_item.get_parent().title})\n\n"
+        ),
+        [bid.user.email],
+        settings.DEFAULT_FROM_EMAIL,
+        reply_to=[settings.DEFAULT_ADMIN_EMAIL],
+    )
+
+    resp = HttpResponse()
+    resp.headers["HX-Refresh"] = "true"
+    return resp
+
+
+@require_POST
+def toggle_withdrawn_bid(request, pk):
+    bid = get_object_or_404(Bid, pk=pk)
+    next_url = request.GET.get("next", reverse("auction_item_result", args=(bid.auction_item.id,)))
+    new_status = bid.toggle_withdrawn(request)
+    if new_status:
+        messages.success(request, "Bid has been withdrawn")
+    else:
+        messages.success(request, "Bid has been reinstated")
+    return redirect(next_url)
+
+
+@require_POST
+def notify_auction_item_donor(request, pk):
+    auction_item = get_object_or_404(AuctionItem, pk=pk)
+    auction = auction_item.get_parent().specific
+    next_url = request.GET.get("next", reverse("auction_item_result", args=(pk,)))
+    if not auction.is_closed():
+        messages.error(request, "Cannot notify donor; auction is not yet closed")
+    else:
+        notified = auction_item.notify_donor(request)
+        if notified:
+            messages.success(request, "Donor has been notified by email")
+    return redirect(next_url)
+
+
+@require_POST
+def notify_auction_item_winner(request, pk):
+    auction_item = get_object_or_404(AuctionItem, pk=pk)
+    auction = auction_item.get_parent().specific
+    next_url = request.GET.get("next", reverse("auction_item_result", args=(pk,)))
+    if not auction.is_closed():
+        messages.error(request, "Cannot notify winners; auction is not yet closed")
+    else:
+        notified = auction_item.notify_winner(request)
+        if notified:
+            messages.success(request, "Winner has been notified by email")
+    return redirect(next_url)
+
+
+@require_POST
+def notify_winners(request, pk):
+    # called from admin auction detail page
+    auction = get_object_or_404(Auction, pk=pk)
+    if not auction.is_closed():
+        messages.error(request, "Cannot notify winners; auction is not yet closed")
+    else:
+        auction_items = auction.get_children().specific()
+        notified_count = 0
+        for auction_item in auction_items:
+            notified = auction_item.notify_winner(request)
+            if notified:
+                notified_count += 1
+        messages.success(request, f"{notified_count} winners have been notified")
+    return redirect(reverse("auction_detail", args=(pk,)))

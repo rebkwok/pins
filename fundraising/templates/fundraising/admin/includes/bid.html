@@ -1,0 +1,20 @@
+<dt>Bidder name</dt>
+<dd>{{ bid.user.first_name }} {{ bid.user.last_name }} ({{ bid.user.username }})</dd>
+
+<dt>Bidder email</dt>
+<dd>{{ bid.user.email }}</dd>
+
+<dt>Bid Amount</dt>
+<dd>£{{ bid.amount }}</dd>
+
+<dt>Total due (incl. p&p)</dt>
+<dd>£{{ auction_item.total_due }}</dd>
+
+<dt>Shipping details</dt>
+<dd>{{ bid.name }}<br/>
+{{ bid.address_line_1 }}<br/>
+{% if bid.address_line_2 %}{{ bid.address_line_2 }}<br/>{% endif %}
+{% if bid.address_line_3 %}{{ bid.address_line_3 }}<br/>{% endif %}
+{{ bid.town_city }}<br/>
+{{ bid.county }}<br/>
+{{ bid.postcode }}<br/>

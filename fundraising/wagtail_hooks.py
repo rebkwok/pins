@@ -11,8 +11,8 @@ from wagtail.admin.menu import Menu, MenuItem, SubmenuMenuItem
 
 from django_filters.filters import ChoiceFilter
 
-from .admin_views import auctions_index, auction_detail, auction_docs, auction_item_log
-from .models import RecipeBookSubmission, AuctionCategory, Bid, Auction, AuctionItemLog
+from .admin_views import auctions_index, auction_detail, auction_docs, auction_item_bids, auction_item_log, auction_item_bid, auction_item_result
+from .models import RecipeBookSubmission, AuctionCategory, Bid, Auction, AuctionItemLog, AuctionItem
 from paypal.standard.ipn.models import PayPalIPN
 
 
@@ -267,9 +267,12 @@ class AuctionItemLogViewSet(SnippetViewSet):
 def register_auction_url():
     return [
         path('auctions/', auctions_index, name='auctions'),
-        path('auction/<pk>', auction_detail, name='auction_detail'),
+        path('auction/<pk>/', auction_detail, name='auction_detail'),
         path('auctions/docs/', auction_docs, name='auction_docs'),
-        path('auction/log/<pk>/', auction_item_log, name='auction_item_log'),
+        path('auction/item/<pk>/result/', auction_item_result, name='auction_item_result'),
+        path('auction/item/<pk>/log/', auction_item_log, name='auction_item_log'),
+        path('auction/item/<pk>/bids/', auction_item_bids, name='auction_item_bids'),
+        path('auction/item/bid/<pk>/', auction_item_bid, name='auction_item_bid'),
     ]
 
 

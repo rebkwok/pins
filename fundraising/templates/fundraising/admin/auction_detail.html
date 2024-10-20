@@ -1,9 +1,23 @@
 {% extends "wagtailadmin/generic/listing.html" %}
 
-{% load i18n wagtailadmin_tags %}
+{% load i18n static wagtailadmin_tags %}
 
 {% block titletag %}Auction Items{% endblock %}
 
+{% block extra_css %}   
+    <link rel="stylesheet" href="{% static 'fundraising/css/admin.css' %}">
+{% endblock %}
+
 {% block header %}
 {% include "wagtailadmin/shared/header.html" with title=auction.title icon="date" %}
+<div style="margin-left: 2rem; margin-top: -1rem;"><a href="{% url 'auctions' %}">Back to auctions list</a></div>
+
+<div style="padding-left: 5rem; padding-top:2rem; padding-bottom:2rem;">
+    <form action="{{ auction.notify_winners_url }}" method="POST">
+        {% csrf_token %}
+        <input type="submit" value="Notify all winners" class="button button-success ml-4" {% if not auction.is_closed %}disabled{% endif %} />
+    </form>
+</div>
+
 {% endblock %}
+
