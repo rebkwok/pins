@@ -1675,8 +1675,8 @@ class StandardPage(Page):
         ),
     ]
 
-    parent_page_types = ["HomePage", "OrderFormPage"]
-    subpage_types = []
+    parent_page_types = ["HomePage"]
+    subpage_types = ["OrderFormPage"]
 
 
 class FAQPage(Page):
