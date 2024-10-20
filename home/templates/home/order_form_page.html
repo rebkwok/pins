@@ -41,7 +41,14 @@
 
                 {% if page.shipping_costs_dict %}
                     {% if page.shipping_costs_dict|length == 1 %}
-                        P&P - {% for label, shipping_cost in page.shipping_costs_dict.values %}{{ label }}: £{{shipping_cost }}{% endfor %}
+                        {% for label, shipping_cost in page.shipping_costs_dict.values %}
+                            P&P - 
+                                {% if shipping_cost > 0 %} 
+                                    {{ label }}: £{{shipping_cost }}
+                                {% else %}
+                                    free
+                                {% endif %}
+                        {% endfor %}
                     {% else %}
                     P&P:
                     <ul>
