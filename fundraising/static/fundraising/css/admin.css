@@ -1,0 +1,25 @@
+.icon-auction {
+  height: 1rem; 
+  width: 1rem;
+}
+
+.icon-link {
+  color: #00B0B1;
+}
+
+.winning-icon {
+  color: yellow; 
+}
+
+.font-success {
+  color: green;
+}
+ 
+.font-danger {
+  color: red;
+}
+
+dt {
+  font-size: 120%;
+  font-weight: bold;
+}

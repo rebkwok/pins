@@ -31,11 +31,11 @@
                     <div class="col-9 col-md-10 mb-2">
                     <h4><a href={{  bid.auction_item.get_url }}>{{ bid.auction_item.title }}</a></h4>
                     <strong>Your bid: </strong> 
-                    £{{ bid.amount|floatformat:2 }} <br/>
+                    £{{ bid.amount|floatformat:2 }} {% if bid.withdrawn %}(withdrawn){% endif %}<br/>
                     {% if bid.amount == bid.auction_item.current_winning_bid %}
                     <span class="text-success">You have the current highest bid.</span>
                     {% else %}
-                    <span class="text-danger">Current highest bid: {{ bid.auction_item.current_winning_bid }}</span>
+                    <span class="text-danger">Current highest bid: £{{ bid.auction_item.current_winning_bid }}</span>
                     {% endif %}
                     </div>
                 </div>

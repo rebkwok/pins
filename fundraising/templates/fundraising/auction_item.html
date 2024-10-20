@@ -18,7 +18,7 @@
         {% endif %}
         <hr/>
         <h2 class="mt-4">{{ page.title }}</h2>
-
+        {% if page.show_donor %}<div><small><em>Donated by {{ page.donor }}</em></small></div>{% endif %}
         {{ page.description |richtext }}
         
         <!-- Button trigger modal -->
@@ -112,7 +112,12 @@
 
 
         {% if request.user.is_authenticated %}
-        <p>Enter your bid (minimum £{{ minimum_bid|floatformat:2 }})</p>
+        <p>
+            Enter your bid (minimum £{{ minimum_bid|floatformat:2 }})<br/>
+            <em><small>
+                Note: if you have already bid on this item, you can use this form to update your shipping information without increasing your bid.
+            </small></em>
+        </p>
         <form method="post" action="">
                 {% csrf_token %}
                 <div>
