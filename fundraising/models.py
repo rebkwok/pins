@@ -464,7 +464,7 @@ class AuctionItem(Page):
                     "Account no: 13804187\n"
                     "Sort code: 09-01-29\n\n"
                     "To help us process your item as soon as possible, please include 'Auction' and your name in the "
-                    "reference, and send a screenshot of the transaction to {settings.DEFAULT_ADMIN_EMAIL}\n\n"
+                    f"reference, and send a screenshot of the transaction to {settings.DEFAULT_ADMIN_EMAIL}\n\n"
                     "Thank you for your support!\n"
                     "The PINS team"
                 ),
@@ -489,9 +489,9 @@ class AuctionItem(Page):
         winning_bid = self.current_winning_bid_obj
         if winning_bid:
             send_mail(
-                f"PINS Auction: Your item has been won! ({self.title})",
+                f"PINS Auction: Your item has sold! ({self.title})",
                 (
-                    "Your item has been won and paid for by the winner:\n"
+                    "Your PINS auction item has been won:\n"
                     f"{self.title} ({self.get_parent().title})\n"
                     f"{self.get_full_url(request)}\n\n"
                     f"Please ship it to:\n\n"
