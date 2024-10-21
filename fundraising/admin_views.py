@@ -43,6 +43,7 @@ def auction_detail(request, pk):
     table = Table(
         [
             TitleColumn("title", label="Item (click name for details)", url_name="auction_item_result"),
+            Column("category"),
             PageStatusColumn("status"),
             Column("donor",),
             Column("bid_count", label="# bids"),

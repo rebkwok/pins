@@ -1,0 +1,38 @@
+{% extends 'wagtailadmin/bulk_actions/confirmation/base.html' %}
+{% load i18n wagtailadmin_tags %}
+
+{% block titletag %}{% blocktranslate trimmed count counter=items|length %}Change 1 item{% plural %}Change {{ counter }} items{% endblocktranslate %}{% endblock %}
+
+{% block header %}
+    {% trans "Change category" as del_str %}
+    {% include "wagtailadmin/shared/header.html" with title=del_str icon="doc-empty-inverse" %}
+{% endblock header %}
+
+{% block items_with_access %}
+    {% if items %}
+    <p>{% trans "Are you sure you want to change these items?" %}</p>
+    <ul>
+        {% for item in items %}
+        <li>
+            <a href="" target="_blank" rel="noreferrer">{{ item.item }}</a> (current category: {{ item.item.category }})
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+{% endblock items_with_access %}
+
+{% block items_with_no_access %}
+{% blocktranslate trimmed asvar no_access_msg count counter=items_with_no_access|length %}Category change is only available for Auction Items. This item cannot be changed{% plural %}Category change is only available for Auction Items. These items cannot be changed{% endblocktranslate %}
+{% include 'fundraising/admin/includes/change_category_list_items_with_no_access.html' with items=items_with_no_access no_access_msg=no_access_msg %}
+
+{% endblock items_with_no_access %}
+
+{% block form_section %}
+{% if items %}
+    {% trans 'Yes, change' as action_button_text %}
+    {% trans "No, don't chnage" as no_action_button_text %}
+    {% include 'fundraising/admin/change_category_confirmation_form.html' with action_button_class="serious" %}
+{% else %}
+    {% include 'wagtailadmin/bulk_actions/confirmation/go_back.html' %}
+{% endif %}
+{% endblock form_section %}

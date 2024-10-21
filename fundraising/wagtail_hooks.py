@@ -6,6 +6,8 @@ from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 from wagtail.admin.filters import WagtailFilterSet
 from wagtail.admin.views.bulk_action import BulkAction
+from wagtail.admin.views.pages.bulk_actions.page_bulk_action import PageBulkAction
+
 from wagtail.admin.panels import FieldPanel, TabbedInterface, ObjectList, InlinePanel
 from wagtail.admin.menu import Menu, MenuItem, SubmenuMenuItem
 
@@ -293,3 +295,39 @@ def register_auction_docs_menu_item():
 
 register_snippet(RecipeBookGroup)
 register_snippet(AuctionCategoryViewSet)
+
+
+from django import forms
+class ChangeCategoryForm(forms.Form):
+    category = forms.ModelChoiceField(
+        required=True,
+        queryset=AuctionCategory.objects.all()
+    )
+
+
+@hooks.register("register_bulk_action")
+class ChangeCategory(PageBulkAction):
+    display_name = "Change categopry"
+    action_type = "change_category"
+    aria_label = "Change category"
+    template_name = "fundraising/admin/change_category_confirmation.html"
+    form_class = ChangeCategoryForm
+
+    def check_perm(self, obj):
+        return isinstance(obj.specific, AuctionItem)
+
+    def get_execution_context(self):
+        data = super().get_execution_context()
+        data['form'] = self.cleaned_form
+        return data
+
+    @classmethod
+    def execute_action(cls, objects, **kwargs):
+        category = kwargs["form"].cleaned_data["category"]
+        count = 0
+        for object in objects:
+            auction_item = object.specific
+            auction_item.category = category
+            auction_item.save()
+            count += 1
+        return count, count  # return the count of updated objects

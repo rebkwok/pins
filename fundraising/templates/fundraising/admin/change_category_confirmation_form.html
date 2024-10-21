@@ -1,0 +1,10 @@
+{% extends 'wagtailadmin/bulk_actions/confirmation/form.html' %}
+
+{% block form_fields %}
+    {% for field in form %}
+        <div class="fieldWrapper">
+            {{ field.label_tag }} {{ field }}
+            {{ field.errors }}
+        </div><br/>
+    {% endfor %}
+{% endblock form_fields %}

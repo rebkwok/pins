@@ -234,6 +234,8 @@ class AuctionsPage(Page):
     def auctions(self):
         return Auction.objects.live().descendant_of(self).order_by("-close_at")
 
+from wagtail.search import index
+
 
 class Auction(Page):
 
@@ -330,6 +332,9 @@ class AuctionItem(Page):
         )
     ]
 
+    def get_admin_display_title(self):
+        return f"{self.title} ({self.category})"
+    
     def image(self):
         if self.photos.exists():
             return self.photos.first().image
