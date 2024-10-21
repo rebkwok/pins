@@ -967,18 +967,20 @@ footer {
   display: flex;
   width: 100%;
   justify-content: center;
-  gap: 20px;
   list-style-type: none;
-  padding-left: 0;
+  padding-left: 10px;
 }
 
 .pagination .page-item a {
   text-transform: capitalize;
   text-decoration: underline;
+  color: var(--dark-orange);;
 }
 
 .pagination .page-item.active span {
   color: var(--grey);
+  border-color: var(--dark-orange);
+  background-color: white;
 }
 
 .pagination .page-item.disabled a {

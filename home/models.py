@@ -6,6 +6,7 @@ from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.core.mail import EmailMultiAlternatives
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import validate_slug
 from django.db import models
@@ -1743,3 +1744,59 @@ class FooterText(
     class Meta(TranslatableMixin.Meta):
         verbose_name_plural = "Footer Text"
 
+
+class NewsPage(Page):
+    parent_page_types = ["HomePage"]
+    subpage_types = ["NewsItemPage"]
+    paginate_by = 2
+    body = RichTextField(verbose_name="Page body", blank=True)
+
+    content_panels = Page.content_panels + [
+        FieldPanel("body")
+    ]
+
+    # Returns a queryset of NewsItemPage objects that are live, that are direct
+    # descendants of this index page with most recent first
+    def get_news_items(self):
+        return (
+            NewsItemPage.objects.live().descendant_of(self).order_by("-date", "-id")
+        )
+
+    # Pagination for the index page. We use the `django.core.paginator` as any
+    # standard Django app would, but the difference here being we have it as a
+    # method on the model rather than within a view function
+    def paginate(self, request):
+        page = request.GET.get("page")
+        paginator = Paginator(self.get_news_items(), self.paginate_by)
+        try:
+            pages = paginator.page(page)
+        except PageNotAnInteger:
+            pages = paginator.page(1)
+        except EmptyPage:
+            pages = paginator.page(paginator.num_pages)
+        return pages
+
+    # Returns the above to the get_context method that is used to populate the
+    # template
+    def get_context(self, request):
+        context = super().get_context(request)
+
+        # NewsItemPages objects (get_news_items) are passed through pagination
+        news_items = self.paginate(request)
+
+        context["news_items"] = news_items
+
+        return context
+
+
+class NewsItemPage(Page):
+    parent_page_types = ["NewsPage"]
+    subpage_types = []
+
+    date = models.DateField(default=datetime.datetime.today)
+    body = RichTextField(verbose_name="body")
+
+    content_panels = Page.content_panels + [
+        FieldPanel("date"),
+        FieldPanel("body")
+    ]

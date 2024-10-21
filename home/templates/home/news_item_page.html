@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags wagtailimages_tags hometags %}
+
+{% block content %}
+    {% include "includes/header-hero.html" %}
+
+    <div class="container">
+        <p><em>{{ page.date }}</em></p>
+        <p>{{ page.body | richtext }}
+    </div>
+{% endblock content %}
