@@ -2615,3 +2615,17 @@ summary > span.day, div.advent-day-cover > span.day {
 .image-container:hover .overlay {
   opacity: 1;
 }
+
+@media (max-width: 488px) {
+  .image-container {
+    max-width: 150px;
+  }
+  .advent-image {
+    height: 150px;
+    width: 150px;
+  }
+  summary, div.advent-day-cover {
+    height: 150px;
+    width: 150px;
+  }
+}
