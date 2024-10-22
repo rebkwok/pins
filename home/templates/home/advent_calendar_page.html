@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags wagtailimages_tags wagtailembeds_tags %}
+
+{% block content %}
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
+                <h1>{{ page.title }}</h1>
+
+                {{ page.introduction|richtext }}
+                      
+
+                <div class="container">
+                <div class="row">
+
+                    <div class="col-3">
+                    <button onclick="toggle()" class="btn btn-secondary">Open/close all previous days</button>
+                    </div>
+                    <div class="row image-gallery-container">
+                        <ul class="image-gallery">
+                            {% for day in page.days.all %}
+
+                            {% if forloop.counter < today_day %}
+                                <details class="previous"> 
+                                    <summary class="text-center advent-day-cover"><span class="day">{{ forloop.counter }}</span><br/><span class="reveal-text"></span></summary>
+                                    <div class="image-container">
+                                    {% image day.image fill-600x600-c100 loading="lazy" class="advent-image" %}
+                                    <div class="overlay">{% if day.caption %}{{ day.caption }}{% else %}{{ forloop.counter }}{% endif %}</div>
+                                    </div>
+                                </details>
+                            {% elif forloop.counter == today_day %}
+                                <details> 
+                                    <summary class="text-center advent-day-cover today"><span class="day">{{ forloop.counter }}</span><br/><span class="reveal-text"></span></summary>
+                                    {% image day.image fill-600x600-c100 loading="lazy" class="advent-image" %}
+                                </details>
+                            {% else %}
+                                <div class="text-center advent-day-cover"><span class="day">{{ forloop.counter }}</span></div>                                
+                            {% endif %}
+
+                            {% endfor %}
+                        </ul>
+                    </div>
+    
+                </div>
+                <div>
+
+            </div>
+        </div>
+    </div>
+
+{% endblock content %}
+
+
+{% block extra_js %}
+
+<script type="text/javascript">
+
+    document.querySelectorAll(".avent-image").forEach((item) => {
+        item.addEventListener("onload", (event) => {
+            this.style.animationName = 'reveal'
+        });
+      });
+
+      function toggle() {
+        var button = document.querySelector("button");
+        var details = document.querySelectorAll("details.previous");
+        var flag = button.textContent === "Close all windows before today";
+        if (flag) {
+          for (var i = 0; i < details.length; i++) {
+            details[i].removeAttribute("open");
+          }
+          button.textContent = "Open/close all windows before today";
+        } else {
+          for (var i = 0; i < details.length; i++) {
+            details[i].setAttribute("open", "");
+          }
+          button.textContent = "Close all windows before today";
+        }
+      }
+
+</script>
+{% endblock %}

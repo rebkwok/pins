@@ -2533,3 +2533,85 @@ ul.errorlist {
     max-height: 100px;
   }
 }
+
+details[open] summary {
+	display: none;
+}
+
+details[open] img {
+  animation: .3s cubic-bezier(0.1, 0, 0.1, 1) both;
+}
+
+summary, div.advent-day-cover {
+  display: inline-block;
+  border: 1px solid black;
+  height: 200px;
+  width: 200px;
+  padding-top: 5px;
+  padding-left: 10px;
+  padding-right: 10px;
+  background-size: cover;
+}
+
+summary {
+  cursor: pointer;
+  background-image: url("/static/images/advent/xmas3.svg");
+}
+
+summary.today {
+  cursor: pointer;
+  background-image: url("/static/images/advent/xmas1.svg");
+}
+
+div.advent-day-cover {
+  background-image: url("/static/images/advent/xmas3.svg");
+  opacity: 0.3;
+}
+
+summary > span.day, div.advent-day-cover > span.day {
+  font-size: xxx-large;
+}
+
+@keyframes reveal {
+  from {
+    transform: scale(.7);
+    opacity: 0;
+  }
+}
+
+.advent-image {
+  height: 200px;
+  width: 200px;
+  border: red 2px solid;
+}
+
+.reveal-text {
+  padding-top: 80px;
+  display: block;
+}
+
+.image-container {
+  position: relative;
+  max-width: 200px;
+}
+
+/* The overlay effect - lays on top of the container and over the image */
+.overlay {
+  position: absolute;
+  bottom: 0;
+  background: rgb(124, 6, 6);
+  background: rgba(124, 6, 6, 0.5); /* Black see-through */
+  color: #f1f1f1;
+  width: 100%;
+  transition: .5s ease;
+  opacity:0;
+  color: white;
+  font-size: 20px;
+  padding: 20px;
+  text-align: center;
+}
+
+/* When you mouse over the container, fade in the overlay title */
+.image-container:hover .overlay {
+  opacity: 1;
+}

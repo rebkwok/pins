@@ -1808,3 +1808,33 @@ class NewsItemPage(Page):
         FieldPanel("image"),
         FieldPanel("body")
     ]
+
+
+class AdventCalendarDay(Orderable):
+    """
+    Related images for DogPage; hidden on admin
+    """
+    page = ParentalKey("AdventCalendarPage", on_delete=models.CASCADE, related_name='days')
+    image = models.ForeignKey(
+        'wagtailimages.Image', on_delete=models.CASCADE, related_name='+'
+    )
+    caption = models.CharField(max_length=255, null=True, blank=True)
+
+    panels = [
+        FieldPanel('image'),
+        FieldPanel('caption'),
+    ]
+
+
+class AdventCalendarPage(Page):
+    body = RichTextField(verbose_name="body")
+
+    content_panels = Page.content_panels + [
+        FieldPanel("body"),
+        InlinePanel("days"),
+    ]
+
+    def get_context(self, request, *args, **kwargs):
+        context = super().get_context(request, *args, **kwargs)
+        context["today_day"] = datetime.datetime.today().day
+        return context
