@@ -1748,7 +1748,7 @@ class FooterText(
 class NewsPage(Page):
     parent_page_types = ["HomePage"]
     subpage_types = ["NewsItemPage"]
-    paginate_by = 2
+    paginate_by = 10
     body = RichTextField(verbose_name="Page body", blank=True)
 
     content_panels = Page.content_panels + [
@@ -1795,8 +1795,16 @@ class NewsItemPage(Page):
 
     date = models.DateField(default=datetime.datetime.today)
     body = RichTextField(verbose_name="body")
+    image = models.ForeignKey(
+        "wagtailimages.Image",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
 
     content_panels = Page.content_panels + [
         FieldPanel("date"),
+        FieldPanel("image"),
         FieldPanel("body")
     ]

@@ -2,29 +2,24 @@
 {% load wagtailcore_tags wagtailimages_tags hometags %}
 
 {% block content %}
-    {% include "includes/header-hero.html" %}
+    {% if not tag %}
+        {% include "includes/header-index.html" %}
+    {% endif %}
 
-    <div class="container mt-4">
-        <div class="row">
-            <div class="col-12">
-                <div class="row">
-                    {{ page.body|richtext }}
-                </div>
+    <div class="container">
 
-                {% if news_items %}
-                    {% for news_item in news_items %}
-                        <h2>{{ news_item.title }}</h2>
-                        <p><em>{{ news_item.date }}</em></p>
-                        <p>{{ news_item.body | richtext }}
-                        
-                    {% endfor %}
-                </ul>
+        <div class="blog-list">
+            {% if news_items %}
+                {% for news_item in news_items %}
+                    {% include "includes/card/blog-listing-card.html" with blog=news_item %}
+                {% endfor %}
             {% else %}
-                <p>Coming soon</p>
+                <div class="col-md-12">
+                    <p>Coming soon.</p>
+                </div>
             {% endif %}
-        </div>
-    
-        {% if news_items.paginator.count > page.paginate_by %}
+
+            {% if news_items.paginator.count > page.paginate_by %}
             <div class="container">
                 <div class="row">
                     <div class="col-12">
@@ -33,8 +28,7 @@
                 </div>
             </div>
         {% endif %}
-
-            </div>
         </div>
     </div>
-{% endblock content %}
+
+    {% endblock content %}

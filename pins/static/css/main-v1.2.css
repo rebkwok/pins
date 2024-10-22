@@ -2164,8 +2164,8 @@ input[type='radio'] {
     flex-shrink: 0;
     overflow: hidden;
     margin: 0;
-    width: 325px;
-    height: 250px;
+    width: 200px;
+    height: 200px;
   }
 }
 
