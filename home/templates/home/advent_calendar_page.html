@@ -12,9 +12,9 @@
 
                 <div class="container">
                 <div class="row">
-
-                    <div class="col-8 col-sm-4">
-                    <button onclick="toggle()" class="btn btn-secondary">Open/close all previous days</button>
+                    <div>{{ page.body| richtext }}</div>
+                    <div class="col-10 col-sm-6">
+                    <button onclick="toggle()" class="btn btn-success window-button">Open all previous days</button>
                     </div>
                     <div class="row image-gallery-container">
                         <ul class="image-gallery">
@@ -62,19 +62,19 @@
       });
 
       function toggle() {
-        var button = document.querySelector("button");
+        var button = document.querySelector("button.window-button");
         var details = document.querySelectorAll("details.previous");
-        var flag = button.textContent === "Close all windows before today";
+        var flag = button.textContent === "Close all previous days";
         if (flag) {
           for (var i = 0; i < details.length; i++) {
             details[i].removeAttribute("open");
           }
-          button.textContent = "Open/close all windows before today";
+          button.textContent = "Open all previous days";
         } else {
           for (var i = 0; i < details.length; i++) {
             details[i].setAttribute("open", "");
           }
-          button.textContent = "Close all windows before today";
+          button.textContent = "Close all previous days";
         }
       }
 
