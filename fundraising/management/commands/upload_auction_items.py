@@ -48,7 +48,10 @@ class Command(BaseCommand):
                     if row["Uploaded"] != "N":
                         self.stdout.write(f"Skipped auction item: {row['Title']}")
                         continue
-                    category, _ = AuctionCategory.objects.get_or_create(name__iexact=row["Category"].strip())
+                    category_name = row["Category"].strip().title()
+                    category = AuctionCategory.objects.filter(name__iexact=category_name).first()
+                    if not category:
+                        category = AuctionCategory.objects.create(name=category_name)
                     postage = row["Postage £"]
                     if postage:
                         postage = postage.lstrip("£").strip()
