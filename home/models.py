@@ -1,6 +1,8 @@
 import datetime
 import re
 import uuid
+from os.path import splitext
+
 
 from django import forms
 from django.conf import settings
@@ -32,11 +34,15 @@ from wagtail.admin.panels import (
 )
 from wagtail.contrib.forms.forms import BaseForm, FormBuilder, SelectDateForm
 
-from wagtail.contrib.forms.models import AbstractEmailForm, AbstractFormField, AbstractFormSubmission
+from wagtail.contrib.forms.models import AbstractEmailForm, AbstractFormField, AbstractFormSubmission, FORM_FIELD_CHOICES
 from wagtail.contrib.forms.views import SubmissionsListView
 
 from wagtail.fields import RichTextField
+from wagtail.images.fields import WagtailImageField
+from wagtail.images import get_image_model
+
 from wagtail.models import (
+    Collection,
     DraftStateMixin,
     Orderable,
     Page,
@@ -50,8 +56,6 @@ from wagtailcaptcha.forms import remove_captcha_field
 from wagtailcaptcha.models import WagtailCaptchaEmailForm, WagtailCaptchaFormBuilder
 
 from encrypted_json_fields.fields import EncryptedJSONField, EncryptedCharField, EncryptedEmailField
-
-
 
 from payments.utils import get_paypal_form
 from .generate_form_submission_pdf import generate_pdf
@@ -287,7 +291,7 @@ class FormField(AbstractFormField):
     https://docs.wagtail.org/en/stable/reference/contrib/forms/index.html
     """
 
-    page = ParentalKey("FormPage", related_name="form_fields", on_delete=models.CASCADE)
+    page = ParentalKey('FormPage', related_name='form_fields', on_delete=models.CASCADE)
 
 
 class FormPage(WagtailCaptchaEmailForm):
@@ -857,6 +861,12 @@ class OrderFormField(AbstractFormField):
     """
     page = ParentalKey("OrderFormPage", related_name="order_form_fields", on_delete=models.CASCADE)
 
+    field_type = models.CharField(
+        verbose_name='field type',
+        max_length=16,
+        choices=list(FORM_FIELD_CHOICES) + [('image', 'Upload Image')]
+    )
+
     def get_field_clean_name(self):
         # if clean name is already set, just return it
         if self.clean_name:
@@ -1143,6 +1153,9 @@ class OrderFormBuilder(WagtailCaptchaFormBuilder):
             return formfields
         return original_fields
 
+    def create_image_field(self, field, options):
+        return WagtailImageField(**options)
+
     def get_form_class(self):
         return type("WagtailForm", (OrderBaseForm,), self.formfields)
 
@@ -1179,6 +1192,13 @@ class OrderFormPage(WagtailCaptchaEmailForm):
     show_summary = models.BooleanField(
         default=False,
         help_text="Show a summary of order options before form."
+    )
+
+    uploaded_image_collection = models.ForeignKey(
+        'wagtailcore.Collection',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
     )
 
     form_footer_text = RichTextField(blank=True)
@@ -1228,6 +1248,7 @@ class OrderFormPage(WagtailCaptchaEmailForm):
             the product variant name/choices instead.
             """),
         InlinePanel("order_form_fields", heading="Form fields", label="Field"),
+        FieldPanel('uploaded_image_collection'),
         FieldPanel("form_footer_text"),
         FieldPanel("thank_you_text"),
         MultiFieldPanel(
@@ -1267,6 +1288,27 @@ class OrderFormPage(WagtailCaptchaEmailForm):
     end_of_form_field_names = ["wagtailcaptcha", "voucher_code"]
     subpage_types = []
     
+    def get_uploaded_image_collection(self):
+        """
+        Returns a Wagtail Collection, using this form's saved value if present,
+        otherwise returns the 'Root' Collection.
+        """
+        collection = self.uploaded_image_collection
+        return collection or Collection.get_first_root_node()
+
+    @staticmethod
+    def get_image_title(filename):
+        """
+        Generates a usable title from the filename of an image upload.
+        Note: The filename will be provided as a 'path/to/file.jpg'
+        """
+
+        if filename:
+            result = splitext(filename)[0]
+            result = result.replace('-', ' ').replace('_', ' ')
+            return result.title()
+        return ''
+
     def save(self, *args, **kwargs):
         self.from_address = settings.DEFAULT_FROM_EMAIL
         super().save(*args, **kwargs)
@@ -1538,6 +1580,31 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         Set cost here to set the cost at the time of submission (in case prices)
         changed or voucher codes were deactivated
         """
+        cleaned_data = form.cleaned_data
+
+        for name, field in form.fields.items():
+            if isinstance(field, WagtailImageField):
+                image_file_data = cleaned_data[name]
+                if image_file_data:
+                    ImageModel = get_image_model()
+                    kwargs = {
+                        'file': cleaned_data[name],
+                        'title': self.get_image_title(cleaned_data[name].name),
+                        'collection': self.get_uploaded_image_collection(),
+                    }
+
+                    if form.user and not form.user.is_anonymous:
+                        kwargs['uploaded_by_user'] = form.user
+
+                    image = ImageModel(**kwargs)
+                    image.save()
+                    # saving the image id
+                    # alternatively we can store a path to the image via image.get_rendition
+                    cleaned_data.update({name: f"{self.get_uploaded_image_collection().name}/{image.filename}"})
+                else:
+                    # remove the value from the data
+                    del cleaned_data[name]
+
         # Don't call super to send the email to the to_address, as we want to use
         # the saved submission for email context
         remove_captcha_field(form)

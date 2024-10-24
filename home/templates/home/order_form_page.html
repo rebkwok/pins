@@ -81,7 +81,8 @@
                     </ul>
                     </div>
                 {% endif %}
-                <form action="{% pageurl page %}" method="POST">
+
+                <form action="{% pageurl page %}" method="POST" enctype="multipart/form-data">
                     {% csrf_token %}
                     {% if form.subject.errors %}
                         <ol>
