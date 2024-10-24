@@ -38,7 +38,7 @@
             {% for category, auction_items in page.categories.items %}
                 <h3>{{ category.name }}</h3>
                 <div class="row image-gallery-container">
-                    <ul class="image-gallery">
+                    <ul class="auction-image-gallery">
                     {% for auction_item in auction_items %}
                         <li>{% include "fundraising/includes/auction_item_card.html" with page=auction_item %}</li>
                     {% endfor %}
