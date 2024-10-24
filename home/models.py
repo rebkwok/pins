@@ -1464,11 +1464,13 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         ]
 
     def get_total_quantity_ordered(self):
-        submissions = self.orderformsubmission_set.all()
-        item_counts_per_variant = self._item_counts_per_variant()
         total = 0
-        for submission in submissions:
-            total += self.quantity_ordered_by_submission(submission.form_data, item_counts_per_variant)
+        if self.pk:
+            submissions = self.orderformsubmission_set.all()
+            item_counts_per_variant = self._item_counts_per_variant()
+            
+            for submission in submissions:
+                total += self.quantity_ordered_by_submission(submission.form_data, item_counts_per_variant)
         return total
 
     def quantity_ordered_by_submission(self, form_data, item_counts_per_variant=None):
