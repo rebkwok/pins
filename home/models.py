@@ -1277,6 +1277,7 @@ class OrderFormPage(WagtailCaptchaEmailForm):
                     panels=[
                         FieldPanel("code"),
                         FieldPanel("amount"),
+                        FieldPanel("one_time_use"),
                         FieldPanel("active"),
                     ]
                 ),
