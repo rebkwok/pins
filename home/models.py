@@ -1496,17 +1496,16 @@ class OrderFormPage(WagtailCaptchaEmailForm):
             validation_error_msg  = f"Quantity selected is unavailable; select a maximum of {rem_stock} total items."
         return valid, validation_error_msg
 
-    def _render_extra_email(self,  submission):
+    def _render_extra_email(self,  submission, total, discount):
         content = "\nOrder summary:\n"
         content += "\n".join([f"  - {variant.group_and_name} ({quantity})" for variant, quantity in submission.items_ordered()])
         content += f"\n\nTotal items ordered: {self.quantity_ordered_by_submission(submission.form_data)}"
-        _, total, discount = self.get_variant_quantities_and_total(submission.form_data)
         if discount:
             content += f"\nDiscount: £{discount}"
         content += f"\nTotal amount due: £{total}"
         return content
 
-    def render_email(self, form, submission):
+    def render_email(self, form, submission, total, discount):
         # Everything here is identical to the base class, except we
         # skip andy fields that are product variants, and render them
         # in the order summary at the end
@@ -1534,12 +1533,12 @@ class OrderFormPage(WagtailCaptchaEmailForm):
 
         content = "\n".join(content)
         content += "\n"
-        content += self._render_extra_email(submission)
+        content += self._render_extra_email(submission, total, discount)
         return content
 
-    def render_email_for_purchaser(self, submission):
+    def render_email_for_purchaser(self, submission, total, discount):
         content = "Thank you for your order!\n"
-        content += self._render_extra_email(submission)
+        content += self._render_extra_email(submission, total, discount)
         content += f"\n\nView your order at https://{settings.DOMAIN}{submission.get_absolute_url()}."
         content += f"\nIf you haven't made your payment yet, you'll also find a link there."
         return content
@@ -1566,16 +1565,61 @@ class OrderFormPage(WagtailCaptchaEmailForm):
     def get_submission_class(self):
         return OrderFormSubmission
 
-    def send_mail(self, form, submission):
+    def send_mail(self, form, submission, total, discount):
         addresses = [x.strip() for x in self.to_address.split(",")]
         send_mail(
             self.subject,
-            self.render_email(form, submission),
+            self.render_email(form, submission, total, discount),
             addresses,
             self.from_address,
         )
 
-    def process_form_submission(self, form):
+    def get_context(self, request):
+        context = super().get_context(request)
+        if request.GET.get("order_ref"):
+            context["existing_order_ref"] = request.GET["order_ref"]
+        else:
+            existing_order_ref = request.session.get("orders", {}).get(str(self.id))
+            if existing_order_ref:
+                context["existing_order_ref"] = existing_order_ref
+        return context
+
+    def serve(self, request, *args, **kwargs):
+        # override form mixin serve() so we can pass request to process_form_submission
+        context = None
+        if request.method == "POST":
+            form = self.get_form(
+                request.POST, request.FILES, page=self, user=request.user
+            )
+
+            if form.is_valid():
+                form_submission = self.process_form_submission(form, request)
+                return self.render_landing_page(
+                    request, form_submission, *args, **kwargs
+                )
+        else:
+            form = self.get_form(page=self, user=request.user)
+            context = self.get_context(request)
+            if "existing_order_ref" in context:
+                submission = OrderFormSubmission.objects.filter(page=self, reference=context["existing_order_ref"]).first()
+                # Don't render the form page with any existing order if it's already paid
+                if submission and not submission.paid:
+                    for field_name, field in form.fields.items():
+                        if field_name in submission.form_data:
+                            field.initial = submission.form_data[field_name]
+                    _, total, discount = self.get_variant_quantities_and_total(submission.form_data)
+                    context["existing_order_total"] = total
+                    context["existing_order_discount"] = discount
+                else:
+                    del context["existing_order_ref"]
+                    if self.id in request.session.get("orders", {}):
+                        del request.session["orders"][str(self.id)]
+        context = context or self.get_context(request)
+        context["form"] = form
+        return TemplateResponse(request, self.get_template(request), context)
+        
+
+    def process_form_submission(self, form, request=None):
         """
         Accepts form instance with submitted data, user and page.
         Creates submission instance.
@@ -1611,24 +1655,50 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         # Don't call super to send the email to the to_address, as we want to use
         # the saved submission for email context
         remove_captcha_field(form)
-        submission =  self.get_submission_class().objects.create(
-            form_data=form.cleaned_data,
-            page=self,
-        )
+
+        # Do we have an unpaid submission for this order?
+        existing_submission = None
+        if request is not None:
+            existing_session_order_ref = request.session.get("orders", {}).get(str(self.id))
+            if existing_session_order_ref:
+                submission = self.get_submission_class().objects.filter(reference=existing_session_order_ref).first()
+                if submission:
+                    if not submission.paid:
+                        existing_submission = submission
+                    else:
+                        if self.id in request.session.get("orders", {}):
+                            del request.session["orders"][str(self.id)]
+
+        if existing_submission:
+            submission = existing_submission
+            submission.form_data = form.cleaned_data
+            submission.save()
+        else:
+            submission = self.get_submission_class().objects.create(
+                form_data=form.cleaned_data,
+                page=self,
+            )
+
+        _, total, discount = self.get_variant_quantities_and_total(form.cleaned_data)
+
         if self.to_address:
-            self.send_mail(form, submission)
-        _, total, _ = self.get_variant_quantities_and_total(form.cleaned_data)
+            self.send_mail(form, submission, total, discount)
+        
         submission.cost = total
         submission.save()
 
         # Send email to purchaser
         send_mail(
             self.subject,
-            self.render_email_for_purchaser(submission),
+            self.render_email_for_purchaser(submission, total, discount),
             [submission.email],
             settings.DEFAULT_FROM_EMAIL,
             reply_to=[settings.DEFAULT_ADMIN_EMAIL],
         )
+
+        # Add ref to session if processing with a request
+        if request is not None:
+            request.session["orders"] = {str(self.id): submission.reference}
 
         return submission
     

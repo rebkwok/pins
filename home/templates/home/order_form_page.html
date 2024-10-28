@@ -13,6 +13,12 @@
             </div>
                 {% endif %}
 
+            <div class="col-md-8">
+                {% if existing_order_ref %}
+                    <h2>Updating order: {{ existing_order_ref }}</h2>
+                {% endif %}
+            </div>
+
             <div class="col-md-8 index-header__body-introduction">
                 {% if page.body %}
                     {{ page.body|richtext }}
@@ -150,7 +156,11 @@
                         <h3>Review order</h4>
                         <div id="order-summary"></div>
                         <p><strong>
-                            Total: £<span id="order-total">{{ page.default_total }}</span><br>
+                            {% if existing_order_total %}
+                                Total: £<span id="order-total">{{ existing_order_total }}{% if existing_order_discount %} (discount £{{ existing_order_discount }}){% endif %}</span><br>
+                            {% else %}
+                                Total: £<span id="order-total">{{ page.default_total }}</span><br>
+                            {% endif %}
                         </strong></p>
 
                         <div id="not-allowed"></div>

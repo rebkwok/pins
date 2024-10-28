@@ -12,10 +12,12 @@
 
             <div class="col-md-7 index-header__body-introduction">
                 {{ page.thank_you_text|richtext }}
-            
+
                 <p>Your order total is <strong>£{{ total }}</strong></p>
 
             {% if paypal_form %}
+                <p><a href={{ page.url }}?order_ref={{ form_submission.reference }}>Update/change your order</a></p>
+
                 <p>Click the button below to go to PayPal to make your payment.<br>
                     <strong><i>Note: you do not need a PayPal account, payments can be taken by debit/credit card.</i></strong>
                 </p>
