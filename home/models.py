@@ -880,6 +880,8 @@ class ProductVariant(Orderable):
         max_length=100, blank=True, 
         help_text="Optional group for this variant. Use to group variants with multiple options, e.g. sizes"
     )
+    group_total_available = models.PositiveIntegerField(null=True, blank=True)
+    variant_total_available = models.PositiveIntegerField(null=True, blank=True)
     name = models.CharField(max_length=50)
     description = models.CharField(blank=True, max_length=250)
     cost = models.DecimalField(max_digits=10, decimal_places=2)
@@ -893,9 +895,17 @@ class ProductVariant(Orderable):
         default="0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20",
         help_text="Comma separated list of quantity choices for the drop down menu"
     )
+    default_value = models.PositiveIntegerField(default=0)
     slug = models.CharField(max_length=60, blank=True, default="", help_text="This field will be autopoulated")
     
     def save(self, *args, **kwargs):
+        if self.page.specific.total_available and (self.group_total_available or self.variant_total_available):
+            raise ValueError("Cannot set group/variant stock for a page with overall stock set")
+        if self.group_total_available and not self.group_name:
+            raise ValueError("Group stock requires a group name")
+        if self.group_total_available and self.variant_total_available:
+            raise ValueError("Cannot set both group and product stock")
+
         if not self.slug:
             base_slug = "pv__"
             if self.group_name:
@@ -1002,7 +1012,7 @@ class OrderFormSubmissionsListView(OrderingMixin, SubmissionsListView):
         row_dict = super().to_row_dict(item)
         row_dict["reference"] = item.reference
         row_dict["total"] = item.cost
-        row_dict["total_items"] = self.form_page.quantity_ordered_by_submission(row_dict)
+        row_dict["total_items"] = self.form_page.quantity_ordered_by_submission(row_dict)["total"]
         row_dict["paid"] = "Y" if item.paid else "-"
         row_dict["shipped"] = "Y" if item.shipped else "-"
         return row_dict
@@ -1069,7 +1079,7 @@ class OrderFormSubmissionsListView(OrderingMixin, SubmissionsListView):
             for row in context_data["data_rows"]:
                 form_data = row["fields"]
                 form_data_dict = {field[0]: form_data[i] for i, field in enumerate(fields)}
-                total_items = self.form_page.quantity_ordered_by_submission(form_data_dict)
+                total_items = self.form_page.quantity_ordered_by_submission(form_data_dict)["total"]
                 email = submission_data[row["model_id"]].pop("email")
                 if not email_from_form:
                     form_data.append(email)
@@ -1106,7 +1116,7 @@ class OrderBaseForm(BaseForm):
         ):
             del self.cleaned_data["voucher_code"]
 
-        total_items = self.page.quantity_ordered_by_submission(self.cleaned_data)
+        total_items = self.page.quantity_ordered_by_submission(self.cleaned_data)["total"]
         if total_items == 0:
             self.add_error("__all__", "Select at least one item")
 
@@ -1228,11 +1238,14 @@ class OrderFormPage(WagtailCaptchaEmailForm):
                     "product_variants", label="Product Variants", 
                     panels=[
                         FieldPanel("group_name"),
+                        FieldPanel("group_total_available"),
+                        FieldPanel("variant_total_available"),
                         FieldPanel("name"),
                         FieldPanel("description"),
                         FieldPanel("cost"),
                         FieldPanel("item_count"),
                         FieldPanel("quantity_choices"),
+                        FieldPanel("default_value"),
                     ]
                 ),
             ],
@@ -1313,7 +1326,17 @@ class OrderFormPage(WagtailCaptchaEmailForm):
     def save(self, *args, **kwargs):
         self.from_address = settings.DEFAULT_FROM_EMAIL
         super().save(*args, **kwargs)
-    
+
+        # Check the product variant stock
+        all_groups = set(self.product_variants.filter(group_total_available__isnull=False).values_list("group_name", flat=True))
+        for group_name in all_groups:
+            group_stock = {
+                stock for stock in set(self.product_variants.filter(group_name=group_name).values_list("group_total_available", flat=True))
+                if stock not in [None, ""]
+            }
+            if len(group_stock) != 1:
+                raise ValueError("Group stock inconsistent across product variants")
+        
         # Save the product variants to ensure slugs have been generated
         for pr in self.product_variants.all():
             pr.save()
@@ -1370,7 +1393,7 @@ class OrderFormPage(WagtailCaptchaEmailForm):
                 clean_name=product_variant_slug, 
                 label=variant.name,
                 field_type="dropdown", 
-                default_value = 0
+                default_value = variant.default_value
             )
         if (field.choices != variant.quantity_choices) or (field.label != variant.name): 
             field.choices = variant.quantity_choices
@@ -1439,7 +1462,7 @@ class OrderFormPage(WagtailCaptchaEmailForm):
             total += (variant.cost * quantity)
         if total > 0:
             # shipping cost
-            total_quantity = self.quantity_ordered_by_submission(data)
+            total_quantity = self.quantity_ordered_by_submission(data)["total"]
             total += self.get_shipping_cost(total_quantity)
             total -= voucher_amount
 
@@ -1449,20 +1472,50 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         return dict(self.product_variants.values_list("slug", "item_count"))
 
     def sold_out(self):
-        if self.total_available is None:
+        # Are we sold out entirely?
+        if not self.id:
             return False
-        return self.get_total_quantity_ordered() >= self.total_available
+        if self.total_available:
+            return self.get_total_quantity_ordered() >= self.total_available
+        
+        totals_available = self.get_stock_quantities()
+        ordered = self.get_total_quantity_ordered_by_group_and_variant()
+
+        for group_name, total_available in totals_available["groups"].items():
+            if total_available > ordered["groups"].get(group_name, 0):
+                return False
+        
+        for variant_slug, total_available in totals_available["variants"].items():
+            if total_available > ordered["variants"].get(variant_slug, 0):
+                return False
+        
+        return True
 
     def disallowed_variants(self):
-        if self.total_available is None:
-            return []
-        quantity_ordered_so_far = self.get_total_quantity_ordered()
-        remaining_stock = self.total_available - quantity_ordered_so_far 
         item_counts_per_variant = self._item_counts_per_variant()
-        return [
-            variant for variant in self.product_variants.all()
-            if item_counts_per_variant[variant.slug] > remaining_stock
-        ]
+        if self.total_available:
+            quantity_ordered_so_far = self.get_total_quantity_ordered()
+            remaining_stock = self.total_available - quantity_ordered_so_far 
+            return [
+                variant for variant in self.product_variants.all()
+                if item_counts_per_variant[variant.slug] > remaining_stock
+            ]
+        
+        disallowed = []
+        totals_available = self.get_stock_quantities()
+        ordered = self.get_total_quantity_ordered_by_group_and_variant()
+
+        for variant in self.product_variants.all():
+            if variant.group_name in totals_available["groups"]:
+                remaining_stock = totals_available["groups"][variant.group_name] - ordered["groups"].get(variant.group_name, 0)
+                if item_counts_per_variant[variant.slug] > remaining_stock:
+                    disallowed.append(variant)
+            elif variant.slug in totals_available["variants"]:
+                remaining_stock = totals_available["variants"][variant.slug] - ordered["variants"].get(variant.slug, 0)
+                if item_counts_per_variant[variant.slug] > remaining_stock:
+                    disallowed.append(variant)
+
+        return disallowed
 
     def get_total_quantity_ordered(self):
         total = 0
@@ -1471,35 +1524,110 @@ class OrderFormPage(WagtailCaptchaEmailForm):
             item_counts_per_variant = self._item_counts_per_variant()
             
             for submission in submissions:
-                total += self.quantity_ordered_by_submission(submission.form_data, item_counts_per_variant)
+                total += self.quantity_ordered_by_submission(submission.form_data, item_counts_per_variant)["total"]
         return total
 
+    def get_total_quantity_ordered_by_group_and_variant(self):
+        quantities_ordered ={
+            "total": 0,
+            "groups": {},
+            "variants": {}
+        }
+        if self.pk:
+            submissions = self.orderformsubmission_set.all()
+            item_counts_per_variant = self._item_counts_per_variant()
+
+            for submission in submissions:
+                submission_quantities_ordered = self.quantity_ordered_by_submission(submission.form_data, item_counts_per_variant)
+                quantities_ordered["total"] += submission_quantities_ordered["total"]
+                for group, quantity in quantities_ordered["groups"].items():
+                    quantities_ordered.setdefault(group, 0)
+                    quantities_ordered["groups"][group] += quantity
+                for variant, quantity in quantities_ordered["variants"].items():
+                    quantities_ordered["variants"].setdefault(variant, 0)
+                    quantities_ordered["variants"][variant] += quantity
+
+        return quantities_ordered
+    
+    def get_stock_quantities(self):
+        if self.total_available:
+            return {"overall": self.total_available}
+        groups_with_totals = self.product_variants.filter(group_total_available__isnull=False).values_list("group_name", "group_total_available")
+        totals = {"groups": {}, "variants": {}}
+        for group_name, group_total in groups_with_totals:
+            totals["groups"][group_name] = group_total
+        variants_with_totals = self.product_variants.filter(variant_total_available__isnull=False).values_list("slug", "variant_total_available")
+        for variant_slug, variant_total in variants_with_totals:
+            totals["variants"][variant_slug] = variant_total
+        return totals
+
     def quantity_ordered_by_submission(self, form_data, item_counts_per_variant=None):
+        variant_to_group = dict(self.product_variants.all().values_list("slug", "group_name"))
+        quantities = {
+            "total": 0,
+            "groups": {},
+            "variants": {}
+        }
+
         if item_counts_per_variant is None:
             item_counts_per_variant = self._item_counts_per_variant()
-        quantities = self._get_quantities(form_data)
-        number_of_items = 0
-        for key, quantity in quantities.items():
-            number_of_items += item_counts_per_variant[key] * quantity
-        return number_of_items
+        variant_quantities = self._get_quantities(form_data)
+
+        for key, quantity in variant_quantities.items():
+            quantities["total"] += item_counts_per_variant[key] * quantity
+            quantities["variants"].setdefault(key, 0)
+            quantities["variants"][key] += quantity
+            quantities["groups"].setdefault(variant_to_group[key], 0)
+            quantities["groups"][variant_to_group[key]] += quantity
+        return quantities
 
     def quantity_submitted_is_valid(self, form_data):
         validation_error_msg = ""
-        if self.total_available is None:
-            return True, validation_error_msg
-        total_ordered_so_far = self.get_total_quantity_ordered()
+        valid = True
+
         total_for_this_order = self.quantity_ordered_by_submission(form_data)
-        remaining_stock = self.total_available - total_ordered_so_far
-        valid = total_for_this_order <= remaining_stock
-        if not valid:
-            rem_stock = remaining_stock if remaining_stock >= 0 else 0
-            validation_error_msg  = f"Quantity selected is unavailable; select a maximum of {rem_stock} total items."
+
+        # First check totals
+        if self.total_available:
+            total_ordered_so_far = self.get_total_quantity_ordered()
+            remaining_stock = self.total_available - total_ordered_so_far
+            valid = total_for_this_order <= remaining_stock
+            if not valid:
+                rem_stock = remaining_stock if remaining_stock >= 0 else 0
+                validation_error_msg  = f"Quantity selected is unavailable; select a maximum of {rem_stock} total items."
+            return valid, validation_error_msg
+        
+
+        total_ordered_so_far = self.get_total_quantity_ordered_by_group_and_variant()
+        totals_available = self.get_stock_quantities()
+
+        # Next check groups
+        for group, quantity in total_for_this_order["groups"].items():
+            if group in totals_available["groups"]:
+                remaining_stock = totals_available["groups"][group] - total_ordered_so_far["groups"].get(group, 0)
+                valid = quantity <= remaining_stock
+                if not valid:
+                    rem_stock = remaining_stock if remaining_stock >= 0 else 0
+                    validation_error_msg  = f"Quantity selected for {group} is unavailable; select a maximum of {rem_stock} total items."
+                    return valid, validation_error_msg
+        
+        # Finally check variants
+        for variant, quantity in total_for_this_order["variants"].items():
+            if variant in totals_available["variants"]:
+                remaining_stock = totals_available["variants"][variant] - total_ordered_so_far["variants"].get(variant, 0)
+                valid = quantity <= remaining_stock
+                if not valid:
+                    rem_stock = remaining_stock if remaining_stock >= 0 else 0
+                    variant_name = self.product_variants.get(slug=variant).name
+                    validation_error_msg  = f"Quantity selected for {variant_name} is unavailable; select a maximum of {rem_stock} total items."
+                    return valid, validation_error_msg
+
         return valid, validation_error_msg
 
     def _render_extra_email(self,  submission, total, discount):
         content = "\nOrder summary:\n"
         content += "\n".join([f"  - {variant.group_and_name} ({quantity})" for variant, quantity in submission.items_ordered()])
-        content += f"\n\nTotal items ordered: {self.quantity_ordered_by_submission(submission.form_data)}"
+        content += f"\n\nTotal items ordered: {self.quantity_ordered_by_submission(submission.form_data)['total']}"
         if discount:
             content += f"\nDiscount: £{discount}"
         content += f"\nTotal amount due: £{total}"
@@ -1549,7 +1677,7 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         _, total, _ = self.get_variant_quantities_and_total(form_submission.get_data())
         
         context["total"] = total
-        total_quantity = self.quantity_ordered_by_submission(form_submission.form_data)
+        total_quantity = self.quantity_ordered_by_submission(form_submission.form_data)['total']
         shipping = self.get_shipping_cost(total_quantity)
         context["paypal_form"] = get_paypal_form(
             request=request,
