@@ -1593,9 +1593,9 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         for key, quantity in variant_quantities.items():
             quantities["total"] += item_counts_per_variant[key] * quantity
             quantities["variants"].setdefault(key, 0)
-            quantities["variants"][key] += quantity
+            quantities["variants"][key] += item_counts_per_variant[key] * quantity
             quantities["groups"].setdefault(variant_to_group[key], 0)
-            quantities["groups"][variant_to_group[key]] += quantity
+            quantities["groups"][variant_to_group[key]] += item_counts_per_variant[key] * quantity
         return quantities
 
     def quantity_submitted_is_valid(self, form_data):
