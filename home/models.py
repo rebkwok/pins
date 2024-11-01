@@ -1608,7 +1608,7 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         if self.total_available:
             total_ordered_so_far = self.get_total_quantity_ordered()
             remaining_stock = self.total_available - total_ordered_so_far
-            valid = total_for_this_order <= remaining_stock
+            valid = total_for_this_order["total"] <= remaining_stock
             if not valid:
                 rem_stock = remaining_stock if remaining_stock >= 0 else 0
                 validation_error_msg  = f"Quantity selected is unavailable; select a maximum of {rem_stock} total items."
