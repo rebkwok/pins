@@ -1028,12 +1028,29 @@ class OrderFormSubmissionsListView(OrderingMixin, SubmissionsListView):
         ordering_by_field = self.get_validated_ordering()
         context_data = super().get_context_data(**kwargs)
         if not self.is_export:
-            total_ordered_so_far = self.form_page.get_total_quantity_ordered()
-            if self.form_page.total_available:
-                remaining_stock = self.form_page.total_available - total_ordered_so_far
+            
+            ordered = self.form_page.get_total_quantity_ordered_by_group_and_variant()
+            totals_available = self.form_page.get_stock_quantities()
+            
+            context_data["description"] = f"Total sold: {ordered['total']} | Remaining stock: N/A"
+
+            if totals_available.get("overall"):
+                total_ordered = ordered["total"]
+                remaining_stock = totals_available["overall"] - total_ordered
+                context_data["description"] = f"Total sold: {total_ordered} | Remaining stock: {remaining_stock}"
             else:
-                remaining_stock = "N/A"
-            context_data["description"] = f"Total sold: {total_ordered_so_far} | Remaining stock: {remaining_stock}"
+                stock_desc = []
+                for group_name, total_available in totals_available["groups"].items():
+                    ordered_for_group = ordered["groups"].get(group_name, 0)
+                    stock_desc.append(f"{group_name}: sold {ordered_for_group}/{total_available}")
+                
+                for variant_slug, total_available in totals_available["variants"].items():
+                    ordered_for_variant = ordered["variants"].get(variant_slug, 0)
+                    stock_desc.append(f"{variant_slug}: sold {ordered_for_variant}/{total_available}")
+
+                if stock_desc:
+                    context_data["description"] = " | ".join(stock_desc)
+
             def _reformat_field(heading):
                 heading["label"] = self._get_heading_label(heading["name"], heading["label"])
                 if heading["name"] in ["name", "email", "email_address"]:
