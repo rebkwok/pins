@@ -1557,10 +1557,10 @@ class OrderFormPage(WagtailCaptchaEmailForm):
             for submission in submissions:
                 submission_quantities_ordered = self.quantity_ordered_by_submission(submission.form_data, item_counts_per_variant)
                 quantities_ordered["total"] += submission_quantities_ordered["total"]
-                for group, quantity in quantities_ordered["groups"].items():
-                    quantities_ordered.setdefault(group, 0)
+                for group, quantity in submission_quantities_ordered["groups"].items():
+                    quantities_ordered["groups"].setdefault(group, 0)
                     quantities_ordered["groups"][group] += quantity
-                for variant, quantity in quantities_ordered["variants"].items():
+                for variant, quantity in submission_quantities_ordered["variants"].items():
                     quantities_ordered["variants"].setdefault(variant, 0)
                     quantities_ordered["variants"][variant] += quantity
 
