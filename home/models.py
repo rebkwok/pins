@@ -1713,10 +1713,10 @@ class OrderFormPage(WagtailCaptchaEmailForm):
     def get_submission_class(self):
         return OrderFormSubmission
 
-    def send_mail(self, form, submission, total, discount):
+    def send_mail(self, form, submission, total, discount, subject):
         addresses = [x.strip() for x in self.to_address.split(",")]
         send_mail(
-            self.subject,
+            subject,
             self.render_email(form, submission, total, discount),
             addresses,
             self.from_address,
@@ -1829,15 +1829,19 @@ class OrderFormPage(WagtailCaptchaEmailForm):
 
         _, total, discount = self.get_variant_quantities_and_total(form.cleaned_data)
 
+        subject = self.subject
+        if existing_submission:
+            subject = f"{self.subject} (UPDATED)"
+
         if self.to_address:
-            self.send_mail(form, submission, total, discount)
+            self.send_mail(form, submission, total, discount, subject)
         
         submission.cost = total
         submission.save()
 
         # Send email to purchaser
         send_mail(
-            self.subject,
+            subject,
             self.render_email_for_purchaser(submission, total, discount),
             [submission.email],
             settings.DEFAULT_FROM_EMAIL,
