@@ -237,7 +237,7 @@ def test_order_form_page_disallowed_variants(order_form_page, order_form_pre_sub
     # make an order for 6
     order_form_pre_submission({"pv__test_product": 1, "pv__test_product_x5": 1})
     assert order_form_page.get_total_quantity_ordered() == 6
-
+    
     assert set(order_form_page.disallowed_variants()) == {variant5, variant10}
     # sell out
     order_form_pre_submission({"pv__test_product": 1})
@@ -245,6 +245,32 @@ def test_order_form_page_disallowed_variants(order_form_page, order_form_pre_sub
     assert set(
         order_form_page.disallowed_variants()
     ) == {order_form_page.product_variants.first(), variant5, variant10}
+
+
+def test_order_form_page_disallowed_variants_by_group(order_form_page, order_form_pre_submission):
+    assert order_form_page.disallowed_variants() == []
+
+    # test_product and test_product_x5 are allowed, test_product_x10 is not allowed
+    group1variant4 = baker.make("home.ProductVariant", page=order_form_page, group_name="group1", group_total_available=6, name="test product x4", cost=10, item_count=4)
+    group1variant3 = baker.make("home.ProductVariant", page=order_form_page, group_name="group1", name="test product x3", cost=20, item_count=3)
+    group2variant10 = baker.make("home.ProductVariant", page=order_form_page, group_total_available=10, group_name="group2", name="test product x10", cost=90, item_count=10)
+    variant4 = baker.make("home.ProductVariant", page=order_form_page, variant_total_available=3, name="test product_x4", cost=90, item_count=4)
+
+    assert order_form_page.disallowed_variants() == [variant4]
+
+    # make an order for group1 variant 3 (and override default for pv__test_product)
+    order_form_pre_submission({"pv__test_product": 0, "pv__group1_test_product_x3": 1})
+    assert order_form_page.get_total_quantity_ordered() == 3
+    
+    # group 1 has 6 total available, one set of 3 sold, variant3 is allowed, variant4 is not sold out
+    assert set(order_form_page.disallowed_variants()) == {variant4, group1variant4}
+    # sell out
+    order_form_pre_submission({"pv__group1_test_product_x3": 1, "pv__group2_test_product_x10": 1, "pv__test_product_x4": 4})
+
+    assert order_form_page.sold_out()
+    assert set(
+        order_form_page.disallowed_variants()
+    ) == {group1variant4, group1variant3, group2variant10, variant4}
 
 
 def test_order_form_submission(order_form_submission):
@@ -292,7 +318,15 @@ def test_quantity_ordered_by_submission(order_form_page, order_form_pre_submissi
     # make an order for 6
     submission = order_form_pre_submission({"pv__test_product": 1, "pv__test_product_x5": 2, "pv__test_product_x10": 1})
     assert order_form_page.get_total_quantity_ordered() == 21
-    assert order_form_page.quantity_ordered_by_submission(submission.form_data) == 21
+    assert order_form_page.quantity_ordered_by_submission(submission.form_data) == {
+        'total': 21, 
+        'groups': {'': 21}, 
+        'variants': {
+            'pv__test_product': 1, 
+            'pv__test_product_x5': 10, 
+            'pv__test_product_x10': 10
+        }
+    }
 
 
 @pytest.mark.parametrize(

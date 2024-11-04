@@ -1498,6 +1498,9 @@ class OrderFormPage(WagtailCaptchaEmailForm):
         totals_available = self.get_stock_quantities()
         ordered = self.get_total_quantity_ordered_by_group_and_variant()
 
+        if not (totals_available["groups"] or totals_available["variants"]):
+            return False
+
         for group_name, total_available in totals_available["groups"].items():
             if total_available > ordered["groups"].get(group_name, 0):
                 return False
