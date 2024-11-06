@@ -16,10 +16,10 @@
                             {% endif %}
                             {% if page.description %}
                                 <p class="dog-detail__meta-title">About {{ page.title }}</p>
-                                <p class="dog-detail__meta-content">{{ page.description|richtext }}</p>
+                                <p class="dog-detail__meta-content">{{ page.description|richtext|linebreaks }}</p>
                             {% elif page.fb_description %}
                                 <p class="dog-detail__meta-title">About {{ page.title }}</p>
-                                <p class="dog-detail__meta-content">{{ page.fb_description|richtext }}</p>
+                                <p class="dog-detail__meta-content">{{ page.fb_description|richtext|linebreaks }}</p>
                             {% endif %}
                             
                             <p class="dog-detail__meta-content">
