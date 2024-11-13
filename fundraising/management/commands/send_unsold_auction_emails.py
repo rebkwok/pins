@@ -30,10 +30,10 @@ class Command(BaseCommand):
         unsold_items = [it for it in auction_items if not it.active_bids]
         items_by_donor = {}
         for unsold_item in unsold_items:
-            items_by_donor.setdefault((unsold_item.donor, unsold_item.donor_email), []).append(unsold_item.title)
+            items_by_donor.setdefault((unsold_item.donor, unsold_item.donor_email), []).append(unsold_item)
 
         for (donor, donor_email), donor_items in items_by_donor.items():
-            items_str = "\n".join([f"- {donor_item}" for donor_item in donor_items])
+            items_str = "\n".join([f"- {donor_item.title}" for donor_item in donor_items])
             item_plural = "s" if len(donor_items) > 1 else ""
             subject=f"Your items in the PINS auction ({auction.title})"
             message=message_body(donor, item_plural, items_str)
@@ -54,6 +54,9 @@ class Command(BaseCommand):
                     recipient_list=[donor_email],
                     reply_to=[settings.DEFAULT_ADMIN_EMAIL]
                 )
+                for donor_item in donor_items:
+                    donor_item.unsold_notification_sent = True
+                    donor_item.save()
 
                 
 def message_body(donor, item_plural, items_str):

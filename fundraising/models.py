@@ -317,6 +317,8 @@ class AuctionItem(Page):
     starting_bid = models.DecimalField(max_digits=6, decimal_places=2)
     postage =models.DecimalField(max_digits=6, decimal_places=2, default=0.00)
 
+    unsold_notification_sent = models.BooleanField(default=False)
+
     content_panels = Page.content_panels + [
         FieldPanel("category"),
         FieldPanel("description"),
@@ -481,7 +483,7 @@ class AuctionItem(Page):
     def donor_notified(self):
         if self.active_bids.exists():
             return self.current_winning_bid_obj.donor_notified
-        return False
+        return self.unsold_notification_sent
 
     def notify_donor(self, request):
         if self.donor_notified():
