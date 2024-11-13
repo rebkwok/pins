@@ -27,7 +27,7 @@ class Command(BaseCommand):
         assert auction.is_closed()
 
         auction_items = auction.get_children().specific()
-        unsold_items = [it for it in auction_items if not it.active_bids]
+        unsold_items = [it for it in auction_items if not it.active_bids and not it.unsold_notification_sent]
         items_by_donor = {}
         for unsold_item in unsold_items:
             items_by_donor.setdefault((unsold_item.donor, unsold_item.donor_email), []).append(unsold_item)
