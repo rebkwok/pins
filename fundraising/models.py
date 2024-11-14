@@ -418,7 +418,7 @@ class AuctionItem(Page):
 
     def winner(self):
         if self.active_bids.exists():
-            return self.current_winning_bid_obj.user
+            return f"{self.current_winning_bid_obj.name} ({self.current_winning_bid_obj.user})"
 
     def minimum_bid(self):
         return max(self.starting_bid, self.current_winning_bid() + Decimal(0.01))

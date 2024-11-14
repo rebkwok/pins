@@ -48,7 +48,7 @@ def auction_detail(request, pk):
             Column("donor",),
             Column("bid_count", label="# bids"),
             Column("current_winning_bid", label="Winning bid", accessor=lambda x: _get_winning_bid(x)),
-            UserColumn("winner"),
+            Column("winner"),
             BooleanColumn("winner_notified"),
             BooleanColumn("donor_notified"),
             Column("total_due", accessor=lambda x: _get_total_due(x)),
