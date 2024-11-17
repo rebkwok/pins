@@ -85,6 +85,7 @@ def order_form_submission(order_form_page):
                 "name": "Mickey Mouse",
                 "email_address": "mickey.mouse@test.com",
                 "pv__test_product": 2,
+                "data_processing_consent": True,
                 "g-recaptcha-response": "PASSED",
                 **form_data
             },
@@ -102,6 +103,7 @@ def order_form_pre_submission(order_form_page):
         data = {
             "name": "Mickey Mouse",
             "email_address": "mickey.mouse@test.com",
+            "data_processing_consent": True,
             "pv__test_product": 2,
             **form_data
         }
@@ -133,6 +135,7 @@ def pdf_form_submission(pdf_form_page):
             {
                 "name": "Mickey Mouse",
                 "email": "mickey.mouse@test.com",
+                "data_processing_consent": True,
                 "a_field": "Foo\r\nbar",
                 "a_multicheckbox": ["yes", "no"],
                 "a_checkbox": True,
