@@ -154,7 +154,7 @@ ACCOUNT_SESSION_REMEMBER = True
 ACCOUNT_SIGNUP_PASSWORD_ENTER_TWICE = True
 ACCOUNT_USERNAME_BLACKLIST = ["admin", "god"]
 # We're going to want to collect extra info
-# ACCOUNT_SIGNUP_FORM_CLASS = 'accounts.forms.SignupForm'
+ACCOUNT_FORMS = {'signup': 'dashboard.forms.PINSSignupForm'}
 
 
 ROOT_URLCONF = "pins.urls"

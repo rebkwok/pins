@@ -57,6 +57,7 @@ from wagtailcaptcha.models import WagtailCaptchaEmailForm, WagtailCaptchaFormBui
 
 from encrypted_json_fields.fields import EncryptedJSONField, EncryptedCharField, EncryptedEmailField
 
+from common.fields import data_processing_consent_field
 from payments.utils import get_paypal_form
 from .generate_form_submission_pdf import generate_pdf
 
@@ -284,7 +285,7 @@ class HomePage(Page):
     def __str__(self):
         return self.title
 
-
+    
 class FormField(AbstractFormField):
     """
     For standard non-draft-savable forms e.g. contact form
@@ -292,6 +293,28 @@ class FormField(AbstractFormField):
     """
 
     page = ParentalKey('FormPage', related_name='form_fields', on_delete=models.CASCADE)
+
+
+class EmailFormBuilder(FormBuilder):           
+
+    @property
+    def formfields(self):
+        formfields = super().formfields
+        original_formfields = set(formfields)
+
+        fields_to_add = {}
+        # Check for any of the usual personal data fields
+        if original_formfields & {"name", "email", "email_address", "address", "phone", "phone_number"}:
+            if "data_processing_consent" not in original_formfields:
+                formfields["data_processing_consent"] = data_processing_consent_field()
+        formfields = {
+            **fields_to_add,
+            **formfields
+        }
+        return formfields
+
+    def get_form_class(self):
+        return type("WagtailForm", (BaseForm,), self.formfields)
 
 
 class FormPage(WagtailCaptchaEmailForm):
@@ -409,15 +432,19 @@ class PDFFormBuilder(FormBuilder):
     @property
     def formfields(self):
         formfields = super().formfields
+        original_formfields = set(formfields)
+
         fields_to_add = {}
-        if "name" not in set(formfields):
+        if "name" not in original_formfields:
             fields_to_add["name"] = forms.CharField()
-        if not (set(formfields) & {"email", "email_address"}):
+        if not (original_formfields & {"email", "email_address"}):
             fields_to_add["email"] = forms.EmailField()
+        if "data_processing_consent" not in original_formfields:
+            fields_to_add["data_processing_consent"] = data_processing_consent_field()
         formfields = {
             **fields_to_add,
             **formfields
-        }    
+        }
         return formfields
 
     def get_form_class(self):
@@ -567,7 +594,7 @@ class PDFFormPage(FormPage):
     @property
     def required_for_draft_fields(self):
         return [
-            "reference", "name", "email", "email_address",
+            "reference", "name", "email", "email_address", "data_processing_consent"
             *[field.clean_name for field in self.get_form_fields() if field.required_for_draft]
         ]
 
@@ -1151,11 +1178,16 @@ class OrderFormBuilder(WagtailCaptchaFormBuilder):
     @property
     def formfields(self):
         original_fields = super().formfields
+
         if not (set(original_fields) & {"email", "email_address"}):
             original_fields = {
                 "email": forms.EmailField(),
                 **original_fields
-            }    
+            }
+        if "data_processing_consent"  not in original_fields:
+            original_fields.update(
+                data_processing_consent=data_processing_consent_field()
+            )
         if self.page.voucher_codes.filter(active=True).exists():
             formfields = {
                 k: v for k, v in original_fields.items() if k != "wagtailcaptcha"
@@ -1676,6 +1708,9 @@ class OrderFormPage(WagtailCaptchaEmailForm):
                 value = date_format(value, settings.SHORT_DATETIME_FORMAT)
             elif isinstance(value, datetime.date):
                 value = date_format(value, settings.SHORT_DATE_FORMAT)
+            
+            if field.name == "data_processing_consent":
+                value = "confirmed"
 
             content.append(f"{field.label}: {value}")
 

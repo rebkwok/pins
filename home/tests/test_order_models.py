@@ -38,6 +38,7 @@ def test_order_form_with_invalid_voucher_code(order_form_page):
             "email_address": "m@mouse.com", 
             "pv__test_product": 1,
             "voucher_code": "foo",
+            "data_processing_consent": True,
             "g-recaptcha-response": "PASSED"
         },
         page=order_form_page
@@ -64,6 +65,7 @@ def test_order_form_with_invalid_voucher_code_for_other_page(order_form_page):
             "email_address": "m@mouse.com", 
             "pv__test_product": 1,
             "voucher_code": "foo",
+            "data_processing_consent": True,
             "g-recaptcha-response": "PASSED"
         },
         page=order_form_page
@@ -83,6 +85,7 @@ def test_order_form_with_valid_voucher_code(order_form_page):
             "email_address": "m@mouse.com", 
             "pv__test_product": 1,
             "voucher_code": "foo",
+            "data_processing_consent": True,
             "g-recaptcha-response": "PASSED"
         },
         page=order_form_page
@@ -99,6 +102,7 @@ def test_order_form_with_invalid_quantity(order_form_page):
             "name": "Minnie Mouse", 
             "email_address": "m@mouse.com", 
             "pv__test_product": 2,
+            "data_processing_consent": True,
             "g-recaptcha-response": "PASSED"
         },
         page=order_form_page
@@ -135,16 +139,16 @@ def test_order_form_page_subject_title(order_form_page, order_form_submission, t
     assert submission.page.subject_title == subject_title
     
 
-def test_order_form_page_builder_no_email_field(home_page):
+def test_order_form_page_builder_no_email_or_data_processing_field(home_page):
     orderformpage = OrderFormPageFactory(parent=home_page)
     builder =  orderformpage.form_builder(orderformpage.order_form_fields.all(), page=orderformpage)
-    assert list(builder.formfields.keys()) == ["email", "wagtailcaptcha"]
+    assert set(builder.formfields.keys()) == {"email", "data_processing_consent", "wagtailcaptcha"}
 
 def test_order_form_page_builder_with_email_field(home_page):
     orderformpage = OrderFormPageFactory(parent=home_page)
     baker.make("home.OrderFormField", label="Email address", field_type="email", page=orderformpage)
     builder =  orderformpage.form_builder(orderformpage.order_form_fields.all(), page=orderformpage)
-    assert list(builder.formfields.keys()) == ["email_address", "wagtailcaptcha"]
+    assert set(builder.formfields.keys()) == {"email_address", "data_processing_consent", "wagtailcaptcha"}
 
 
 def test_order_form_page_remove_variant(order_form_page):
@@ -363,6 +367,7 @@ def test_order_form_process_form_submission(order_form_page):
             "email_address": "m@mouse.com", 
             "pv__test_product": 1,
             "pv__test_product_x5": 0,
+            "data_processing_consent": True,
             "g-recaptcha-response": "PASSED"
         },
         page=order_form_page
@@ -379,7 +384,8 @@ def test_order_form_process_form_submission(order_form_page):
     assert mail.outbox[0].reply_to == []
     assert mail.outbox[0].body == (
         "name: Minnie Mouse\n"
-        "email_address: m@mouse.com\n\n"
+        "email_address: m@mouse.com\n"
+        "Data processing consent: confirmed\n\n"
         "Order summary:\n"
         "  - test product (1)\n\n"
         "Total items ordered: 1\n"
@@ -411,6 +417,7 @@ def test_order_form_process_form_submission_with_voucher_code(order_form_page):
             "email_address": "m@mouse.com", 
             "pv__test_product": 1,
             "voucher_code": "foo",
+            "data_processing_consent": True,
             "g-recaptcha-response": "PASSED"
         },
         page=order_form_page
@@ -428,6 +435,7 @@ def test_order_form_process_form_submission_with_voucher_code(order_form_page):
     assert mail.outbox[0].body == (
         "name: Minnie Mouse\n"
         "email_address: m@mouse.com\n"
+        "Data processing consent: confirmed\n"
         "Voucher code: foo\n\n"
         "Order summary:\n"
         "  - test product (1)\n\n"

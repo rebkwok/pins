@@ -28,6 +28,7 @@ from wagtail.admin.mail import send_mail
 from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, Panel, MultipleChooserPanel
 from wagtail.images.models import Image
 
+from common.fields import data_processing_consent_field
 from .utils import user_address_choices
 
 
@@ -676,6 +677,8 @@ class BidForm(forms.ModelForm):
         required=False,
         label="Select an existing address",
     )
+    data_processing_consent = data_processing_consent_field()
+
     class Meta:
         fields = ("amount", "auction_item", "user", "notify", "name", "address_line_1", "address_line_2", "address_line_3", "town_city", "county", "postcode")
         model = Bid
@@ -725,6 +728,7 @@ class BidForm(forms.ModelForm):
                 "county", 
                 "postcode"
             ),
+            "data_processing_consent",
             Submit('submit', f'Submit', css_class="btn btn-success"),
         )
 
