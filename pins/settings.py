@@ -93,7 +93,7 @@ INSTALLED_APPS = [
     "modelcluster",
     "taggit",
     "storages",
-    "captcha",
+    "django_recaptcha",
     "wagtailcaptcha",
     "django.contrib.admin",
     "django.contrib.auth",

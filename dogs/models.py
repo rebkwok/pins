@@ -23,10 +23,26 @@ from wagtail.fields import RichTextField
 from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, Panel
 from wagtail.images.models import Image
 
-from scrape_albums import IDS_TO_IGNORE
-
 
 logger = logging.getLogger(__name__)
+
+
+IDS_TO_IGNORE = [
+    "489076346765992",  # Mobile uploads
+    "489076353432658",  # Timeline photos
+    "489076360099324",  # Cover photos
+    "489076350099325",  # Profile pictures
+    "478527842488598",  # All dogs for adoption/foster/ sponsor
+    "1456923637982342",  # In Loving Memory
+    "1022503768091000",  # Sponsor a Hound Programme
+    "342935776047806",  # Happily Homed Dogs
+    "1147766635564712",  # Vega, Dina & Balto - their journey
+    "819257798415599",  # Pal - a remarkable love story -saved from the brink of death
+    "795739000767479",  # Nino - in memoriam see Nino's Tale for his story
+    "177583412583044",  # Pacita The Pod who Started it All!
+    "1883457118662323",  # Puma/Norah
+    "668225005517791", # Peeps
+]
 
 
 class DogIndexPageStatuses(Orderable):
