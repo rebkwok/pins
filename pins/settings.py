@@ -12,10 +12,15 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import environ
+import logging
 import os
 import sys
 
 from pathlib import Path
+
+from .custom_logging import GroupWriteRotatingFileHandler, log_file_permissions
+
+logging.handlers.GroupWriteRotatingFileHandler = GroupWriteRotatingFileHandler
 
 
 root = environ.Path(__file__) - 2  # two folders back (/a/b/ - 3 = /)
@@ -340,6 +345,8 @@ if env('USE_MAILCATCHER'):  # pragma: no cover
 # #####LOGGING######
 if not TESTING and not env("LOCAL"):  # pragma: no cover
     LOG_FOLDER = env('LOG_FOLDER')
+    LOG_FILE = os.path.join(LOG_FOLDER, 'pins.log')
+    log_file_permissions(LOG_FILE)
 
     LOGGING = {
         'version': 1,
@@ -354,8 +361,8 @@ if not TESTING and not env("LOCAL"):  # pragma: no cover
         'handlers': {
             'file_app': {
                 'level': 'INFO',
-                'class': 'logging.handlers.RotatingFileHandler',
-                'filename': os.path.join(LOG_FOLDER, 'pins.log'),
+                'class': "logging.handlers.GroupWriteRotatingFileHandler",
+                'filename': LOG_FILE,
                 'maxBytes': 1024*1024*5,  # 5 MB
                 'backupCount': 5,
                 'formatter': 'verbose'
