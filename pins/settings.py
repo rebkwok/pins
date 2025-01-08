@@ -329,7 +329,7 @@ else:  # pragma: no cover
 
 DEFAULT_FROM_EMAIL = 'web@podencosinneed.org'
 SUPPORT_EMAIL = 'rebkwok@gmail.com'
-DEFAULT_ADMIN_EMAIL = "pinscotland16@gmail.com"
+DEFAULT_ADMIN_EMAIL = "info@podencosinneed.org"
 SERVER_EMAIL = SUPPORT_EMAIL
 
 # MAILCATCHER
