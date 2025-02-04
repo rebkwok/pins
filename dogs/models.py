@@ -35,7 +35,6 @@ IDS_TO_IGNORE = [
     "478527842488598",  # All dogs for adoption/foster/ sponsor
     "1456923637982342",  # In Loving Memory
     "1022503768091000",  # Sponsor a Hound Programme
-    "342935776047806",  # Happily Homed Dogs
     "1147766635564712",  # Vega, Dina & Balto - their journey
     "819257798415599",  # Pal - a remarkable love story -saved from the brink of death
     "795739000767479",  # Nino - in memoriam see Nino's Tale for his story
