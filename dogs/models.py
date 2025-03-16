@@ -389,9 +389,9 @@ class FacebookAlbumTracker:
         if expiry < datetime.now() + timedelta(days=1):
             return "expires_soon"
     
-        session_expiry = datetime.fromtimestamp(token_resp["data"]["data_access_expires_at"])
-        if session_expiry < datetime.now() + timedelta(days=7):
-            return "session_expires_soon"
+        # session_expiry = datetime.fromtimestamp(token_resp["data"]["data_access_expires_at"])
+        # if session_expiry < datetime.now() + timedelta(days=7):
+        #     return "session_expires_soon"
 
         return "ok"
             
