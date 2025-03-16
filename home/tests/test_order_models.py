@@ -246,9 +246,7 @@ def test_order_form_page_disallowed_variants(order_form_page, order_form_pre_sub
     # sell out
     order_form_pre_submission({"pv__test_product": 1})
     assert order_form_page.sold_out()
-    assert set(
-        order_form_page.disallowed_variants()
-    ) == {order_form_page.product_variants.first(), variant5, variant10}
+    assert set(order_form_page.disallowed_variants()) == set(order_form_page.product_variants.all())
 
 
 def test_order_form_page_disallowed_variants_by_group(order_form_page, order_form_pre_submission):
