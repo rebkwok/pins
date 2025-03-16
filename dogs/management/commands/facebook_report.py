@@ -40,13 +40,13 @@ class Command(BaseCommand):
                 recipient_list=[settings.SUPPORT_EMAIL]
             )
             return
-        elif status == "session_expires_soon":
-            send_mail(
-                subject="Facebook token warning!",
-                message=f"WARNING! Access token session expires in <7 days.\n{msg}",
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[settings.SUPPORT_EMAIL]
-            )
+        # elif status == "session_expires_soon":
+        #     send_mail(
+        #         subject="Facebook token warning!",
+        #         message=f"WARNING! Access token session expires in <7 days.\n{msg}",
+        #         from_email=settings.DEFAULT_FROM_EMAIL,
+        #         recipient_list=[settings.SUPPORT_EMAIL]
+        #     )
 
         changes = tracker.update_all(force_update=True)
     
