@@ -507,7 +507,10 @@ class FacebookAlbumTracker:
         new_data = new_data or self.fetch_all(force_update=force_update)
         changes = self.report_changes(new_data)
         new_pages = self.create_new_pages(changes["added"])
+        remove_pages = self.remove_pages(changes["removed"])
+        failed_to_delete = set(changes["removed"]) - remove_pages
         changes["added"] = new_pages
+        changes["failed_to_delete"] = failed_to_delete
         self.albums_obj.update_all(new_data)
         logger.info("All album data updated")
         return changes
@@ -529,6 +532,17 @@ class FacebookAlbumTracker:
             needs_offer_page.add_child(instance=dog_page)
 
         return new_pages
+
+    def remove_pages(self, removed_fb_albums):
+        deleted = set()
+        for album_id in removed_fb_albums:
+            # make sure it doesn't exist
+            try:
+                self.get_album_metadata(album_id)
+            except GraphAPIError:
+                DogPage.objects.get(facebook_album_id=album_id).delete()
+                deleted.add(album_id)
+        return deleted
 
     def update_albums(self, album_ids, force_update=False):
         for i, album_id in enumerate(album_ids, start=1):

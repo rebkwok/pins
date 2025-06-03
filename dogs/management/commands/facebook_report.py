@@ -52,7 +52,8 @@ class Command(BaseCommand):
     
         if not any(list(changes.values())):
             mail_content.append("==================\nNo changes")
-    
+
+        failed_to_delete = changes.pop("failed_to_delete")
         for change, changed_data in changes.items():
             if not changed_data:
                 continue
@@ -77,6 +78,10 @@ class Command(BaseCommand):
                     mail_content.append(f"{key}: \n\tAlbum name: {val['facebook_album_name']}\n\tPage title: {val['page_title']}")
                 else:
                     mail_content.append(f"{key}: {val}")
+            if failed_to_delete:
+                mail_content.append("Some pages failed to delete: ")
+                for album_id in failed_to_delete:
+                    mail_content.append(f"{album_id}: {changes['removed'][album_id]["link"]}")
                     
         mail_content = "\n".join(mail_content)
         self.stdout.write(mail_content)
