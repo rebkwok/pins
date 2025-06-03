@@ -41,6 +41,7 @@ IDS_TO_IGNORE = [
     "177583412583044",  # Pacita The Pod who Started it All!
     "1883457118662323",  # Puma/Norah
     "668225005517791", # Peeps
+    "920246696982286", # all dogs in foster in UK
 ]
 
 
