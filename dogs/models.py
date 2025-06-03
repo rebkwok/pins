@@ -537,10 +537,14 @@ class FacebookAlbumTracker:
     def remove_pages(self, removed_fb_albums):
         deleted = set()
         for album_id in removed_fb_albums:
-            # make sure it doesn't exist
-            try:
-                self.get_album_metadata(album_id)
-            except GraphAPIError:
+            # make sure it doesn't exist, or it's ignored
+            can_delete = album_id in IDS_TO_IGNORE
+            if not can_delete:
+                try:
+                    self.get_album_metadata(album_id)
+                except GraphAPIError:
+                    can_delete = True
+            if can_delete:
                 DogPage.objects.get(facebook_album_id=album_id).delete()
                 deleted.add(album_id)
         return deleted

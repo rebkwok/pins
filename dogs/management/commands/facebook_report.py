@@ -81,7 +81,7 @@ class Command(BaseCommand):
             if failed_to_delete:
                 mail_content.append("Some pages failed to delete: ")
                 for album_id in failed_to_delete:
-                    mail_content.append(f"{album_id}: {changes['removed'][album_id]["link"]}")
+                    mail_content.append(f"{album_id}: {changes['removed'][album_id]}")
                     
         mail_content = "\n".join(mail_content)
         self.stdout.write(mail_content)
