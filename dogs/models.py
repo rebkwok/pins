@@ -42,6 +42,7 @@ IDS_TO_IGNORE = [
     "1883457118662323",  # Puma/Norah
     "668225005517791", # Peeps
     "920246696982286", # all dogs in foster in UK
+    "342935776047806", # happily homed
 ]
 
 
