@@ -546,8 +546,11 @@ class FacebookAlbumTracker:
                 except GraphAPIError:
                     can_delete = True
             if can_delete:
-                DogPage.objects.get(facebook_album_id=album_id).delete()
-                deleted.add(album_id)
+                try:
+                    DogPage.objects.get(facebook_album_id=album_id).delete()
+                    deleted.add(album_id)
+                except DogPage.DoesNotExist:
+                    ...
         return deleted
 
     def update_albums(self, album_ids, force_update=False):
