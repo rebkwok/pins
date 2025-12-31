@@ -1,0 +1,47 @@
+[project]
+name = "pins"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "Django>=6.0",
+    "wagtail>=7.2.1",
+    "crispy-bootstrap5>=2025.6",
+    "django-allauth>=65.13.1",
+    "django-crispy-forms>=2.5",
+    "django-encrypted-json-fields>=1.0.5",
+    "django-environ>=0.12.0",
+    "django-extensions>=4.1",
+    "psycopg2>=2.9.11",
+    "gunicorn>=23.0.0",
+    "django_ses[events]>=4.5.0",
+    "htmx>=0.0.0",
+    "pymemcache>=4.0.0",
+    "whitenoise>=6.11.0",
+    "facebook-sdk>=3.1.0",
+    "wagtail-json-widget>=0.0.9",
+    "django-storages[boto3]>=1.14.6",
+    "django-recaptcha>=4.1.0",
+    "wagtail-django-recaptcha>=2.1.1",
+    "django-paypal>=2.1",
+    "wagtail-modeladmin>=2.2.0",
+    "shortuuid>=1.0.13",
+    "reportlab>=4.4.7",
+    "html2text>=2025.4.15",
+]
+
+[dependency-groups]
+    dev = [
+        "pytest>=9.0.2",
+        "coverage>=7.13.1",
+        "pytest-django>=4.11.1",
+        "pytest-cov>=7.0.0",
+        "pytest-env>=1.2.0",
+        "pytest-freezer>=0.4.9",
+        "pytest-xdist>=3.8.0",
+        "wagtail-factories>=4.3.0",
+        "ipython>=9.8.0",
+        "model-bakery>=1.21.0",
+        "ipdb>=0.13.13",
+]

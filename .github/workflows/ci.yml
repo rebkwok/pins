@@ -29,39 +29,23 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
         with:
-          python-version: 3.12
-          cache: pip
-          cache-dependency-path: requirements.txt
+          # Install a specific version of uv.
+          version: "0.9.21"
 
       - name: psycopg2 prerequisites
         run: sudo apt-get install libpq-dev
-
-      - name: Install dependencies
-        run: |
-          set -xe
-          python -m pip install --upgrade pip
-          python -m venv venv
-          venv/bin/pip install --progress-bar=off -r requirements.txt
-          venv/bin/pip install coveralls
 
       - name: Run tests
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost/ci_test
         run: |
-          source ${{ github.workspace }}/venv/bin/activate
-          pytest --cov-config=.coveragerc --cov=. -n auto
-    
-      - name: Run coverage 
-        run: |
-          source ${{ github.workspace }}/venv/bin/activate
-          coverage report
+          uv run pytest --cov-config=.coveragerc --cov=. -n auto
 
-      # - name: Coveralls
-      #   uses: AndreMiras/coveralls-python-action@develop
-      #   with:
-      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run coverage
+        run: |
+          uv run coverage report
