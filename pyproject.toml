@@ -45,3 +45,44 @@ dependencies = [
         "model-bakery>=1.21.0",
         "ipdb>=0.13.13",
 ]
+
+[tool.pytest]
+    addopts = ["--reuse-db", "-n" , "auto"]
+    DJANGO_SETTINGS_MODULE = "pins.settings"
+
+    env = [
+        "TESTING=1",
+        "SECRET_KEY=dummy_secret",
+        "EMAIL_HOST_USER=dummy_user",
+        "EMAIL_HOST_PASSWORD=dummy_password",
+        "LOG_FOLDER=log_folder",
+        "FB_APP_ID=dummy",
+        "FB_APP_SECRET=dummy",
+        "FB_ACCESS_TOKEN=dummy",
+        "FB_PAGE_ID=1",
+        "PAYPAL_EMAIL=dummy-email@hotmail.com",
+        "PAYPAL_CUSTOM_KEY=dummy",
+        "FIELD_ENCRYPTION_KEY='ddD0dDddD0DddD00DDDDDd0DDdd0DddDdd-DdD0ddDd='",
+        "PDF_ENCRYPTION_KEY=dummy",
+        "RECIPE_SUBMISSIONS_OPEN=True",
+    ]
+
+[tool.coverage.run]
+    omit = [
+        "venv/*",
+        ".venv/*",
+        "*/migrations/*",
+        "*/tests/*",
+        "*/tests.py",
+        "*/wsgi.py",
+        "*/__init__.py",
+        "manage.py",
+        "scrape_albums.py",
+    ]
+
+    relative_files = true
+
+[tool.coverage.report]
+    skip_empty = true
+    skip_covered = true
+    fail_under = 71

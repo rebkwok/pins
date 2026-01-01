@@ -44,7 +44,7 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost/ci_test
         run: |
-          uv run pytest --cov-config=.coveragerc --cov=. -n auto
+          uv run pytest --cov
 
       - name: Run coverage
         run: |
