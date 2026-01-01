@@ -29,6 +29,7 @@ dependencies = [
     "reportlab>=4.4.7",
     "html2text>=2025.4.15",
     "django-ses[events]",
+    "envdir>=1.0.1",
 ]
 
 [dependency-groups]

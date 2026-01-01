@@ -718,6 +718,15 @@ wheels = [
 ]
 
 [[package]]
+name = "envdir"
+version = "1.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/26/b3/583f3b1481f8af69ca01ba15079435152e9402543a3f8423ead98879c5fa/envdir-1.0.1.tar.gz", hash = "sha256:ede06bacc4da4a74bff86b0aca7a9c174f60750ff8ff78e2dc6b183df02a566b", size = 20510 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/75/dd/817dc77edf4807fc2c29e28046ab83aa7ccfe27e79d24ca37d7aaa1e36bb/envdir-1.0.1-py2.py3-none-any.whl", hash = "sha256:54ed3f965fa33f433f989a2bfb26bcd04035f27d105217c33a72783971224d0d", size = 13178 },
+]
+
+[[package]]
 name = "et-xmlfile"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1499,6 +1508,7 @@ dependencies = [
     { name = "django-recaptcha" },
     { name = "django-ses", extra = ["events"] },
     { name = "django-storages", extra = ["boto3"] },
+    { name = "envdir" },
     { name = "facebook-sdk" },
     { name = "gunicorn" },
     { name = "html2text" },
@@ -1542,6 +1552,7 @@ requires-dist = [
     { name = "django-recaptcha", specifier = ">=4.1.0" },
     { name = "django-ses", extras = ["events"], git = "https://github.com/hesstobi/django-ses.git?rev=1ab8edea0b93c47013f150ac4dc364c358709d41" },
     { name = "django-storages", extras = ["boto3"], specifier = ">=1.14.6" },
+    { name = "envdir", specifier = ">=1.0.1" },
     { name = "facebook-sdk", specifier = ">=3.1.0" },
     { name = "gunicorn", specifier = ">=23.0.0" },
     { name = "html2text", specifier = ">=2025.4.15" },
