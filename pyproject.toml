@@ -15,7 +15,6 @@ dependencies = [
     "django-extensions>=4.1",
     "psycopg2>=2.9.11",
     "gunicorn>=23.0.0",
-    "django_ses[events]>=4.5.0",
     "htmx>=0.0.0",
     "pymemcache>=4.0.0",
     "whitenoise>=6.11.0",
@@ -29,6 +28,7 @@ dependencies = [
     "shortuuid>=1.0.13",
     "reportlab>=4.4.7",
     "html2text>=2025.4.15",
+    "django-ses[events]",
 ]
 
 [dependency-groups]
@@ -86,3 +86,6 @@ dependencies = [
     skip_empty = true
     skip_covered = true
     fail_under = 71
+
+[tool.uv.sources]
+django-ses = { git = "https://github.com/hesstobi/django-ses.git", rev = "1ab8edea0b93c47013f150ac4dc364c358709d41" }
