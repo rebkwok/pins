@@ -606,11 +606,15 @@ wheels = [
 
 [[package]]
 name = "django-ses"
-version = "4.5.0"
-source = { git = "https://github.com/hesstobi/django-ses.git?rev=1ab8edea0b93c47013f150ac4dc364c358709d41#1ab8edea0b93c47013f150ac4dc364c358709d41" }
+version = "4.6.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "boto3" },
     { name = "django" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/92/31/d9652175f31fc084654d4e43fc5de46379dab1c139fcce6fcf37c5802c12/django_ses-4.6.0.tar.gz", hash = "sha256:7cd88ccc0ef28c89cea680895b1f73030c07af1c7c872217c42e3f2077c9c8a4", size = 69115 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9e/b6/f0ec3564b49385b857213930b634e75feda1be21a0bacf3b205b8a49854b/django_ses-4.6.0-py3-none-any.whl", hash = "sha256:08a2cd0ac87692b0d19d24d4cdf4abef6149113218cc8822a7e8fec992b0dda4", size = 36629 },
 ]
 
 [package.optional-dependencies]
@@ -1550,7 +1554,7 @@ requires-dist = [
     { name = "django-extensions", specifier = ">=4.1" },
     { name = "django-paypal", specifier = ">=2.1" },
     { name = "django-recaptcha", specifier = ">=4.1.0" },
-    { name = "django-ses", extras = ["events"], git = "https://github.com/hesstobi/django-ses.git?rev=1ab8edea0b93c47013f150ac4dc364c358709d41" },
+    { name = "django-ses", extras = ["events"], specifier = ">=4.6.0" },
     { name = "django-storages", extras = ["boto3"], specifier = ">=1.14.6" },
     { name = "envdir", specifier = ">=1.0.1" },
     { name = "facebook-sdk", specifier = ">=3.1.0" },
