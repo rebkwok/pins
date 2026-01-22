@@ -49,8 +49,8 @@ class Command(BaseCommand):
         #     )
 
         changes = tracker.update_all(force_update=True)
-    
-        if not any(list(changes.values())):
+        has_changes = any(list(changes.values()))
+        if not has_changes:
             mail_content.append("==================\nNo changes")
 
         failed_to_delete = changes.pop("failed_to_delete")
@@ -86,8 +86,11 @@ class Command(BaseCommand):
         mail_content = "\n".join(mail_content)
         self.stdout.write(mail_content)
         if email:
+            subject = "album report "
+            if not has_changes:
+                subject += "(NO CHANGES) "
             send_mail(
-                subject=f"album report - {datetime.now(UTC)}",
+                subject=f"{subject}-{datetime.now(UTC).strftime("%Y-%M-%d %H:%m")}",
                 message=mail_content,
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[settings.SUPPORT_EMAIL]
