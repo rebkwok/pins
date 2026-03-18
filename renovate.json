@@ -2,5 +2,41 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
-  ]
+  ],
+  "lockFileMaintenance": { "enabled": true },
+  "minimumReleaseAg": "7 days",
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "matchDatasources": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "addlabels": ["js"],
+      "groupName": "js prod dependencies"
+    },
+    {
+      "matchDatasources": ["npm"],
+      "matchDepTypes": ["dependencies"],
+      "addlabels": ["js"],
+      "groupName": "js prod dependencies"
+    },
+    {
+      "matchDatasources": ["pip", "uv"],
+      "matchDepTypes": ["devDependencies"],
+      "addlabels": ["python"],
+      "groupName": "python dev dependencies"
+    },
+    {
+      "matchDatasources": ["pip", "uv"],
+      "matchDepTypes": ["dependencies"],
+      "addlabels": ["python"],
+      "groupName": "python prod dependencies"
+    },
+    {
+      "matchDatasources": ["actions"],
+      "addlabels": ["actions"]
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "addlabels": ["security"]
+  }
 }
