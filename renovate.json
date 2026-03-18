@@ -1,7 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    "docker:disable"
   ],
   "labels": ["dependencies"],
   "lockFileMaintenance": {
@@ -52,7 +53,7 @@
       ]
     },
     {
-      "matchDatasources": ["github-tags"],
+      "matchManagers": ["github-actions"],
       "addLabels": ["actions"],
       "minimumReleaseAge": "7 days",
       "schedule": [
