@@ -2,8 +2,7 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended",
-    "docker:disable",
-    "python-version:disable"
+    "docker:disable"
   ],
   "labels": ["dependencies"],
   "lockFileMaintenance": {
@@ -13,6 +12,10 @@
       ]
   },
   "packageRules": [
+    {
+      "matchDatasources": ["python-version"],
+      "enabled": false
+    },
     {
       "matchDatasources": ["npm"],
       "matchDepTypes": ["devDependencies"],
