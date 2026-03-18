@@ -1,0 +1,66 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "labels": ["dependencies"],
+  "lockFileMaintenance": {
+      "enabled": true, 
+      "schedule": [
+        "* 0-3 * * WED"
+      ]
+  },
+  "packageRules": [
+    {
+      "matchDatasources": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "addLabels": ["js"],
+      "groupName": "js dev dependencies",
+      "minimumReleaseAge": "7 days",
+      "schedule": [
+        "* 0-3 * * WED"
+      ]
+    },
+    {
+      "matchDatasources": ["npm"],
+      "matchDepTypes": ["dependencies"],
+      "addLabels": ["js"],
+      "groupName": "js prod dependencies",
+      "minimumReleaseAge": "7 days",
+      "schedule": [
+        "* 0-3 * * WED"
+      ]
+    },
+    {
+      "matchDatasources": ["pypi"],
+      "matchDepTypes": ["devDependencies"],
+      "addLabels": ["python"],
+      "groupName": "python dev dependencies",
+      "minimumReleaseAge": "7 days",
+      "schedule": [
+        "* 0-3 * * WED"
+      ]
+    },
+    {
+      "matchDatasources": ["pypi"],
+      "matchDepTypes": ["dependencies"],
+      "addLabels": ["python"],
+      "groupName": "python prod dependencies",
+      "minimumReleaseAge": "7 days",
+      "schedule": [
+        "* 0-3 * * WED"
+      ]
+    },
+    {
+      "matchDatasources": ["github-tags"],
+      "addLabels": ["actions"],
+      "minimumReleaseAge": "7 days",
+      "schedule": [
+        "* 0-3 * * WED"
+      ]
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "addLabels": ["security"]
+  }
+}
