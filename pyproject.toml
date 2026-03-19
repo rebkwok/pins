@@ -47,6 +47,9 @@ dependencies = [
         "ipdb>=0.13.13",
 ]
 
+[tool.uv]
+exclude-newer = "7 days"
+
 [tool.pytest]
     addopts = ["--reuse-db", "-n" , "auto"]
     DJANGO_SETTINGS_MODULE = "pins.settings"
