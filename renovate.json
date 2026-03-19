@@ -13,6 +13,7 @@
       ]
   },
   "ignorePaths": [".python-version"],
+  "bumpVersion": ["major", "minor", "patch", "prerelease"],
   "packageRules": [
     {
       "matchManagers": ["npm"],
