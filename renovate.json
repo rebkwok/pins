@@ -10,7 +10,9 @@
       "enabled": true, 
       "schedule": [
         "* 0-3 * * WED"
-      ]
+      ],
+      // update transitive deps by updating the entire lockfile
+      "prBodyNotes": [":information_source: Before reviewing this PR, merge any prod/dev dependency PRs and rebase."]
   },
   "ignorePaths": [".python-version"],
   "packageRules": [
