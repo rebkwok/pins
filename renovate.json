@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended",
+    "config:best-practices",
     "docker:disable"
   ],
   "labels": ["dependencies"],
@@ -14,7 +14,7 @@
   "ignorePaths": [".python-version"],
   "packageRules": [
     {
-      "matchDatasources": ["npm"],
+      "matchManagers": ["npm"],
       "matchDepTypes": ["devDependencies"],
       "addLabels": ["js"],
       "groupName": "js dev dependencies",
@@ -24,7 +24,7 @@
       ]
     },
     {
-      "matchDatasources": ["npm"],
+      "matchManagers": ["npm"],
       "matchDepTypes": ["dependencies"],
       "addLabels": ["js"],
       "groupName": "js prod dependencies",
@@ -34,8 +34,8 @@
       ]
     },
     {
-      "matchDatasources": ["pypi"],
-      "matchDepTypes": ["devDependencies"],
+      "matchManagers": ["pep621"],
+      "matchDepTypes": ["dependency-groups", "tool.uv.dev-dependencies"],
       "addLabels": ["python"],
       "groupName": "python dev dependencies",
       "minimumReleaseAge": "7 days",
@@ -44,8 +44,8 @@
       ]
     },
     {
-      "matchDatasources": ["pypi"],
-      "matchDepTypes": ["dependencies"],
+      "matchManagers": ["pep621"],
+      "matchDepTypes": ["project.dependencies", "project.optional-dependencies", "tool.uv.sources"],
       "addLabels": ["python"],
       "groupName": "python prod dependencies",
       "minimumReleaseAge": "7 days",
