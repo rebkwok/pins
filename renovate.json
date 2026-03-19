@@ -37,24 +37,24 @@
     {
       "matchManagers": ["pep621"],
       "matchDepTypes": ["dependency-groups", "tool.uv.dev-dependencies"],
-      "matchUpdateTypes": ["major", "minor", "patch"],
       "addLabels": ["python"],
       "groupName": "python dev dependencies",
       "minimumReleaseAge": "7 days",
       "schedule": [
         "* 0-3 * * WED"
-      ]
+      ],
+      "rangeStrategy": "bump"
     },
     {
       "matchManagers": ["pep621"],
       "matchDepTypes": ["project.dependencies", "project.optional-dependencies", "tool.uv.sources"],
-      "matchUpdateTypes": ["major", "minor", "patch"],
       "addLabels": ["python"],
       "groupName": "python prod dependencies",
       "minimumReleaseAge": "7 days",
       "schedule": [
         "* 0-3 * * WED"
-      ]
+      ],
+      "rangeStrategy": "bump"
     },
     {
       "matchManagers": ["github-actions"],
