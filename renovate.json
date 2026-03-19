@@ -59,6 +59,11 @@
       "rangeStrategy": "bump"
     },
     {
+      "matchManagers": ["pep621"],
+      "matchDepNames": ["reportlab"],
+      "allowedVersions": "<=4.4.8"
+    },
+    {
       "matchManagers": ["github-actions"],
       "addLabels": ["actions"],
       "minimumReleaseAge": "7 days",
