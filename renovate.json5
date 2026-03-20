@@ -60,22 +60,22 @@
       "matchDepTypes": ["dependency-groups", "tool.uv.dev-dependencies"],
       "addLabels": ["python"],
       "groupName": "python dev dependencies",
+      "rangeStrategy": "bump",
       "minimumReleaseAge": "7 days",
       "schedule": [
         "* 0-3 * * WED"
       ],
-      "rangeStrategy": "bump"
     },
     {
       "matchManagers": ["pep621"],
       "matchDepTypes": ["project.dependencies", "project.optional-dependencies", "tool.uv.sources"],
       "addLabels": ["python"],
       "groupName": "python prod dependencies",
+      "rangeStrategy": "bump",
       "minimumReleaseAge": "7 days",
       "schedule": [
         "* 0-3 * * WED"
       ],
-      "rangeStrategy": "bump"
     },
     {
       "matchManagers": ["github-actions"],
