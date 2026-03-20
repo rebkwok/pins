@@ -86,6 +86,8 @@
       ]
     },
     // Pin a specific dependency to an upper allowed version
+    // Otherwise renovate will use the general "bump" strategy to change the upper limit in pyproject.toml
+    // and will bump it anyway
     // {
     //   "matchManagers": ["pep621"],
     //   "matchDepNames": ["reportlab"],
