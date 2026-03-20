@@ -60,7 +60,7 @@
       "matchDepTypes": ["dependency-groups", "tool.uv.dev-dependencies"],
       "addLabels": ["python"],
       "groupName": "python dev dependencies",
-      "rangeStrategy": "bump",
+      "rangeStrategy": "pin",
       "minimumReleaseAge": "7 days",
       "schedule": [
         "* 0-3 * * WED"
