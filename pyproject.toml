@@ -34,17 +34,17 @@ dependencies = [
 
 [dependency-groups]
     dev = [
-        "pytest>=9.0.2",
-        "coverage>=7.13.1",
-        "pytest-django>=4.11.1",
-        "pytest-cov>=7.0.0",
-        "pytest-env>=1.2.0",
-        "pytest-freezer>=0.4.9",
-        "pytest-xdist>=3.8.0",
-        "wagtail-factories>=4.3.0",
-        "ipython>=9.8.0",
-        "model-bakery>=1.21.0",
-        "ipdb>=0.13.13",
+        "pytest==9.0.2",
+        "coverage==7.13.1",
+        "pytest-django==4.11.1",
+        "pytest-cov==7.0.0",
+        "pytest-env==1.2.0",
+        "pytest-freezer==0.4.9",
+        "pytest-xdist==3.8.0",
+        "wagtail-factories==4.3.0",
+        "ipython==9.8.0",
+        "model-bakery==1.21.0",
+        "ipdb==0.13.13",
 ]
 
 [tool.pytest]
