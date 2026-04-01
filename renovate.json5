@@ -29,7 +29,7 @@
       "enabled": true, 
       "minimumReleaseAge": "7 days",
       // treat packages without a timestamp as stable
-      "minimumReleaseAgeBehaviour": timestamp-optional,
+      "minimumReleaseAgeBehaviour": "timestamp-optional",
       "schedule": [
         "* 0-3 * * WED"
       ],
