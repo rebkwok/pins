@@ -44,6 +44,7 @@ IDS_TO_IGNORE = [
     "920246696982286", # all dogs in foster in UK
     "342935776047806", # happily homed
     "1230050356001917", # Storm pups videos
+    "1070719275268360", # All Pins Dogs In Spain or UK, Ready For A Foster Or Forever Home
 ]
 
 
