@@ -508,15 +508,15 @@ wheels = [
 
 [[package]]
 name = "django-allauth"
-version = "65.16.0"
+version = "65.16.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asgiref" },
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/40/a0/94f485e056c1d1ddd0a50ef240a8d810aaa917855dccecbc3d9af3d7f880/django_allauth-65.16.0.tar.gz", hash = "sha256:7a94857146f8dfe810da1ab78514792e5f7ddb115c22d054e04c1ef18112af32", size = 2233580, upload-time = "2026-04-13T18:35:22.307Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3d/df/357187dfff18c7783e4911827a6c69437e290d7259a32a99c23fcd85997f/django_allauth-65.16.1.tar.gz", hash = "sha256:4425ac3088541c4c54983e16e08f6e3eb9f438dc1b1009534fa51c8bb739ed31", size = 2232835, upload-time = "2026-04-17T18:53:59.475Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b6/45/e3b2ccbf1a6d07725ed089812bfc13065795213f19b50ec27b7c4b6abaa9/django_allauth-65.16.0-py3-none-any.whl", hash = "sha256:e65d4aa4ed754c634d0f381dc58c6bbe2a0453f9a26d5bf7f138eee86919dc7e", size = 2053654, upload-time = "2026-04-13T18:35:10.753Z" },
+    { url = "https://files.pythonhosted.org/packages/ad/58/d95b6c3088d83697bfd93782ee57bc6a6462e41eb19121a947b8a015396a/django_allauth-65.16.1-py3-none-any.whl", hash = "sha256:e49df24056bf37c44e56aaad1e51f78994b7d175bc3476d65e8f8f58390a8ce8", size = 2051868, upload-time = "2026-04-17T18:54:12.032Z" },
 ]
 
 [[package]]
@@ -1651,7 +1651,7 @@ dev = [
 requires-dist = [
     { name = "crispy-bootstrap5", specifier = "<=2025.6" },
     { name = "django", specifier = "<=6.0.4" },
-    { name = "django-allauth", specifier = "<=65.16.0" },
+    { name = "django-allauth", specifier = "<=65.16.1" },
     { name = "django-crispy-forms", specifier = "<=2.6" },
     { name = "django-encrypted-json-fields", specifier = "<=1.0.5" },
     { name = "django-environ", specifier = "<=0.13.0" },
@@ -1665,14 +1665,14 @@ requires-dist = [
     { name = "gunicorn", specifier = "<=23.0.0" },
     { name = "html2text", specifier = "<=2025.4.15" },
     { name = "htmx", specifier = "<=0.0.0" },
-    { name = "psycopg2", specifier = "<=2.9.11" },
+    { name = "psycopg2", specifier = "<=2.9.12" },
     { name = "pymemcache", specifier = "<=4.0.0" },
     { name = "reportlab", specifier = "<=4.4.10" },
     { name = "shortuuid", specifier = "<=1.0.13" },
     { name = "wagtail", specifier = "<=7.3.1" },
-    { name = "wagtail-django-recaptcha", specifier = "<=2.1.1" },
+    { name = "wagtail-django-recaptcha", specifier = "<=2.2.0" },
     { name = "wagtail-json-widget", specifier = "<=0.0.9" },
-    { name = "wagtail-modeladmin", specifier = "<=2.2.0" },
+    { name = "wagtail-modeladmin", specifier = "<=2.3.0" },
     { name = "whitenoise", specifier = "<=6.12.0" },
 ]
 
@@ -1783,12 +1783,12 @@ wheels = [
 
 [[package]]
 name = "psycopg2"
-version = "2.9.11"
+version = "2.9.12"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/89/8d/9d12bc8677c24dad342ec777529bce705b3e785fa05d85122b5502b9ab55/psycopg2-2.9.11.tar.gz", hash = "sha256:964d31caf728e217c697ff77ea69c2ba0865fa41ec20bb00f0977e62fdcc52e3", size = 379598, upload-time = "2025-10-10T11:14:46.075Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c7/bc/f66df707ed1aec949fbf24e4460e4f4277a7ba23cdadb3965bb1f634ddb9/psycopg2-2.9.12.tar.gz", hash = "sha256:1dedb1c7a1d8552c4a6044c6b1c41a52e6a8e2d144af83eccac758076b1b7c15", size = 379683, upload-time = "2026-04-20T23:36:11.013Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/88/5a/18c8cb13fc6908dc41a483d2c14d927a7a3f29883748747e8cb625da6587/psycopg2-2.9.11-cp313-cp313-win_amd64.whl", hash = "sha256:8dc379166b5b7d5ea66dcebf433011dfc51a7bb8a5fc12367fa05668e5fc53c8", size = 2714048, upload-time = "2025-10-10T11:10:19.816Z" },
-    { url = "https://files.pythonhosted.org/packages/47/08/737aa39c78d705a7ce58248d00eeba0e9fc36be488f9b672b88736fbb1f7/psycopg2-2.9.11-cp314-cp314-win_amd64.whl", hash = "sha256:f10a48acba5fe6e312b891f290b4d2ca595fc9a06850fe53320beac353575578", size = 2803738, upload-time = "2025-10-10T11:10:23.196Z" },
+    { url = "https://files.pythonhosted.org/packages/91/ab/03403779a251ca14a7f1b07a41c7aa735fd451f0aebe4c4f901a231167a4/psycopg2-2.9.12-cp313-cp313-win_amd64.whl", hash = "sha256:3d23e684927d37b95cee9a943f6927b04ae2fdcd056fd0e2a30929ee89fee5a9", size = 2757176, upload-time = "2026-04-20T23:33:23.577Z" },
+    { url = "https://files.pythonhosted.org/packages/73/4a/a3566f77501c21a6c2a1fc234dbe5dff74a86e3f150ef070e4ffb835e7f9/psycopg2-2.9.12-cp314-cp314-win_amd64.whl", hash = "sha256:a73d5513bfe929c56555006c7a9cc7ae6e4276aa99dd2b1e2544eb8bb54f8b23", size = 2848588, upload-time = "2026-04-20T23:33:25.983Z" },
 ]
 
 [[package]]
@@ -2340,12 +2340,16 @@ wheels = [
 
 [[package]]
 name = "wagtail-django-recaptcha"
-version = "2.1.1"
+version = "2.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django-recaptcha" },
+    { name = "wagtail" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/50/da/d451e1ba925dd705e0cb9c407329636fa8b3ab3889219efa1c875e6932b7/wagtail-django-recaptcha-2.1.1.tar.gz", hash = "sha256:ae6cf07b1b6e30827bfba5db03f310df45d63ea28694959c886f5cb1d3c31fb9", size = 13199, upload-time = "2024-01-26T03:01:29.122Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ae/ba/ca504c45123f07314a0cd83a03c5b3872c3e851e703f0a6ea92fbf6f2e10/wagtail_django_recaptcha-2.2.0.tar.gz", hash = "sha256:d7340ba346f365f475595b733c4f4ef380bd2e331261d5a5604b57baa3a7b786", size = 6904, upload-time = "2026-04-18T13:32:51.401Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/85/6e/51b0f5be85c42364b325ef623cbd7fbc038c10bc3d11fb75b6acfe09cc35/wagtail_django_recaptcha-2.2.0-py3-none-any.whl", hash = "sha256:094a59cbfd9f02d41e9fd0a294fc3e754e5b5fc5da01cc15a8e08007f3ad2f67", size = 5375, upload-time = "2026-04-18T13:32:49.957Z" },
+]
 
 [[package]]
 name = "wagtail-factories"
@@ -2374,14 +2378,14 @@ wheels = [
 
 [[package]]
 name = "wagtail-modeladmin"
-version = "2.2.0"
+version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "wagtail" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/44/72/e687aa58e21708655ceaa731586803031385be82eea0876e4268665e8dc4/wagtail_modeladmin-2.2.0.tar.gz", hash = "sha256:41e12f9a79f8c1595fce73bd6b51007422f258089564f9df8e09a82246a8e133", size = 140057, upload-time = "2025-04-25T12:17:26.925Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/11/c3/5d31ddc6e15d4254670cdccbdffa808784c81266c040d604bd1a86563884/wagtail_modeladmin-2.3.0.tar.gz", hash = "sha256:65336077a9bf1b01d6a4af621f9542beb1fda696d2ec6f8d5d807ed49a84c31b", size = 141067, upload-time = "2026-04-19T09:46:37.782Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0b/29/0f5f4e7ce521836092ad878d032410dd7563e1ac2b06af0deb9e19032ef0/wagtail_modeladmin-2.2.0-py3-none-any.whl", hash = "sha256:60ea08b128761b5b6a1cbfe3c8ab828fba13e41ff3d7563a0b8c62c8fe36c4ce", size = 265632, upload-time = "2025-04-25T12:17:25.538Z" },
+    { url = "https://files.pythonhosted.org/packages/a9/76/ca040a98906e8ba95bc8cb2a6935bb13f4b383ec67d3d55d941885927566/wagtail_modeladmin-2.3.0-py3-none-any.whl", hash = "sha256:ff6633ba102a94fd7ace9a0501d7ca290b815fb0485d132d112b5e0289de41ff", size = 265703, upload-time = "2026-04-19T09:46:36.365Z" },
 ]
 
 [[package]]
