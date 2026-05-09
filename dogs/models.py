@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from io import BytesIO
 import logging
+import re
 import requests
 
 from django import forms
@@ -26,26 +27,24 @@ from wagtail.images.models import Image
 
 logger = logging.getLogger(__name__)
 
+FOSTER_RE = re.compile(r'\bfoster', re.IGNORECASE)
+HAPPILY_HOMED_RE = re.compile(r'\bhappily\s+homed\b', re.IGNORECASE)
 
-IDS_TO_IGNORE = [
-    "489076346765992",  # Mobile uploads
-    "489076353432658",  # Timeline photos
-    "489076360099324",  # Cover photos
-    "489076350099325",  # Profile pictures
-    "478527842488598",  # All dogs for adoption/foster/ sponsor
-    "1456923637982342",  # In Loving Memory
-    "1022503768091000",  # Sponsor a Hound Programme
-    "1147766635564712",  # Vega, Dina & Balto - their journey
-    "819257798415599",  # Pal - a remarkable love story -saved from the brink of death
-    "795739000767479",  # Nino - in memoriam see Nino's Tale for his story
-    "177583412583044",  # Pacita The Pod who Started it All!
-    "1883457118662323",  # Puma/Norah
-    "668225005517791", # Peeps
-    "920246696982286", # all dogs in foster in UK
-    "342935776047806", # happily homed
-    "1230050356001917", # Storm pups videos
-    "1070719275268360", # All Pins Dogs In Spain or UK, Ready For A Foster Or Forever Home
+# Ordered: first match wins
+STATUS_ROUTING = [
+    (FOSTER_RE, "In foster"),
+    (HAPPILY_HOMED_RE, "Happily homed"),
 ]
+
+RECENTLY_FETCHED_THRESHOLD_HOURS = 1
+
+
+def get_target_status_title(album_title):
+    for pattern, status_title in STATUS_ROUTING:
+        if pattern.search(album_title):
+            return status_title
+    return None
+
 
 
 class DogIndexPageStatuses(Orderable):
@@ -250,41 +249,38 @@ class FacebookAlbums(models.Model):
     # {
     #     "<album_id>": {
     #         "name": "",
-    #         "count": 10, 
-    #         "description": "", 
+    #         "count": 10,
+    #         "description": "",
     #         "link": "",
     #         "images": [<list of image urls>],
-    #         "updated_time": ""
+    #         "updated_time": "",
+    #         "last_fetched": "",
     #         }
     #     },
     # }
     albums = models.JSONField()
-    previous_albums = models.JSONField(default=dict) # backup 
+    # Snapshot of albums at the last acknowledgement. The nightly sync diffs
+    # new data against this baseline so that changes are reported until
+    # explicitly acknowledged, even if a report email is missed.
+    reporting_baseline = models.JSONField(default=dict)
     date_updated = models.DateTimeField(default=timezone.now)
     rate_limited_at = models.DateTimeField(null=True)
 
     @classmethod
     def instance(cls):
-        if cls.objects.exists():
-            return cls.objects.last()
-        return cls.objects.create(albums={})
+        obj, _ = cls.objects.get_or_create(pk=1, defaults={"albums": {}})
+        return obj
 
     @property
     def is_rate_limited(self):
-        is_limited = self.rate_limited_at is not None
-        if not is_limited:
+        if self.rate_limited_at is None:
             return False
-        
-        is_limited = timezone.now() <= self.rate_limited_at + timedelta(minutes=60)
-        if not is_limited:
-            self.clear_rate_limit()
-
-        return is_limited 
+        return timezone.now() <= self.rate_limited_at + timedelta(minutes=60)
 
     def set_rate_limit(self):
         self.rate_limited_at = timezone.now()
         self.save()
-    
+
     def clear_rate_limit(self):
         self.rate_limited_at = None
         self.save()
@@ -299,51 +295,124 @@ class FacebookAlbums(models.Model):
         self.save()
 
     def update_all(self, all_album_data):
-        self.previous_albums = self.albums
         self.albums = all_album_data
         self.date_updated = timezone.now()
         self.save()
+
+    def acknowledge(self):
+        self.reporting_baseline = self.albums
+        self.save()
+
+    def album_recently_fetched(self, album_id):
+        # Prevents redundant API calls when an admin saves a DogPage shortly
+        # after the nightly sync has already fetched fresh data.
+        last_fetched_str = self.get_album(album_id).get("last_fetched")
+        if not last_fetched_str:
+            return False
+        last_fetched = datetime.fromisoformat(last_fetched_str)
+        delta = timedelta(hours=RECENTLY_FETCHED_THRESHOLD_HOURS)
+        return timezone.now() - last_fetched < delta
+
+    def pending_changes(self):
+        """Return changes between reporting_baseline and current albums."""
+        baseline = self.reporting_baseline
+        current = self.albums
+        added = {
+            album_id: current[album_id]["name"]
+            for album_id in set(current) - set(baseline)
+        }
+        removed = {
+            album_id: baseline[album_id]["name"]
+            for album_id in set(baseline) - set(current)
+        }
+        changed = {
+            album_id: f"{current[album_id]['name']} (previously {baseline[album_id]['name']})"
+            for album_id in set(current) & set(baseline)
+            if current[album_id].get("name") != baseline[album_id].get("name")
+        }
+        return {"added": added, "removed": removed, "changed": changed}
+
+
+class FacebookTokenManager:
+
+    def __init__(self):
+        self.app_id = settings.FB_APP_ID
+        self.app_secret = settings.FB_APP_SECRET
+        self._albums_obj = None
+
+    @property
+    def _albums(self):
+        if self._albums_obj is None:
+            self._albums_obj = FacebookAlbums.instance()
+        return self._albums_obj
+
+    def get_current_access_token(self):
+        token_path = settings.FB_ACCESS_TOKEN_PATH
+        if not token_path.exists():
+            # First run: seed the file from the env var. After this the env var
+            # is not consulted again; the file holds the live (extended) token.
+            token_path.parent.mkdir(parents=True, exist_ok=True)
+            token_path.write_text(settings.FB_ACCESS_TOKEN)
+        return token_path.read_text()
+
+    def get_token_status(self, token):
+        # "expires_soon" means expiry within the next day; the caller should
+        # extend the token before it lapses.
+        url = (
+            f"https://graph.facebook.com/debug_token?input_token={token}"
+            f"&access_token={token}"
+        )
+        token_resp = requests.get(url).json()
+        if token_resp.get("error"):
+            error_msg = token_resp["error"].get("message", "")
+            if "Session has expired" in error_msg:
+                return "expired"
+            elif "limit" in error_msg:
+                self._albums.set_rate_limit()
+                return "rate_limited"
+            else:
+                return f"Error: {error_msg}"
+
+        expiry = datetime.fromtimestamp(token_resp["data"]["expires_at"])
+        if expiry < datetime.now() + timedelta(days=1):
+            return "expires_soon"
+
+        return "ok"
+
+    def extend_token(self, api):
+        return api.extend_access_token(self.app_id, self.app_secret)["access_token"]
 
 
 class FacebookAlbumTracker:
 
     def __init__(self):
         self._api = None
-        self.app_id = settings.FB_APP_ID # Obtained from https://developers.facebook.com/
-        self.app_secret = settings.FB_APP_SECRET # Obtained from https://developers.facebook.com/
+        self.token_manager = FacebookTokenManager()
         self.albums_obj = FacebookAlbums.instance()
-    
+
     @property
     def api(self):
-        """Setup the fb graph api"""
         if self._api is None:
-            # read the current access token
-            token = self.get_current_access_token()
-            # make sure the token is up to date
-            token_status = self.get_token_status(token)
+            token = self.token_manager.get_current_access_token()
+            token_status = self.token_manager.get_token_status(token)
             if token_status == "expired":
-                # raise exception; generate a new token
-                # at https://developers.facebook.com/tools/explorer/
-                # try deleting path and getting token again, in case we're
-                # added a new starting short-lived token
+                # The stored token has expired. Delete the file so
+                # get_current_access_token() falls back to the short-lived seed
+                # token from FB_ACCESS_TOKEN, which may have been refreshed.
                 settings.FB_ACCESS_TOKEN_PATH.unlink()
-                token = self.get_current_access_token()
-                token_status = self.get_token_status(token)
+                token = self.token_manager.get_current_access_token()
+                token_status = self.token_manager.get_token_status(token)
                 if token_status == "expired":
-                    # definitely expired; raise exception
                     raise Exception("Access token session has expired.")
             elif token_status == "expires_soon":
-                # extend token and write it to file
-                token = self.extend_token()
+                # Extend before it lapses and persist the new long-lived token.
+                self._api = GraphAPI(access_token=token)
+                token = self.token_manager.extend_token(self._api)
                 settings.FB_ACCESS_TOKEN_PATH.write_text(token)
-            # setup api with  token
             self._api = GraphAPI(access_token=token)
         return self._api
-                               
+
     def get_all_albums(self):
-        """
-        Get all albums for existing DogPages
-        """
         album_ids = DogPage.objects.filter(facebook_album_id__isnull=False).values_list("facebook_album_id", flat=True)
         try:
             return self.api.get_objects(album_ids, fields="name,link,description,updated_time,count")
@@ -359,68 +428,10 @@ class FacebookAlbumTracker:
                     logger.error("Album id %s not found", album_id)
             return results
 
-    def get_current_access_token(self):
-        token_path = settings.FB_ACCESS_TOKEN_PATH
-        if not token_path.exists():
-            # if the path doesn't already exist, it's the first time we've
-            # accessed it, use the access token setting provided and
-            # write that to file. The access token setting won't be used
-            # again
-            token_path.parent.mkdir(parents=True, exist_ok=True)
-            token_path.write_text(settings.FB_ACCESS_TOKEN)
-        token = token_path.read_text()
-        return token
-
-    def get_token_status(self, token):
-        # check expiry; "soon" means it expired in the next day
-        url = (
-            f"https://graph.facebook.com/debug_token?input_token={token}"
-            f"&access_token={token}"
-        )
-        token_resp = requests.get(url).json()
-        # error if rate limited
-        if token_resp.get("error"):
-            error_msg = token_resp["error"].get("message", "")
-            if "Session has expired" in error_msg:
-                return "expired"    
-            elif "limit" in error_msg:
-                self.albums_obj.set_rate_limit()
-                return "rate_limited"
-            else:
-                return f"Error: {error_msg}"
-
-        expiry = datetime.fromtimestamp(token_resp["data"]["expires_at"])
-        if expiry < datetime.now() + timedelta(days=1):
-            return "expires_soon"
-    
-        # session_expiry = datetime.fromtimestamp(token_resp["data"]["data_access_expires_at"])
-        # if session_expiry < datetime.now() + timedelta(days=7):
-        #     return "session_expires_soon"
-
-        return "ok"
-            
-    def extend_token(self):
-        # Extend the expiration time of a valid OAuth access token.
-        return self.api.extend_access_token(self.app_id, self.app_secret)["access_token"]
-
-    def create_or_update_album(self, album_id, force_update=False):
-        metadata = self.get_album_metadata(album_id)
-        if force_update or (
-            self.albums_obj.get_album(album_id).get("updated_time") != metadata.get("updated_time")
-        ):
-            logger.info("Updating album %s", album_id)
-            album_data = self.get_album_data(album_id, album_metadata=metadata, force_update=force_update)
-            if album_data:
-                self.albums_obj.update_album(album_id, album_data)
-            logger.info("Album %s updated", album_id)
-        else:
-            logger.info("Album %s is up to date", album_id)
-    
     def get_album_metadata(self, album_id):
         return self.api.get_object(album_id, fields="name,link,description,updated_time,count")
 
     def get_album_images(self, album_id):
-        # get images (max 50) for album
         url = f"https://graph.facebook.com/v18.0/{album_id}/photos/?fields=images&access_token={self.api.access_token}"
         resp_json = requests.get(url).json()
         while True:
@@ -430,8 +441,6 @@ class FacebookAlbumTracker:
             resp_json = requests.get(resp_json["paging"]["next"]).json()
 
     def create_gallery_image(self, page, collection, image_id, image_url):
-        # create the gallery image
-        # image id is the facebook image id
         image_resp = requests.get(image_url, allow_redirects=True)
         photo_name = f"{page.slug}_{image_id}"
         image = Image(
@@ -445,15 +454,16 @@ class FacebookAlbumTracker:
     def get_collection(self, page, album_id):
         collection_name = f"{page.slug}_{album_id}"
         try:
-            return Collection.objects.get(name=collection_name )
+            return Collection.objects.get(name=collection_name)
         except Collection.DoesNotExist:
             root_collection = Collection.get_first_root_node()
             return root_collection.add_child(name=collection_name)
-        
+
     def get_album_data(self, album_id, album_metadata=None, force_update=False):
-        # When we fetch all new album data, there may be data for dogs that we don't
-        # have a page for yet. Those will be created manually, so we just want to 
-        # retrieve the data for them, not to create collection or gallery images.
+        # A DogPage may not exist yet for a newly discovered album — in that
+        # case we still fetch and cache the album data, but skip gallery image
+        # creation (which requires a page). The page is created separately by
+        # create_new_pages().
         try:
             page = DogPage.objects.get(facebook_album_id=album_id)
             page_image_ids = page.gallery_images.values_list("fb_image_id", flat=True)
@@ -465,20 +475,18 @@ class FacebookAlbumTracker:
 
         album_metadata = album_metadata or self.get_album_metadata(album_id)
         if (
-            not force_update 
+            not force_update
             and self.albums_obj.get_album(album_id).get("updated_time") == album_metadata.get("updated_time")
         ):
             return self.albums_obj.get_album(album_id)
-        
-        if album_metadata["id"] in IDS_TO_IGNORE:
+
+        if album_metadata["id"] in settings.FB_ALBUM_IDS_TO_IGNORE:
             logger.info("Ignoring album '%s'", album_metadata["name"])
             return
 
         del album_metadata["id"]
-        
-        # Get photo data and urls for album photos
-        album_metadata["images"] = []
 
+        album_metadata["images"] = []
         for photo in self.get_album_images(album_id):
             images = photo.pop("images")
             photo["image_url"] = images[0]["source"]
@@ -486,62 +494,115 @@ class FacebookAlbumTracker:
 
             if page and (photo["id"] not in page_image_ids):
                 self.create_gallery_image(page, collection, photo["id"], photo["image_url"])
-                
+
+        album_metadata["last_fetched"] = timezone.now().isoformat()
         return album_metadata
 
-    def fetch_all(self, force_update=False):
-        """Retrieve all album data from facebook"""
-        # get all albums for page
+    def create_or_update_album(self, album_id, force_update=False):
+        metadata = self.get_album_metadata(album_id)
+        if force_update or (
+            self.albums_obj.get_album(album_id).get("updated_time") != metadata.get("updated_time")
+        ):
+            logger.info("Updating album %s", album_id)
+            album_data = self.get_album_data(album_id, album_metadata=metadata, force_update=force_update)
+            if album_data:
+                self.albums_obj.update_album(album_id, album_data)
+            logger.info("Album %s updated", album_id)
+        else:
+            logger.info("Album %s is up to date", album_id)
+
+    def fetch_all(self):
         all_current_albums = list(self.api.get_all_connections(
-            id=settings.FB_PAGE_ID, connection_name="albums", 
+            id=settings.FB_PAGE_ID, connection_name="albums",
             fields="name,link,description,updated_time,count",
         ))
-
         total = len(all_current_albums)
         albums_data = {}
         for i, album_metadata in enumerate(all_current_albums, start=1):
             album_id = album_metadata["id"]
             logger.info("Fetching album %d of %d (%s)", i, total, album_id)
-            album_data = self.get_album_data(album_id, force_update=force_update)
-            if album_data is not None:      
+            album_data = self.get_album_data(album_id)
+            if album_data is not None:
                 albums_data[album_id] = album_data
         return albums_data
 
-    def update_all(self, new_data=None, force_update=False):  
-        new_data = new_data or self.fetch_all(force_update=force_update)
+    def update_all(self, new_data=None):
+        new_data = new_data or self.fetch_all()
         changes = self.report_changes(new_data)
         new_pages = self.create_new_pages(changes["added"])
-        remove_pages = self.remove_pages(changes["removed"])
-        failed_to_delete = set(changes["removed"]) - remove_pages
+        removed = self.remove_pages(changes["removed"])
+        failed_to_delete = set(changes["removed"]) - removed
+        changed_titles = {
+            album_id: new_data[album_id]["name"]
+            for album_id in changes["changed"]
+        }
+        moved = self.apply_title_routing(changed_titles)
         changes["added"] = new_pages
         changes["failed_to_delete"] = failed_to_delete
+        changes["moved"] = moved
         self.albums_obj.update_all(new_data)
+        has_changes = any([new_pages, changes["removed"], changes["changed"], moved])
+        if not has_changes:
+            self.albums_obj.acknowledge()
         logger.info("All album data updated")
         return changes
 
     def create_new_pages(self, new_fb_albums):
-        # For new albums, we assume the dog is in Spain and needs offer
         needs_offer_page = DogStatusPage.objects.get(title__iexact="Needs Offer")
-
         new_pages = {}
         for album_id, album_name in new_fb_albums.items():
-            # FB album title is usually in the format "<Name> - in Spain, needs offer"
-            # Split on - and take the first element. If that doesn't work, try splitting
-            # on commas.
+            # FB album titles are typically "<Name> - in Spain, needs offer".
+            # Split on " - " first; fall back to splitting on "," if that
+            # produces a single character (i.e. the title had no " - ").
             dog_name = album_name.strip().split("-")[0].strip().title()
             if len(dog_name) == 1:
                 dog_name = album_name.strip().split(",")[0].strip().title()
+            status_title = get_target_status_title(album_name)
+            if status_title:
+                try:
+                    parent_page = DogStatusPage.objects.get(title__iexact=status_title)
+                except DogStatusPage.DoesNotExist:
+                    logger.warning("Status page '%s' not found; defaulting to Needs Offer", status_title)
+                    parent_page = needs_offer_page
+            else:
+                parent_page = needs_offer_page
             dog_page = DogPage(title=dog_name, location="Spain", facebook_album_id=album_id)
             new_pages[album_id] = {"facebook_album_name": album_name, "page_title": dog_name}
-            needs_offer_page.add_child(instance=dog_page)
-
+            parent_page.add_child(instance=dog_page)
         return new_pages
+
+    def apply_title_routing(self, changed_titles):
+        """Move pages whose title now matches a status keyword. Returns {album_id: {from, to}}."""
+        moved = {}
+        for album_id, new_title in changed_titles.items():
+            status_title = get_target_status_title(new_title)
+            if not status_title:
+                continue
+            try:
+                dog_page = DogPage.objects.get(facebook_album_id=album_id)
+            except DogPage.DoesNotExist:
+                continue
+            current_parent = dog_page.get_parent().specific
+            if isinstance(current_parent, DogStatusPage) and current_parent.title.lower() == status_title.lower():
+                continue
+            try:
+                target_page = DogStatusPage.objects.get(title__iexact=status_title)
+            except DogStatusPage.DoesNotExist:
+                logger.warning("Status page '%s' not found; skipping move for album %s", status_title, album_id)
+                continue
+            old_title = current_parent.title
+            dog_page.move(target_page, pos="last-child")
+            moved[album_id] = {"from": old_title, "to": target_page.title}
+            logger.info("Moved page for album %s from '%s' to '%s'", album_id, old_title, target_page.title)
+        return moved
 
     def remove_pages(self, removed_fb_albums):
         deleted = set()
         for album_id in removed_fb_albums:
-            # make sure it doesn't exist, or it's ignored
-            can_delete = album_id in IDS_TO_IGNORE
+            # Only delete if the album is genuinely gone from Facebook (raises
+            # GraphAPIError) or is in the ignore list. This guards against
+            # false removals caused by transient API errors during fetch_all.
+            can_delete = album_id in settings.FB_ALBUM_IDS_TO_IGNORE
             if not can_delete:
                 try:
                     self.get_album_metadata(album_id)
@@ -552,7 +613,7 @@ class FacebookAlbumTracker:
                     DogPage.objects.get(facebook_album_id=album_id).delete()
                     deleted.add(album_id)
                 except DogPage.DoesNotExist:
-                    ...
+                    pass
         return deleted
 
     def update_albums(self, album_ids, force_update=False):
@@ -561,29 +622,25 @@ class FacebookAlbumTracker:
             self.create_or_update_album(album_id, force_update=force_update)
 
     def report_changes(self, new_data):
-        saved_data = self.albums_obj.albums
+        baseline = self.albums_obj.reporting_baseline
         changes = {"added": {}, "removed": {}, "changed": {}}
-        if new_data != saved_data:
-            # new items
-            new_albums = set(new_data) - set(saved_data)
-            removed_albums = set(saved_data) - set(new_data)
-
+        if new_data != baseline:
+            new_albums = set(new_data) - set(baseline)
+            removed_albums = set(baseline) - set(new_data)
             changes["added"] = {
                 album_id: new_data[album_id]["name"] for album_id in new_albums
             }
             changes["removed"] = {
-                album_id: saved_data[album_id]["name"] for album_id in removed_albums
+                album_id: baseline[album_id]["name"] for album_id in removed_albums
             }
-            
-            same_albums = set(new_data) & set(saved_data)
-            # Only report changes to name (may require moving to different status page)
-            # description and images are updated automatically
+            same_albums = set(new_data) & set(baseline)
+            # Only title changes are reported; description and image updates
+            # are applied automatically without requiring manual action.
             changes["changed"] = {
-                album_id: f"{new_data[album_id]['name']} (previously {saved_data[album_id]['name']})"
+                album_id: f"{new_data[album_id]['name']} (previously {baseline[album_id]['name']})"
                 for album_id in same_albums
-                if new_data[album_id]["name"] != saved_data[album_id]["name"]
+                if new_data[album_id]["name"] != baseline[album_id]["name"]
             }
-
         return changes
 
 
@@ -725,19 +782,24 @@ class DogPage(Page):
         return context
 
     def save(self, *args, **kwargs):
+        _is_new = not self.pk
         super().save(*args, **kwargs)
+        if not self.facebook_album_id:
+            return
         albums_obj = FacebookAlbums.instance()
-        if self.facebook_album_id and not albums_obj.is_rate_limited:
-            new = False if not self.id else True
-            try:
-                logger.info("Checking fb info for album id %s, dog %s", self.facebook_album_id, self.title)
-                self.update_facebook_info(new=new)
-            except GraphAPIError as e:
-                logger.error(e)
-                if "Unsupported get request" in str(e):
-                    raise
-                albums_obj = FacebookAlbums.instance()
-                albums_obj.set_rate_limit()
+        if albums_obj.is_rate_limited:
+            return
+        if not _is_new and albums_obj.album_recently_fetched(self.facebook_album_id):
+            return
+        try:
+            logger.info("Checking fb info for album id %s, dog %s", self.facebook_album_id, self.title)
+            self.update_facebook_info(new=_is_new)
+        except GraphAPIError as e:
+            logger.error(e)
+            if "Unsupported get request" in str(e):
+                raise
+            albums_obj = FacebookAlbums.instance()
+            albums_obj.set_rate_limit()
 
 
 @receiver(pre_delete, sender=DogPage, dispatch_uid='dogpage_delete_collection')
