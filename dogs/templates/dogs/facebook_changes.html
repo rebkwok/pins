@@ -1,0 +1,90 @@
+{% extends "wagtailadmin/base.html" %}
+{% load i18n %}
+
+{% block titletag %}Facebook Album Changes{% endblock %}
+
+{% block content %}
+<div class="nice-padding">
+    <h1>Facebook Album Changes</h1>
+
+    {% if not has_changes %}
+        <p>No pending changes since last acknowledgement.</p>
+    {% else %}
+        <p>The following changes have been detected since you last acknowledged. Review and action as needed, then click <strong>Acknowledge</strong>.</p>
+
+        {% if changes.added %}
+        <h2>Added</h2>
+        <p class="help-text">New dog pages created as Needs Offer, location Spain (unless title indicated otherwise).</p>
+        <ul>
+            {% for album_id, name, page, status_page in changes.added %}
+            <li>
+                <strong>{{ album_id }}</strong>: {{ name }}
+                {% if page %} - <a href="{% url 'wagtailadmin_pages:edit' page.pk %}">{{ page.title }}</a>{% endif %}
+                {% if status_page %}(<a href="{% url 'wagtailadmin_pages:edit' status_page.pk %}">{{ status_page.title }}</a>){% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if changes.removed %}
+        <h2>Removed</h2>
+        <ul>
+            {% for album_id, name, page, status_page in changes.removed %}
+            <li>
+                <strong>{{ album_id }}</strong>: {{ name }}
+                {% if page %} - <a href="{% url 'wagtailadmin_pages:edit' page.pk %}">{{ page.title }}</a>{% endif %}
+                {% if status_page %}(<a href="{% url 'wagtailadmin_pages:edit' status_page.pk %}">{{ status_page.title }}</a>){% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if changes.changed %}
+        <h2>Title Changed</h2>
+        <p class="help-text">Changes to album title only — may require manually moving a page or updating the location.</p>
+        <ul>
+            {% for album_id, description, page, status_page in changes.changed %}
+            <li>
+                <strong>{{ album_id }}</strong>: {{ description }}
+                {% if page %} - <a href="{% url 'wagtailadmin_pages:edit' page.pk %}">{{ page.title }}</a>{% endif %}
+                {% if status_page %}(<a href="{% url 'wagtailadmin_pages:edit' status_page.pk %}">{{ status_page.title }}</a>){% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if changes.moved %}
+        <h2>Moved</h2>
+        <p class="help-text">Pages automatically moved between status sections based on album title.</p>
+        <ul>
+            {% for album_id, page_title, from_status, to_status, page, status_page in changes.moved %}
+            <li>
+                <strong>{{ album_id }}</strong>:
+                {% if page %}<a href="{% url 'wagtailadmin_pages:edit' page.pk %}">{{ page_title }}</a>{% else %}{{ page_title }}{% endif %}
+                — {{ from_status }} → {{ to_status }}
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if changes.recreated %}
+        <h2>Recreated</h2>
+        <p class="help-text">These pages were deleted from the site but their Facebook albums still exist, so they have been automatically recreated.</p>
+        <ul>
+            {% for album_id, album_name, page_title, page, status_page in changes.recreated %}
+            <li>
+                <strong>{{ album_id }}</strong>: {{ album_name }}
+                {% if page %} - <a href="{% url 'wagtailadmin_pages:edit' page.pk %}">{{ page_title }}</a>{% endif %}
+                {% if status_page %}(<a href="{% url 'wagtailadmin_pages:edit' status_page.pk %}">{{ status_page.title }}</a>){% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        <form method="post" action="{% url 'facebook_acknowledge' %}">
+            {% csrf_token %}
+            <button type="submit" class="button">Acknowledge</button>
+        </form>
+    {% endif %}
+</div>
+{% endblock %}
