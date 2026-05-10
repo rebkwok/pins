@@ -97,17 +97,25 @@ class Command(BaseCommand):
         mail_content = [f"Facebook album changes as of {now}"]
 
         changes = tracker.update_all()
-        has_changes = any(changes[k] for k in ("added", "removed", "changed", "moved"))
+        failed_to_delete = changes.pop("failed_to_delete")
+
+        # Albums whose title changed AND whose page was moved belong in one section only.
+        changed_and_moved_ids = set(changes["changed"]) & set(changes["moved"])
+        changes["changed_and_moved"] = {
+            album_id: {"description": changes["changed"].pop(album_id), **changes["moved"].pop(album_id)}
+            for album_id in changed_and_moved_ids
+        }
+
+        has_changes = any(changes[k] for k in ("added", "removed", "changed", "moved", "changed_and_moved"))
 
         if not has_changes:
             mail_content.append("==================\nNo changes")
-
-        failed_to_delete = changes.pop("failed_to_delete")
 
         section_notes = {
             "added": "Note: New dog pages are created as Needs Offer, location Spain (unless title indicates otherwise)",
             "changed": "Note: changes to album title only",
             "moved": "Note: pages moved based on updated album title",
+            "changed_and_moved": "Note: album title changed and page was automatically moved to a new status section",
         }
 
         for change, changed_data in changes.items():
@@ -125,6 +133,10 @@ class Command(BaseCommand):
                     )
                 elif change == "moved":
                     mail_content.append(f"{key}: {val['page_title']} ({val['from']} → {val['to']})")
+                elif change == "changed_and_moved":
+                    mail_content.append(
+                        f"{key}: {val['description']} — {val['page_title']} moved {val['from']} → {val['to']}"
+                    )
                 else:
                     mail_content.append(f"{key}: {val}")
 

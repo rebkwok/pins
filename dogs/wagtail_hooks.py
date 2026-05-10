@@ -49,6 +49,7 @@ def _enrich_changes(changes):
         + list(changes.get('removed', {}).keys())
         + list(changes.get('changed', {}).keys())
         + list(changes.get('moved', {}).keys())
+        + list(changes.get('changed_and_moved', {}).keys())
         + list(changes.get('recreated', {}).keys())
     )
     dog_pages = DogPage.objects.filter(facebook_album_id__in=all_album_ids).only(
@@ -75,6 +76,11 @@ def _enrich_changes(changes):
     result['moved'] = [
         (album_id, val['page_title'], val['from'], val['to'], *with_page(album_id))
         for album_id, val in changes.get('moved', {}).items()
+    ]
+    # changed_and_moved: val = {"description": ..., "page_title": ..., "from": ..., "to": ...}
+    result['changed_and_moved'] = [
+        (album_id, val['description'], val['page_title'], val['from'], val['to'], *with_page(album_id))
+        for album_id, val in changes.get('changed_and_moved', {}).items()
     ]
     # recreated: val = {"page_title": ..., "facebook_album_name": ...}
     result['recreated'] = [

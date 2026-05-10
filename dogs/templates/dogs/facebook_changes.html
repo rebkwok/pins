@@ -67,6 +67,20 @@
         </ul>
         {% endif %}
 
+        {% if changes.changed_and_moved %}
+        <h2>Title Changed and Page Moved</h2>
+        <p class="help-text">Album title changed and page was automatically moved to a new status section.</p>
+        <ul>
+            {% for album_id, description, page_title, from_status, to_status, page, status_page in changes.changed_and_moved %}
+            <li>
+                <strong>{{ album_id }}</strong>: {{ description }}
+                — {% if page %}<a href="{% url 'wagtailadmin_pages:edit' page.pk %}">{{ page_title }}</a>{% else %}{{ page_title }}{% endif %}
+                moved {{ from_status }} → {{ to_status }}
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
         {% if changes.recreated %}
         <h2>Recreated</h2>
         <p class="help-text">These pages were deleted from the site but their Facebook albums still exist, so they have been automatically recreated.</p>

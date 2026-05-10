@@ -373,9 +373,40 @@ class TestUpdateAllIntegration:
         assert bella.get_parent().title.lower() == "in foster"
 
         pending = albums_obj.pending_changes()
-        assert "album1" in pending['moved']
-        assert "album1" in pending['changed']
+        # album1 changed title AND moved → appears only in changed_and_moved
+        assert "album1" in pending['changed_and_moved']
+        assert "album1" not in pending['moved']
+        assert "album1" not in pending['changed']
+        # album2 title changed but did not move → appears only in changed
         assert "album2" in pending['changed']
+        assert "album2" not in pending['changed_and_moved']
+
+        # 9. Acknowledge
+        albums_obj.acknowledge()
+        tracker.albums_obj.refresh_from_db()
+
+        # 10. Manually move bella (album1) out of In foster back to Needs Offer.
+        #     The album title has not changed — still "Bella - in foster".
+        bella = DogPage.objects.get(facebook_album_id="album1")
+        needs_offer = DogStatusPage.objects.get(pk=status_pages["needs_offer"].pk)
+        bella.move(needs_offer, pos="last-child")
+
+        # 11. Run update_all with the same data (no title changes)
+        with patch.object(tracker, 'fetch_all', return_value=changed_data):
+            with patch.object(DogPage, 'update_facebook_info'):
+                tracker.update_all()
+
+        # 12. update_all detects bella is in the wrong status page and moves her
+        #     back. The move appears in pending_changes as 'moved' only — not
+        #     'changed' or 'changed_and_moved' because the album title is unchanged.
+        albums_obj.refresh_from_db()
+        bella.refresh_from_db()
+        assert bella.get_parent().title.lower() == "in foster"
+
+        pending = albums_obj.pending_changes()
+        assert "album1" in pending['moved']
+        assert "album1" not in pending['changed']
+        assert "album1" not in pending['changed_and_moved']
 
 
 # ---------------------------------------------------------------------------
