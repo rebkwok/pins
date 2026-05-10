@@ -386,7 +386,10 @@ class FacebookTokenManager:
                 return f"Error: {error_msg}"
 
         expiry = datetime.fromtimestamp(token_resp["data"]["expires_at"])
-        if expiry < datetime.now() + timedelta(days=1):
+        now = datetime.now()
+        if expiry <= now:
+            return "expired"
+        if expiry < now + timedelta(days=1):
             return "expires_soon"
 
         return "ok"

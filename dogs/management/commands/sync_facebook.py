@@ -3,6 +3,7 @@ from datetime import datetime, UTC
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.core.mail import send_mail
+from django.urls import reverse
 
 from dogs.models import FacebookAlbumTracker, FacebookTokenManager, DogPage
 
@@ -62,6 +63,16 @@ class Command(BaseCommand):
                 )
             self.stderr.write("Access token has expired.")
             return
+
+        if status == "expires_soon":
+            if email:
+                send_mail(
+                    subject="Facebook token expiring soon!",
+                    message=f"Access token expires within 24 hours.\n{renewal_msg}",
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[settings.SUPPORT_EMAIL],
+                )
+            self.stderr.write("Warning: access token expires within 24 hours.")
 
         if check:
             self._run_check()
@@ -124,6 +135,9 @@ class Command(BaseCommand):
             for album_id in failed_to_delete:
                 removed = changes.get("removed", {})
                 mail_content.append(f"{album_id}: {removed.get(album_id, '')}")
+
+        changes_url = settings.WAGTAILADMIN_BASE_URL + reverse('facebook_changes')
+        mail_content.append(f"\nView and acknowledge changes: {changes_url}")
 
         report = "\n".join(mail_content)
         self.stdout.write(report)

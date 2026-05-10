@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.core.management import call_command
 
-from dogs.models import FacebookAlbums
+from dogs.models import FacebookAlbums, FacebookAlbumTracker, FacebookTokenManager
 
 
 pytestmark = pytest.mark.django_db
@@ -18,7 +18,7 @@ def albums_obj():
 @pytest.fixture
 def mock_tracker():
     with patch("dogs.management.commands.sync_facebook.FacebookAlbumTracker") as mock_cls:
-        instance = MagicMock()
+        instance = MagicMock(spec=FacebookAlbumTracker)
         mock_cls.return_value = instance
         yield instance
 
@@ -26,7 +26,7 @@ def mock_tracker():
 @pytest.fixture
 def mock_token_manager():
     with patch("dogs.management.commands.sync_facebook.FacebookTokenManager") as mock_cls:
-        instance = MagicMock()
+        instance = MagicMock(spec=FacebookTokenManager)
         instance.get_current_access_token.return_value = "valid_token"
         instance.get_token_status.return_value = "ok"
         mock_cls.return_value = instance
@@ -80,10 +80,11 @@ class TestSyncFacebookFullSync:
     def test_moved_pages_appear_in_output(self, albums_obj, mock_token_manager, mock_tracker):
         mock_tracker.update_all.return_value = {
             **NO_CHANGE_RESULT,
-            "moved": {"album1": {"from": "Needs Offer", "to": "In foster"}},
+            "moved": {"album1": {"page_title": "Bella", "from": "Needs Offer", "to": "In foster"}},
         }
         output = run_sync()
         assert "album1" in output
+        assert "Bella" in output
         assert "Needs Offer" in output
         assert "In foster" in output
 
@@ -152,7 +153,7 @@ class TestSyncFacebookTokenErrors:
 
     def test_expired_token_sends_alert_email(self, albums_obj, mock_tracker):
         with patch("dogs.management.commands.sync_facebook.FacebookTokenManager") as mock_cls:
-            mgr = MagicMock()
+            mgr = MagicMock(spec=FacebookTokenManager)
             mgr.get_current_access_token.return_value = "expired_token"
             mgr.get_token_status.return_value = "expired"
             mock_cls.return_value = mgr
@@ -164,12 +165,47 @@ class TestSyncFacebookTokenErrors:
 
     def test_expired_token_does_not_run_sync(self, albums_obj, mock_tracker):
         with patch("dogs.management.commands.sync_facebook.FacebookTokenManager") as mock_cls:
-            mgr = MagicMock()
+            mgr = MagicMock(spec=FacebookTokenManager)
             mgr.get_current_access_token.return_value = "expired_token"
             mgr.get_token_status.return_value = "expired"
             mock_cls.return_value = mgr
             run_sync()
         mock_tracker.update_all.assert_not_called()
+
+    def test_expires_soon_sends_warning_email(self, albums_obj, mock_tracker):
+        with patch("dogs.management.commands.sync_facebook.FacebookTokenManager") as mock_cls:
+            mgr = MagicMock(spec=FacebookTokenManager)
+            mgr.get_current_access_token.return_value = "expiring_token"
+            mgr.get_token_status.return_value = "expires_soon"
+            mock_cls.return_value = mgr
+            mock_tracker.update_all.return_value = NO_CHANGE_RESULT.copy()
+            with patch("dogs.management.commands.sync_facebook.send_mail") as mock_mail:
+                run_sync(["--email"])
+        # Two emails: the warning + the sync report
+        assert mock_mail.call_count == 2
+        subjects = [call.kwargs["subject"] for call in mock_mail.call_args_list]
+        assert any("expir" in s.lower() for s in subjects)
+
+    def test_expires_soon_no_warning_without_email_flag(self, albums_obj, mock_tracker):
+        with patch("dogs.management.commands.sync_facebook.FacebookTokenManager") as mock_cls:
+            mgr = MagicMock(spec=FacebookTokenManager)
+            mgr.get_current_access_token.return_value = "expiring_token"
+            mgr.get_token_status.return_value = "expires_soon"
+            mock_cls.return_value = mgr
+            mock_tracker.update_all.return_value = NO_CHANGE_RESULT.copy()
+            with patch("dogs.management.commands.sync_facebook.send_mail") as mock_mail:
+                run_sync()
+        mock_mail.assert_not_called()
+
+    def test_expires_soon_still_runs_sync(self, albums_obj, mock_tracker):
+        with patch("dogs.management.commands.sync_facebook.FacebookTokenManager") as mock_cls:
+            mgr = MagicMock(spec=FacebookTokenManager)
+            mgr.get_current_access_token.return_value = "expiring_token"
+            mgr.get_token_status.return_value = "expires_soon"
+            mock_cls.return_value = mgr
+            mock_tracker.update_all.return_value = NO_CHANGE_RESULT.copy()
+            run_sync()
+        mock_tracker.update_all.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 from datetime import timedelta
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import patch
 
 import pytest
 from django.utils import timezone
@@ -297,6 +297,88 @@ class TestUpdateAllBaselineAdvance:
 
 
 # ---------------------------------------------------------------------------
+# FacebookAlbumTracker.update_all — integration
+# ---------------------------------------------------------------------------
+
+class TestUpdateAllIntegration:
+    """End-to-end tests for update_all covering new pages, recreated pages,
+    and title-based routing — with only network calls mocked out."""
+
+    ALBUM_DATA = {
+        "album1": {"name": "Bella - in Spain", "updated_time": "2024-01-01T00:00:00"},
+        "album2": {"name": "Rex - in Spain", "updated_time": "2024-01-01T00:00:00"},
+        "album3": {"name": "Luna - in Spain", "updated_time": "2024-01-01T00:00:00"},
+        "album4": {"name": "Max - in Spain", "updated_time": "2024-01-01T00:00:00"},
+    }
+
+    def test_full_lifecycle(self, albums_obj, status_pages):
+        tracker = FacebookAlbumTracker()
+
+        # 1. Run update_all — 4 new albums, 4 new pages created
+        with patch.object(tracker, 'fetch_all', return_value=self.ALBUM_DATA):
+            with patch.object(DogPage, 'update_facebook_info'):
+                tracker.update_all()
+
+        # 2. pending_changes reports all 4 as added, nothing else
+        albums_obj.refresh_from_db()
+        pending = albums_obj.pending_changes()
+        assert set(pending['added']) == {"album1", "album2", "album3", "album4"}
+        assert not pending['removed']
+        assert not pending['changed']
+        assert not pending['moved']
+        assert not pending['recreated']
+
+        # 3. Acknowledge — baseline advances, no further pending changes
+        albums_obj.acknowledge()
+        tracker.albums_obj.refresh_from_db()
+        assert not any(tracker.albums_obj.pending_changes().values())
+
+        # 4. Delete one page, then run update_all again with the same album data
+        DogPage.objects.get(facebook_album_id="album1").delete()
+
+        with patch.object(tracker, 'fetch_all', return_value=self.ALBUM_DATA):
+            with patch.object(DogPage, 'update_facebook_info'):
+                tracker.update_all()
+
+        # 5. Deleted page is recreated and reported in pending_changes as recreated
+        albums_obj.refresh_from_db()
+        assert DogPage.objects.filter(facebook_album_id="album1").exists()
+        pending = albums_obj.pending_changes()
+        assert "album1" in pending['recreated']
+        assert not pending['added']
+        assert not pending['removed']
+        assert not pending['changed']
+
+        # 6. Acknowledge
+        albums_obj.acknowledge()
+        tracker.albums_obj.refresh_from_db()
+
+        # 7. Run update_all with two changed album titles:
+        #    album1 title now matches the foster keyword → page should move
+        #    album2 title changes but does not match any routing keyword
+        changed_data = {
+            **self.ALBUM_DATA,
+            "album1": {"name": "Bella - in foster", "updated_time": "2024-01-02T00:00:00"},
+            "album2": {"name": "Rex - still in Spain", "updated_time": "2024-01-02T00:00:00"},
+        }
+
+        with patch.object(tracker, 'fetch_all', return_value=changed_data):
+            with patch.object(DogPage, 'update_facebook_info'):
+                tracker.update_all()
+
+        # 8. album1's page has moved to In foster; both title changes and
+        #    the move all appear in pending_changes
+        albums_obj.refresh_from_db()
+        bella = DogPage.objects.get(facebook_album_id="album1")
+        assert bella.get_parent().title.lower() == "in foster"
+
+        pending = albums_obj.pending_changes()
+        assert "album1" in pending['moved']
+        assert "album1" in pending['changed']
+        assert "album2" in pending['changed']
+
+
+# ---------------------------------------------------------------------------
 # Title-based routing helpers
 # ---------------------------------------------------------------------------
 
@@ -556,6 +638,14 @@ class TestFacebookTokenManager:
             mock_get.return_value.json.return_value = {
                 "error": {"message": "Session has expired at unix time 12345"}
             }
+            manager = FacebookTokenManager()
+            assert manager.get_token_status("token") == "expired"
+
+    def test_get_token_status_expired_by_timestamp(self):
+        """A past expires_at should return 'expired' even without an API-level error."""
+        past = (timezone.now() - timedelta(hours=1)).timestamp()
+        with patch("dogs.models.requests.get") as mock_get:
+            mock_get.return_value.json.return_value = {"data": {"expires_at": past}}
             manager = FacebookTokenManager()
             assert manager.get_token_status("token") == "expired"
 
