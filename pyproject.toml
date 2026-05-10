@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "Django<=6.0.5",
-    "wagtail<=7.3.1",
+    "wagtail<=7.3.2",
     "crispy-bootstrap5<=2025.6",
     "django-allauth<=65.16.0",
     "django-crispy-forms<=2.6",
