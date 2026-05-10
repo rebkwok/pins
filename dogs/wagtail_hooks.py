@@ -72,9 +72,9 @@ def _enrich_changes(changes):
             (album_id, description, *with_page(album_id))
             for album_id, description in changes.get(section, {}).items()
         ]
-    # moved: val = {"page_title": ..., "from": ..., "to": ...}
+    # moved: val = {"album_name": ..., "page_title": ..., "from": ..., "to": ...}
     result['moved'] = [
-        (album_id, val['page_title'], val['from'], val['to'], *with_page(album_id))
+        (album_id, val['album_name'], val['page_title'], val['from'], val['to'], *with_page(album_id))
         for album_id, val in changes.get('moved', {}).items()
     ]
     # changed_and_moved: val = {"description": ..., "page_title": ..., "from": ..., "to": ...}

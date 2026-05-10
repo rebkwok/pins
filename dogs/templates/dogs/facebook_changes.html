@@ -57,11 +57,11 @@
         <h2>Moved</h2>
         <p class="help-text">Pages automatically moved between status sections based on album title.</p>
         <ul>
-            {% for album_id, page_title, from_status, to_status, page, status_page in changes.moved %}
+            {% for album_id, album_name, page_title, from_status, to_status, page, status_page in changes.moved %}
             <li>
-                <strong>{{ album_id }}</strong>:
-                {% if page %}<a href="{% url 'wagtailadmin_pages:edit' page.pk %}">{{ page_title }}</a>{% else %}{{ page_title }}{% endif %}
-                — {{ from_status }} → {{ to_status }}
+                <strong>{{ album_id }}</strong>: {{ album_name }}
+                — {% if page %}<a href="{% url 'wagtailadmin_pages:edit' page.pk %}">{{ page_title }}</a>{% else %}{{ page_title }}{% endif %}
+                moved {{ from_status }} → {{ to_status }}
             </li>
             {% endfor %}
         </ul>

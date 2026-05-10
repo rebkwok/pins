@@ -336,7 +336,10 @@ class FacebookAlbums(models.Model):
             if current[album_id].get("name") != baseline[album_id].get("name")
         }
         site = self.pending_site_changes or {}
-        moved = site.get("moved", {})
+        moved = {
+            album_id: {**val, "album_name": self.albums.get(album_id, {}).get("name", "")}
+            for album_id, val in site.get("moved", {}).items()
+        }
         changed_and_moved_ids = set(changed) & set(moved)
         changed_and_moved = {
             album_id: {"description": changed[album_id], **moved[album_id]}
