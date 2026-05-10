@@ -42,7 +42,7 @@ dependencies = [
         "pytest-freezer<=0.4.9",
         "pytest-xdist<=3.8.0",
         "wagtail-factories<=4.4.0",
-        "ipython<=9.12.0",
+        "ipython<=9.13.0",
         "model-bakery<=1.23.4",
         "ipdb<=0.13.13",
 ]
