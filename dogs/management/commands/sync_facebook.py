@@ -113,7 +113,7 @@ class Command(BaseCommand):
                         f"{key}: \n\tAlbum name: {val['facebook_album_name']}\n\tPage title: {val['page_title']}"
                     )
                 elif change == "moved":
-                    mail_content.append(f"{key}: {val['from']} → {val['to']}")
+                    mail_content.append(f"{key}: {val['page_title']} ({val['from']} → {val['to']})")
                 else:
                     mail_content.append(f"{key}: {val}")
 

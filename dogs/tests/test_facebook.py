@@ -409,6 +409,7 @@ class TestApplyTitleRouting:
         page.refresh_from_db()
         assert page.get_parent().specific == status_pages["in_foster"]
         assert "album1" in moved
+        assert moved["album1"]["page_title"] == page.title
         assert moved["album1"]["from"] == "Needs Offer"
         assert moved["album1"]["to"] == "In foster"
 

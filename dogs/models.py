@@ -263,6 +263,10 @@ class FacebookAlbums(models.Model):
     # new data against this baseline so that changes are reported until
     # explicitly acknowledged, even if a report email is missed.
     reporting_baseline = models.JSONField(default=dict)
+    # Site-level changes that don't show up in the album diff (pages moved
+    # between status pages, or pages recreated after manual deletion).
+    # Cleared on acknowledge alongside reporting_baseline.
+    pending_site_changes = models.JSONField(default=dict)
     date_updated = models.DateTimeField(default=timezone.now)
     rate_limited_at = models.DateTimeField(null=True)
 
@@ -301,6 +305,7 @@ class FacebookAlbums(models.Model):
 
     def acknowledge(self):
         self.reporting_baseline = self.albums
+        self.pending_site_changes = {}
         self.save()
 
     def album_recently_fetched(self, album_id):
@@ -330,7 +335,14 @@ class FacebookAlbums(models.Model):
             for album_id in set(current) & set(baseline)
             if current[album_id].get("name") != baseline[album_id].get("name")
         }
-        return {"added": added, "removed": removed, "changed": changed}
+        site = self.pending_site_changes or {}
+        return {
+            "added": added,
+            "removed": removed,
+            "changed": changed,
+            "moved": site.get("moved", {}),
+            "recreated": site.get("recreated", {}),
+        }
 
 
 class FacebookTokenManager:
@@ -476,6 +488,7 @@ class FacebookAlbumTracker:
         album_metadata = album_metadata or self.get_album_metadata(album_id)
         if (
             not force_update
+            and page is not None
             and self.albums_obj.get_album(album_id).get("updated_time") == album_metadata.get("updated_time")
         ):
             return self.albums_obj.get_album(album_id)
@@ -530,18 +543,57 @@ class FacebookAlbumTracker:
         new_data = new_data or self.fetch_all()
         changes = self.report_changes(new_data)
         new_pages = self.create_new_pages(changes["added"])
+
+        # Recreate pages for known albums whose DogPage was manually deleted from the site
+        existing_page_ids = set(
+            DogPage.objects.filter(facebook_album_id__in=new_data.keys())
+            .values_list('facebook_album_id', flat=True)
+        )
+        missing_page_albums = {
+            album_id: new_data[album_id]["name"]
+            for album_id in new_data
+            if album_id not in existing_page_ids
+        }
+        if missing_page_albums:
+            recreated = self.create_new_pages(missing_page_albums)
+            new_pages.update(recreated)
+
         removed = self.remove_pages(changes["removed"])
         failed_to_delete = set(changes["removed"]) - removed
-        changed_titles = {
+
+        # Check status-page routing for all pre-existing albums, not just title-changed ones,
+        # in case a page was manually moved or its parent was wrong before the delete/recreate.
+        created_album_ids = set(changes["added"]) | set(missing_page_albums)
+        titles_to_route = {
             album_id: new_data[album_id]["name"]
-            for album_id in changes["changed"]
+            for album_id in new_data
+            if album_id not in created_album_ids
         }
-        moved = self.apply_title_routing(changed_titles)
+        moved = self.apply_title_routing(titles_to_route)
+
+        # Accumulate site-level changes (moved pages, recreated pages) so they
+        # persist in pending_changes() until the admin acknowledges.
+        site_changes = self.albums_obj.pending_site_changes or {}
+        if moved:
+            existing = site_changes.get("moved", {})
+            existing.update(moved)
+            site_changes["moved"] = existing
+        if missing_page_albums:
+            existing = site_changes.get("recreated", {})
+            existing.update({
+                album_id: info
+                for album_id, info in new_pages.items()
+                if album_id in missing_page_albums
+            })
+            site_changes["recreated"] = existing
+        self.albums_obj.pending_site_changes = site_changes
+
         changes["added"] = new_pages
         changes["failed_to_delete"] = failed_to_delete
         changes["moved"] = moved
         self.albums_obj.update_all(new_data)
-        has_changes = any([new_pages, changes["removed"], changes["changed"], moved])
+        has_changes = any([new_pages, changes["removed"], changes["changed"], moved,
+                           site_changes.get("recreated")])
         if not has_changes:
             self.albums_obj.acknowledge()
         logger.info("All album data updated")
@@ -592,7 +644,7 @@ class FacebookAlbumTracker:
                 continue
             old_title = current_parent.title
             dog_page.move(target_page, pos="last-child")
-            moved[album_id] = {"from": old_title, "to": target_page.title}
+            moved[album_id] = {"page_title": dog_page.title, "from": old_title, "to": target_page.title}
             logger.info("Moved page for album %s from '%s' to '%s'", album_id, old_title, target_page.title)
         return moved
 
