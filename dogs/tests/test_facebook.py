@@ -408,6 +408,34 @@ class TestUpdateAllIntegration:
         assert "album1" not in pending['changed']
         assert "album1" not in pending['changed_and_moved']
 
+        # 13. Without acknowledging, run update_all again with:
+        #     - album5: a brand new album (a new pending change)
+        #     - album1: title now "Bella - happily homed" (another change on top
+        #       of the move already recorded in step 12)
+        accumulated_data = {
+            **changed_data,
+            "album1": {"name": "Bella - happily homed", "updated_time": "2024-01-03T00:00:00"},
+            "album5": {"name": "Pip - in Spain", "updated_time": "2024-01-03T00:00:00"},
+        }
+
+        with patch.object(tracker, 'fetch_all', return_value=accumulated_data):
+            with patch.object(DogPage, 'update_facebook_info'):
+                tracker.update_all()
+
+        # 14. Changes accumulate across update_all calls without acknowledge:
+        #     - album5 appears in 'added' (brand new since last acknowledge)
+        #     - album1 had a move in step 12 and now also a title change; it
+        #       appears in 'changed_and_moved' only (not duplicated in moved/changed)
+        albums_obj.refresh_from_db()
+        bella.refresh_from_db()
+        assert bella.get_parent().title.lower() == "happily homed"
+
+        pending = albums_obj.pending_changes()
+        assert "album5" in pending['added']
+        assert "album1" in pending['changed_and_moved']
+        assert "album1" not in pending['moved']
+        assert "album1" not in pending['changed']
+
 
 # ---------------------------------------------------------------------------
 # Title-based routing helpers
