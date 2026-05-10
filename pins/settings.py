@@ -500,6 +500,25 @@ FB_PAGE_ID = env.str("FB_PAGE_ID")
 FB_APP_SECRET = env.str("FB_APP_SECRET")
 FB_ACCESS_TOKEN = env.str("FB_ACCESS_TOKEN")
 FB_ACCESS_TOKEN_PATH = Path(PROJECT_DIR) / ".fb_access_token"
+FB_ALBUM_IDS_TO_IGNORE = [
+    "489076346765992",  # Mobile uploads
+    "489076353432658",  # Timeline photos
+    "489076360099324",  # Cover photos
+    "489076350099325",  # Profile pictures
+    "478527842488598",  # All dogs for adoption/foster/ sponsor
+    "1456923637982342",  # In Loving Memory
+    "1022503768091000",  # Sponsor a Hound Programme
+    "1147766635564712",  # Vega, Dina & Balto - their journey
+    "819257798415599",  # Pal - a remarkable love story -saved from the brink of death
+    "795739000767479",  # Nino - in memoriam see Nino's Tale for his story
+    "177583412583044",  # Pacita The Pod who Started it All!
+    "1883457118662323",  # Puma/Norah
+    "668225005517791",  # Peeps
+    "920246696982286",  # all dogs in foster in UK
+    "342935776047806",  # happily homed
+    "1230050356001917",  # Storm pups videos
+    "1070719275268360",  # All Pins Dogs In Spain or UK, Ready For A Foster Or Forever Home
+] + env.list("FB_EXTRA_ALBUM_IDS_TO_IGNORE", default=[])
 
 
 # RECAPTCHA

@@ -18,3 +18,5 @@ pins/.fb_*
 .coverage
 
 *for_postage.csv
+
+.claude/
