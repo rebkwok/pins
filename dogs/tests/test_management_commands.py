@@ -221,6 +221,23 @@ class TestSyncFacebookAlbumUpdate:
 
 
 # ---------------------------------------------------------------------------
+# Force-update mode
+# ---------------------------------------------------------------------------
+
+class TestSyncFacebookForceUpdate:
+
+    def test_force_update_passes_flag_to_update_all(self, albums_obj, mock_token_manager, mock_tracker):
+        mock_tracker.update_all.return_value = NO_CHANGE_RESULT.copy()
+        run_sync(["--force-update"])
+        mock_tracker.update_all.assert_called_once_with(force_update=True)
+
+    def test_without_force_update_calls_update_all_without_flag(self, albums_obj, mock_token_manager, mock_tracker):
+        mock_tracker.update_all.return_value = NO_CHANGE_RESULT.copy()
+        run_sync()
+        mock_tracker.update_all.assert_called_once_with(force_update=False)
+
+
+# ---------------------------------------------------------------------------
 # Check mode
 # ---------------------------------------------------------------------------
 

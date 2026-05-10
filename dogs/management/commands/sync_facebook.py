@@ -38,8 +38,13 @@ class Command(BaseCommand):
             action="store_true",
             help="Print stored album data without fetching from Facebook",
         )
+        parser.add_argument(
+            "--force-update",
+            action="store_true",
+            help="Force all album photos to be re-fetched from Facebook, ignoring last_fetched",
+        )
 
-    def handle(self, email, album_ids, from_ix, to_ix, check, **kwargs):
+    def handle(self, email, album_ids, from_ix, to_ix, check, force_update, **kwargs):
         token_manager = FacebookTokenManager()
         token = token_manager.get_current_access_token()
         status = token_manager.get_token_status(token)
@@ -90,13 +95,13 @@ class Command(BaseCommand):
             tracker.update_albums(album_ids, force_update=True)
             return
 
-        self._run_full_sync(tracker, email)
+        self._run_full_sync(tracker, email, force_update=force_update)
 
-    def _run_full_sync(self, tracker, send_email):
+    def _run_full_sync(self, tracker, send_email, force_update=False):
         now = datetime.now(UTC)
         mail_content = [f"Facebook album changes as of {now}"]
 
-        changes = tracker.update_all()
+        changes = tracker.update_all(force_update=force_update)
         failed_to_delete = changes.pop("failed_to_delete")
 
         # Albums whose title changed AND whose page was moved belong in one section only.

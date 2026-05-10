@@ -534,7 +534,7 @@ class FacebookAlbumTracker:
         else:
             logger.info("Album %s is up to date", album_id)
 
-    def fetch_all(self):
+    def fetch_all(self, force_update=False):
         all_current_albums = list(self.api.get_all_connections(
             id=settings.FB_PAGE_ID, connection_name="albums",
             fields="name,link,description,updated_time,count",
@@ -544,13 +544,13 @@ class FacebookAlbumTracker:
         for i, album_metadata in enumerate(all_current_albums, start=1):
             album_id = album_metadata["id"]
             logger.info("Fetching album %d of %d (%s)", i, total, album_id)
-            album_data = self.get_album_data(album_id)
+            album_data = self.get_album_data(album_id, force_update=force_update)
             if album_data is not None:
                 albums_data[album_id] = album_data
         return albums_data
 
-    def update_all(self, new_data=None):
-        new_data = new_data or self.fetch_all()
+    def update_all(self, new_data=None, force_update=False):
+        new_data = new_data or self.fetch_all(force_update=force_update)
         changes = self.report_changes(new_data)
         new_pages = self.create_new_pages(changes["added"])
 
