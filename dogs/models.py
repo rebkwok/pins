@@ -616,6 +616,9 @@ class FacebookAlbumTracker:
         needs_offer_page = DogStatusPage.objects.get(title__iexact="Needs Offer")
         new_pages = {}
         for album_id, album_name in new_fb_albums.items():
+            # defensive - skip if a page already exists
+            if DogPage.objects.filter(facebook_album_id=album_id).exists():
+                continue
             # FB album titles are typically "<Name> - in Spain, needs offer".
             # Split on " - " first; fall back to splitting on "," if that
             # produces a single character (i.e. the title had no " - ").
