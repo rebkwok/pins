@@ -3,8 +3,8 @@ from io import BytesIO
 import logging
 import re
 import requests
+from time import sleep
 
-from django import forms
 from django.conf import settings
 from django.core.files.images import ImageFile
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
@@ -538,11 +538,19 @@ class FacebookAlbumTracker:
             logger.info("Album %s is up to date", album_id)
 
     def fetch_all(self, force_update=False):
-        all_current_albums = list(self.api.get_all_connections(
-            id=settings.FB_PAGE_ID, connection_name="albums",
-            fields="name,link,description,updated_time,count",
-        ))
-        total = len(all_current_albums)
+        attempts = 0
+        while attempts <= 3:
+            attempts += 1
+            all_current_albums = list(self.api.get_all_connections(
+                id=settings.FB_PAGE_ID, connection_name="albums",
+                fields="name,link,description,updated_time,count",
+            ))
+            total = len(all_current_albums)
+            if total > 0:
+                break
+            sleep(5)
+    
+        assert total > 0, "Error fetching albums"
         albums_data = {}
         for i, album_metadata in enumerate(all_current_albums, start=1):
             album_id = album_metadata["id"]

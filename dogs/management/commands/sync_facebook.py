@@ -52,9 +52,9 @@ class Command(BaseCommand):
         renewal_msg = (
             "Generate a new Page token at https://developers.facebook.com/tools/explorer/ "
             "and extend it using the Access Token Tool. Then update the FB_ACCESS_TOKEN "
-            "env variable.\n"
-            "If existing token has expired, also delete .fb_access_token\n"
-            "Check it works by running\n"
+            "env variable.\n\n"
+            "If existing token has expired, also delete .fb_access_token\n\n"
+            "Check it works by running:\n"
             "./manage.py check_token"
         )
 
@@ -73,7 +73,7 @@ class Command(BaseCommand):
             if email:
                 send_mail(
                     subject="Facebook token expiring soon!",
-                    message=f"Access token expires within 24 hours.\n{renewal_msg}",
+                    message=f"Access token expires within 24 hours.\n\n{renewal_msg}",
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[settings.SUPPORT_EMAIL],
                 )
