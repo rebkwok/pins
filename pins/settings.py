@@ -244,8 +244,8 @@ if TESTING or env('CI'):  # use local cache for tests
 else:  # pragma: no cover
     CACHES = {
         "default": {
-            "BACKEND": 'django.core.cache.backends.filebased.FileBasedCache',
-            "LOCATION": root("cache"),
+            "BACKEND": "django.core.cache.backends.memcached.PyMemcacheCache",
+            "LOCATION": "127.0.0.1:11211",
         }
     }
 
