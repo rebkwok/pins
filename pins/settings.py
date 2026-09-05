@@ -234,7 +234,7 @@ SHORT_DATETIME_FORMAT = "d-M-Y H:i"
 SHORT_DATE_FORMAT = "d-M-Y"
 
 
-if TESTING or env('CI'):  # use local cache for tests
+if TESTING or env('CI') or env("LOCAL"):  # use local cache for tests
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
@@ -318,28 +318,36 @@ MEDIA_URL = "/media/"  # note ignored if using S3 storage; should only be used i
 
 
 # Email
-if env("LOCAL") or env("CI"):
-    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-else:  # pragma: no cover
-    EMAIL_BACKEND = 'django_ses.SESBackend'
-    AWS_SES_ACCESS_KEY_ID = env('AWS_SES_ACCESS_KEY_ID')
-    AWS_SES_SECRET_ACCESS_KEY = env('AWS_SES_SECRET_ACCESS_KEY')
-    AWS_SES_REGION_NAME=env('AWS_SES_REGION_NAME')
-    AWS_SES_REGION_ENDPOINT=env('AWS_SES_REGION_ENDPOINT')
 
 DEFAULT_FROM_EMAIL = 'web@podencosinneed.org'
 SUPPORT_EMAIL = 'rebkwok@gmail.com'
 DEFAULT_ADMIN_EMAIL = "info@podencosinneed.org"
 SERVER_EMAIL = SUPPORT_EMAIL
 
+if env("LOCAL") or env("CI"):
+    MAILERS = {"default": {"BACKEND": "django.core.mail.backends.console.EmailBackend"}}
 # MAILCATCHER
-if env('USE_MAILCATCHER'):  # pragma: no cover
-    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-    EMAIL_HOST = '127.0.0.1'
-    EMAIL_HOST_USER = ''
-    EMAIL_HOST_PASSWORD = ''
-    EMAIL_PORT = 1025
-    EMAIL_USE_TLS = False
+elif env("USE_MAILCATCHER"):  # pragma: no cover
+    MAILERS = {
+        "default": {
+            "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+            "OPTIONS": {
+                "host": "127.0.0.1",
+                "host_user": "",
+                "host_password": "",
+                "port": 1025,
+                "use_tls": False,
+            },
+        }
+    }
+else:  # pragma: no cover
+    AWS_SES_ACCESS_KEY_ID = env("AWS_SES_ACCESS_KEY_ID")
+    AWS_SES_SECRET_ACCESS_KEY = env("AWS_SES_SECRET_ACCESS_KEY")
+    AWS_SES_REGION_NAME = env("AWS_SES_REGION_NAME")
+    AWS_SES_REGION_ENDPOINT = env("AWS_SES_REGION_ENDPOINT")
+    MAILERS = {
+        "default": {"BACKEND": "django_ses.SESBackend", "OPTIONS": {"port": 587}},
+    }
 
 
 # #####LOGGING######
