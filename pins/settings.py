@@ -161,6 +161,8 @@ ACCOUNT_USERNAME_BLACKLIST = ["admin", "god"]
 # We're going to want to collect extra info
 ACCOUNT_FORMS = {'signup': 'dashboard.forms.PINSSignupForm'}
 
+# Login 403s on alluth 65.14.2 without this
+ALLAUTH_TRUSTED_PROXY_COUNT = 1
 
 ROOT_URLCONF = "pins.urls"
 
