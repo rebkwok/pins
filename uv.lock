@@ -1798,7 +1798,7 @@ requires-dist = [
     { name = "pymemcache", specifier = "<=4.0.0" },
     { name = "reportlab", specifier = "<=5.0.1" },
     { name = "shortuuid", specifier = "<=1.0.13" },
-    { name = "wagtail", specifier = "<=7.4.3" },
+    { name = "wagtail", specifier = "<=8.0" },
     { name = "wagtail-django-recaptcha", specifier = "<=2.2.0" },
     { name = "wagtail-json-widget", specifier = "<=0.0.9" },
     { name = "wagtail-modeladmin", specifier = "<=2.4.0" },
