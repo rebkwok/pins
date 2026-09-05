@@ -24,7 +24,6 @@ def send_payment_received_email(obj, subject, payment_item):
         ),
         settings.DEFAULT_FROM_EMAIL,
         [obj.email],
-        fail_silently=False,
     )
 
 

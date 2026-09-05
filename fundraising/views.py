@@ -59,7 +59,6 @@ class RecipeBookSubmissionCreateView(CreateView):
             ),
             settings.DEFAULT_FROM_EMAIL,
             [submission.email],
-            fail_silently=False,
         )
         send_mail(
             "A new recipe book contribution has been received",
@@ -70,7 +69,6 @@ class RecipeBookSubmissionCreateView(CreateView):
             ),
             settings.DEFAULT_FROM_EMAIL,
             [settings.DEFAULT_ADMIN_EMAIL],
-            fail_silently=False,
         )
     
 

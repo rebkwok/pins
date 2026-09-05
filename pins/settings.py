@@ -348,7 +348,7 @@ else:  # pragma: no cover
     AWS_SES_REGION_NAME = env("AWS_SES_REGION_NAME")
     AWS_SES_REGION_ENDPOINT = env("AWS_SES_REGION_ENDPOINT")
     MAILERS = {
-        "default": {"BACKEND": "django_ses.SESBackend", "OPTIONS": {"port": 587}},
+        "default": {"BACKEND": "django_ses.SESBackend"},
     }
 
 
