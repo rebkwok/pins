@@ -406,13 +406,6 @@ class ShopPage(Page):
     def children(self):
         return self.categories()
 
-    def get_context(self, request):
-        from .views import get_basket_quantity
-
-        context = super().get_context(request)
-        context["basket_quantity"] = get_basket_quantity(request)
-        return context
-
 
 @register_setting
 class ShopSettings(BaseGenericSetting):

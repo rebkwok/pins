@@ -4,7 +4,6 @@ import pytest
 from model_bakery import baker
 
 from django.core.exceptions import ValidationError
-from django.test import RequestFactory
 from django.utils import timezone
 from django.urls import reverse
 
@@ -28,13 +27,6 @@ def test_shop_page(shop_page, category_page):
     # not live category
     CategoryPageFactory(parent=shop_page, title="Test Category 1", live=False)
     assert shop_page.children().count() == 1
-
-
-def test_shop_page_context(shop_page):
-    # needs to create basket from request
-    request = RequestFactory().get("/")
-    shop_context = shop_page.get_context(request)
-    assert shop_context["basket_quantity"] == 0
 
 
 def test_product(product):
