@@ -9,6 +9,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.views.generic import DetailView
+from salesman.basket.models import BASKET_ID_SESSION_KEY
 from salesman.basket.views import BasketViewSet
 from salesman.checkout.views import CheckoutViewSet
 from salesman.core.utils import get_salesman_model
@@ -33,6 +34,33 @@ def get_basket(request):
     data = resp.data
     data["timeout"] = Basket.objects.get(id=data["id"]).timeout
     return data
+
+
+def get_existing_basket(request):
+    """
+    Return the basket for this request, or None if there isn't one yet.
+    Unlike salesman's Basket.objects.get_or_create_from_request, this doesn't
+    create a basket (or a session) for visitors who haven't added anything to
+    their basket.
+    """
+    user = getattr(request, "user", None)
+    session = getattr(request, "session", None)
+    basket_id = session.get(BASKET_ID_SESSION_KEY) if session is not None else None
+    if user is not None and user.is_authenticated:
+        if basket_id is not None:
+            # The user has a basket from before they logged in; let salesman
+            # merge it into their user basket
+            basket, _ = Basket.objects.get_or_create_from_request(request)
+            return basket
+        return Basket.objects.filter(user=user).first()
+    if basket_id is not None:
+        return Basket.objects.filter(id=basket_id, user=None).first()
+    return None
+
+
+def get_existing_basket_quantity(request):
+    basket = get_existing_basket(request)
+    return basket.quantity if basket is not None else 0
 
 
 def get_basket_quantity(request):
