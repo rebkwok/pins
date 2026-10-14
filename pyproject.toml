@@ -20,6 +20,7 @@ dependencies = [
     "whitenoise<=6.12.0",
     "facebook-sdk<=3.1.0",
     "wagtail-json-widget<=0.0.9",
+    "django-salesman",
     "django-storages[boto3]<=1.14.6",
     "django-recaptcha<=4.1.0",
     "wagtail-django-recaptcha<=2.2.0",
@@ -30,6 +31,9 @@ dependencies = [
     "html2text<=2025.4.15",
     "envdir<=1.0.1",
     "django-ses[events]<=4.8.2",
+    "pygments<=2.21.0",
+    "django-salesman-stripe",
+    "stripe>=16.0.0,<17",
 ]
 
 [dependency-groups]
@@ -45,7 +49,14 @@ dependencies = [
         "ipython<=9.17.1",
         "model-bakery<=1.24.2",
         "ipdb<=0.13.13",
+        "requests-mock>=1.12.1",
 ]
+
+[tool.uv.sources]
+# Fork to allow django 6+
+django-salesman = { git = "https://github.com/rebkwok/django-salesman.git", rev="12a6cdb0d36bbd544590c151aa2e0422fb72489e" }
+django-salesman-stripe = { git = "https://github.com/rebkwok/django-salesman-stripe.git", rev="d35f897b86b52beb716bdf3d443c117ade5b9d47" }
+
 
 [tool.pytest]
     addopts = ["--reuse-db", "-n" , "auto"]
