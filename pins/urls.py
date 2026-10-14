@@ -1,15 +1,17 @@
 from django.conf import settings
-from django.urls import include, path
 from django.contrib import admin
-
-from wagtail.admin import urls as wagtailadmin_urls
+from django.urls import include, path
 from wagtail import urls as wagtail_urls
+from wagtail.admin import urls as wagtailadmin_urls
 from wagtail.documents import urls as wagtaildocs_urls
 
-from search import views as search_views
 from home import orders_urls
 from home import views as home_views
 from fundraising import urls
+from search import views as search_views
+from shop import urls as shop_urls
+from shop.payment import stripe_webhook_view
+
 
 urlpatterns = [
     path("", include('allauth.urls')),
@@ -40,7 +42,10 @@ urlpatterns = [
         "merchandise-information/",
         home_views.merch_info,
         name="merch_info"
-    )
+    ),
+    path("shop/", include(shop_urls)),
+    path("stripe/webhook/", stripe_webhook_view, name="shop-stripe-webhook"),
+    path("api/", include("salesman.urls")),
 ]
 
 
@@ -52,7 +57,8 @@ if settings.DEBUG or settings.TESTING:
     urlpatterns += staticfiles_urlpatterns()
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-urlpatterns += (path(r'django-admin/django-ses/', include('django_ses.urls')),)
+urlpatterns += (path(r"django-admin/django-ses/", include("django_ses.urls")),)
+
 
 urlpatterns = urlpatterns + [
     # For anything not caught by a more specific rule above, hand over to

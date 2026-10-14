@@ -1,0 +1,236 @@
+/* # SHOP */
+
+.shop-detail__introduction {
+  color: var(--pins);
+  font-family: var(--font--primary);
+  font-weight: 400;
+  font-size: 1.625rem;
+  line-height: 1.15;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+
+/* #product ---- Listing Card ---- */
+.product-listing-card {
+  margin-bottom: 40px;
+}
+
+.product-listing-card__meta {
+  border-collapse: separate;
+  border-spacing: 5px;
+}
+
+.product-listing-card__container {
+  padding-top: 20px;
+  padding-bottom: 40px;
+}
+
+.product-listing-card__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 30px;
+}
+
+.product-listing-card__title {
+  color: var(--pins);
+  margin-top: 0;
+}
+
+.product-listing-card__meta-category {
+  color: var(--grey);
+  font-size: 0.875rem;
+  line-height: 1.57;
+  padding-right: 10px;
+  vertical-align: top;
+}
+
+.product-listing-card__meta-content {
+  color: var(--pins);
+  font-size: 0.875rem;
+  line-height: 1.57;
+  vertical-align: top;
+}
+
+.product-listing-card__meta-row:last-child {
+  margin-bottom: 0;
+}
+
+.product-listing-card__image {
+  width: 100%;
+  overflow: hidden;
+  margin: 0;
+  max-width: 100px;
+  max-height: 110px;
+}
+
+.product-listing-card__image img {
+  transition: transform ease 0.2s;
+}
+
+.product-listing-card:hover .product-listing-card__image img {
+  transform: scale(1.05);
+}
+
+.shop-form input[type='submit'],
+.shop-form button[type='submit']
+{
+  border: none;
+  color: var(--white);
+  background-color: var(--pins);
+  font-weight: 700;
+  padding: 10px 15px;
+  display: inline-block;
+  vertical-align: middle;
+  transition-duration: 0.1s;
+  width: max-content;
+}
+
+.shop-form input[type='submit']:hover,
+.shop-form button[type='submit'].basket-btn-danger:hover {
+  background-color: var(--pins);
+}
+
+.shop-form input[type='submit'].basket-btn,
+.shop-form button[type='submit'].basket-btn {
+  padding: 0px 10px;
+  margin-left: 2px;
+}
+
+.shop-form button[type='submit'].basket-btn-danger {
+  background-color: darkred;
+}
+
+@media (min-width: 768px) {
+  .product-listing-card__container {
+    padding-top: 60px;
+    padding-bottom: 40px;
+  }
+
+  .product-listing-card__grid {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 50px;
+  }
+
+  .product-listing-card__image {
+    width: 100%;
+    overflow: hidden;
+    margin: 0;
+    max-width: 180px;
+    max-height: 180px;
+  }
+
+  .product-listing-card__meta-category,
+  .product-listing-card__meta-content {
+    font-size: var(--font-sm);
+    line-height: 1.5;
+  }
+
+}
+
+.layer {
+  background-color: rgba(248, 247, 216, 0.7);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.form-control.quantity {
+  width: 50px;
+}
+
+/* Hero image area */
+.shop > .hero {
+  padding: 100px 0 0;
+  position: relative;
+  margin: 0 0 10px;
+}
+
+.shop > .hero-image {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media screen and (min-width: 768px) {
+  .shop > .hero {
+    padding: 100px 0 0;
+    margin: 0;
+  }
+
+}
+
+
+.shop__hero__container {
+  width: 100%;
+  padding: 30px 20px 100px;
+  background-color: rgba(207,148,131);
+  margin: 0 auto;
+}
+
+
+@media (min-width: 768px) {
+  .shop__hero__container {
+    background-color: transparent;
+    max-width: 1400px;
+    padding: 0 40px;
+  }
+}
+
+
+.shop__hero__title {
+  color: var(--white);
+  font-weight: 400;
+  font-size: 2.875rem;
+  line-height: 1.09;
+  margin: 0;
+  width: 100%;
+}
+
+  @media (min-width: 768px) {
+    .shop__hero__title {
+      background-color: rgba(207,148,131, 0.7);
+      width: max-content;
+      max-width: 100%;
+      font-size: 6.25rem;
+      line-height: 0.64;
+      padding: 40px 30px;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+    }
+  }
+
+
+.carousel.shop-carousel {
+  width: 180px;
+}
+
+.carousel-control-next,
+.carousel-control-prev, 
+.carousel-indicators {
+    filter: invert(100%);
+}
+
+.carousel-indicators {
+  bottom: -40px;
+}
+
+
+.basket-countdown-alert {
+  margin: 10px auto 10px;
+  max-width: 1400px;
+  border-radius: 0;
+  background-color: var(--pins-transparent);
+  color: var(--dark-blue);
+  padding: 10px;
+  font-family: var(--font--primary);
+}
+
+.text-strikethrough {
+  text-decoration: line-through;
+}
