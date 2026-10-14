@@ -1,6 +1,9 @@
 # signals.py
+import logging
+
 from django.conf import settings
 from django.core.mail import EmailMessage
+from django.db import transaction
 from django.db.models.signals import post_delete, post_init, post_save
 from django.dispatch import receiver
 from django.urls import reverse
@@ -15,6 +18,8 @@ BasketItem = get_salesman_model("BasketItem")
 Basket = get_salesman_model("Basket")
 Order = get_salesman_model("Order")
 
+logger = logging.getLogger(__name__)
+
 
 def get_email_settings():
     shop_email_settings = ShopSettings.load()
@@ -28,6 +33,25 @@ def get_email_settings():
     return notify_emails, reply_to
 
 
+def send_email(subject, message, to, reply_to):
+    """
+    Send an email once the current transaction has committed.
+    Failures are logged rather than raised, so that a failed email can't
+    fail the request that created or updated the order (e.g. the Stripe webhook).
+    """
+    email = EmailMessage(
+        subject, message, settings.DEFAULT_FROM_EMAIL, to, reply_to=reply_to
+    )
+
+    def _send():
+        try:
+            email.send()
+        except Exception:
+            logger.exception("Error sending email '%s' to %s", subject, to)
+
+    transaction.on_commit(_send)
+
+
 @receiver(status_changed)
 def send_notification(sender, order, new_status, old_status, **kwargs):
     """
@@ -35,7 +59,7 @@ def send_notification(sender, order, new_status, old_status, **kwargs):
     """
     status_url = f'{settings.DOMAIN}{reverse("shop:order_status", args=(order.token,))}'
     if new_status in [order.Status.COMPLETED, order.Status.PROCESSING]:
-        reply_to, _ = get_email_settings()
+        _, reply_to = get_email_settings()
         if new_status == order.Status.COMPLETED:
             subject = f"Order '{order.ref}' is completed"
             message = (
@@ -50,14 +74,7 @@ def send_notification(sender, order, new_status, old_status, **kwargs):
                 f"View the status of your order: {status_url}"
             )
 
-        email = EmailMessage(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [order.email],
-            reply_to=reply_to,
-        )
-        email.send()
+        send_email(subject, message, [order.email], reply_to)
 
 
 @receiver(post_save, sender=Order)
@@ -83,26 +100,12 @@ def send_new_order_notifications(sender, instance, created, **kwargs):
                 f"View the status of your order: {status_url}"
             )
 
-        email = EmailMessage(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [instance.email],
-            reply_to=reply_to,
-        )
-        email.send()
+        send_email(subject, message, [instance.email], reply_to)
 
         if notify_emails:
             subject = f"New shop order '{instance.ref}'"
             message = "A new shop order has been received."
-            email = EmailMessage(
-                subject,
-                message,
-                settings.DEFAULT_FROM_EMAIL,
-                notify_emails,
-                reply_to=reply_to,
-            )
-            email.send()
+            send_email(subject, message, notify_emails, reply_to)
 
 
 @receiver(post_init, sender=BasketItem)
