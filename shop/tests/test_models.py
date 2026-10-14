@@ -343,3 +343,86 @@ def test_get_sale_item_for_product_variant(freezer, sale_with_items):
     assert p_variant.get_sale_item().discount == 20
     assert p_inheriting_variant.get_sale_item().discount == 10
     assert p_excluded.get_sale_item() is None
+
+
+def test_basket_clear_expired(freezer, basket):
+    freezer.move_to("2024-01-01 10:00")
+    variant = basket.items.first().product
+    assert variant.stock == 3
+    not_expired = baker.make(
+        "shop.Basket", timeout=datetime(2024, 1, 1, 11, 0, tzinfo=datetime_tz.utc)
+    )
+    not_expired.add(variant, quantity=1)
+    basket.timeout = datetime(2024, 1, 1, 9, 0, tzinfo=datetime_tz.utc)
+    basket.save()
+
+    assert Basket.clear_expired() == 1
+    assert not basket.items.exists()
+    assert not_expired.items.exists()
+    # items returned to stock
+    variant.refresh_from_db()
+    assert variant.stock == 4
+    # timeout is reset so the basket isn't processed again
+    basket.refresh_from_db()
+    assert basket.timeout is None
+    assert Basket.clear_expired() == 0
+
+
+def test_basket_clear_expired_ignores_empty_baskets(freezer):
+    freezer.move_to("2024-01-01 10:00")
+    baker.make("shop.Basket", timeout=datetime(2024, 1, 1, 9, 0, tzinfo=datetime_tz.utc))
+    assert Basket.clear_expired() == 0
+
+
+def test_basket_delete_stale(freezer, basket):
+    freezer.move_to("2024-01-01 10:00")
+    old_empty = baker.make("shop.Basket")
+    old_with_items = basket
+    # an order has been created from this basket
+    old_ordered = baker.make("shop.Basket", extra={"basket_id": 1234})
+    Basket.objects.filter(
+        id__in=[old_empty.id, old_with_items.id, old_ordered.id]
+    ).update(date_updated=datetime(2023, 12, 1, tzinfo=datetime_tz.utc))
+    recent_empty = baker.make("shop.Basket")
+
+    assert Basket.delete_stale(days=7) == 1
+    assert set(Basket.objects.values_list("id", flat=True)) == {
+        old_with_items.id,
+        old_ordered.id,
+        recent_empty.id,
+    }
+
+
+@pytest.mark.parametrize("user_basket_timeout", [None, "cleared"])
+def test_basket_merge_sets_timeout(freezer, settings, basket, user_basket_timeout):
+    # A user basket that is new (no timeout) or has been cleared by
+    # clear_expired (timeout reset to None) has items merged in
+    freezer.move_to("2024-01-01 10:00")
+    settings.BASKET_TIMEOUT_MINUTES = 15
+    user_basket = baker.make("shop.Basket", user=baker.make("auth.User"))
+    if user_basket_timeout == "cleared":
+        user_basket.add(basket.items.first().product, quantity=1)
+        user_basket.timeout = datetime(2024, 1, 1, 9, 0, tzinfo=datetime_tz.utc)
+        user_basket.save()
+        Basket.clear_expired()
+        user_basket.refresh_from_db()
+    assert user_basket.timeout is None
+
+    user_basket.merge(basket)
+    user_basket.refresh_from_db()
+    assert user_basket.quantity == 2
+    assert user_basket.timeout == datetime(2024, 1, 1, 10, 15, tzinfo=datetime_tz.utc)
+
+    # merged items expire
+    freezer.move_to("2024-01-01 10:16")
+    assert Basket.clear_expired() == 1
+    assert not user_basket.items.exists()
+
+
+def test_basket_merge_empty_basket_does_not_set_timeout(basket):
+    user_basket = baker.make("shop.Basket", user=baker.make("auth.User"))
+    basket.clear()
+    user_basket.merge(basket)
+    user_basket.refresh_from_db()
+    assert user_basket.timeout is None
+
