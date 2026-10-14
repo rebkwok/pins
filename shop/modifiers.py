@@ -28,7 +28,8 @@ class SaleModifier(BasketModifier):
         sale_item = item.product.get_sale_item()
         if sale_item:
             # check if current item (BasketItem) is in the sale (check by product first, then category)
-            item_discount = sale_item.discount
-            label = f"Sale: {item_discount}% off"
-            discount_amount = item.total / -item_discount
+            label = f"Sale: {sale_item.discount}% off"
+            discount_amount = (
+                -item.product.get_discount_amount(sale_item) * item.quantity
+            )
             self.add_extra_row(item, request, label, discount_amount)
