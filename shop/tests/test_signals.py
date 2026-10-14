@@ -1,6 +1,10 @@
+from smtplib import SMTPException
+from unittest.mock import patch
+
 import pytest
 from model_bakery import baker
 
+from django.conf import settings
 from django.core import mail
 
 from salesman.core.utils import get_salesman_model
@@ -16,6 +20,7 @@ def shop_settings():
     baker.make(
         "shop.ShopSettings",
         notify_email_addresses="admin@test.com, another_admin@test.com",
+        reply_to="shop@test.com",
     )
 
 
@@ -60,12 +65,16 @@ def test_delete_basket_item_updates_stock(basket):
         (Order.Status.PROCESSING, "Your order is being processed"),
     ],
 )
-def test_emails_on_order_creation_no_shop_email_setting(payment_status, body_text):
-    new_order = baker.make(Order, status=payment_status, email="test@test.com")
+def test_emails_on_order_creation_no_shop_email_setting(
+    django_capture_on_commit_callbacks, payment_status, body_text
+):
+    with django_capture_on_commit_callbacks(execute=True):
+        new_order = baker.make(Order, status=payment_status, email="test@test.com")
     # email to customer only
     assert len(mail.outbox) == 1
     customer_email = mail.outbox[0]
     assert customer_email.to == ["test@test.com"]
+    assert customer_email.reply_to == [settings.DEFAULT_FROM_EMAIL]
     assert customer_email.subject == f"Order '{new_order.ref}' has been received"
     assert body_text in customer_email.body
 
@@ -81,16 +90,19 @@ def test_emails_on_order_creation_no_shop_email_setting(payment_status, body_tex
     ],
 )
 def test_emails_on_order_creation_with_shop_email_setting(
-    payment_status, body_text, shop_settings
+    django_capture_on_commit_callbacks, payment_status, body_text, shop_settings
 ):
-    new_order = baker.make(Order, status=payment_status, email="test@test.com")
+    with django_capture_on_commit_callbacks(execute=True):
+        new_order = baker.make(Order, status=payment_status, email="test@test.com")
     assert len(mail.outbox) == 2
     customer_email = mail.outbox[0]
     assert customer_email.to == ["test@test.com"]
+    assert customer_email.reply_to == ["shop@test.com"]
     assert customer_email.subject == f"Order '{new_order.ref}' has been received"
 
     admin_email = mail.outbox[1]
-    admin_email.to = ["admin@test.com", "another_admin@test.com"]
+    assert admin_email.to == ["admin@test.com", "another_admin@test.com"]
+    assert admin_email.reply_to == ["shop@test.com"]
     assert admin_email.subject == f"New shop order '{new_order.ref}'"
     assert admin_email.body == "A new shop order has been received."
 
@@ -105,18 +117,25 @@ def test_emails_on_order_creation_with_shop_email_setting(
     ],
 )
 def test_emails_on_order_status_change(
-    payment_status, new_payment_status, email_sent, subject
+    django_capture_on_commit_callbacks,
+    payment_status,
+    new_payment_status,
+    email_sent,
+    subject,
 ):
     assert len(mail.outbox) == 0
-    new_order = baker.make(Order, status=payment_status, email="test@test.com")
+    with django_capture_on_commit_callbacks(execute=True):
+        new_order = baker.make(Order, status=payment_status, email="test@test.com")
     # email to customer only
     assert len(mail.outbox) == 1
 
-    new_order.status = new_payment_status
-    new_order.save()
+    with django_capture_on_commit_callbacks(execute=True):
+        new_order.status = new_payment_status
+        new_order.save()
     if email_sent:
         assert len(mail.outbox) == 2
         assert mail.outbox[1].to == ["test@test.com"]
+        assert mail.outbox[1].reply_to == [settings.DEFAULT_FROM_EMAIL]
         assert mail.outbox[1].subject == f"Order '{new_order.ref}' {subject}"
     else:
         assert len(mail.outbox) == 1
@@ -132,19 +151,60 @@ def test_emails_on_order_status_change(
     ],
 )
 def test_emails_on_order_status_change_with_shop_settings(
-    shop_settings, payment_status, new_payment_status, email_sent, subject
+    django_capture_on_commit_callbacks,
+    shop_settings,
+    payment_status,
+    new_payment_status,
+    email_sent,
+    subject,
 ):
     assert len(mail.outbox) == 0
-    new_order = baker.make(Order, status=payment_status, email="test@test.com")
+    with django_capture_on_commit_callbacks(execute=True):
+        new_order = baker.make(Order, status=payment_status, email="test@test.com")
     # email to customer and admins
     assert len(mail.outbox) == 2
 
-    new_order.status = new_payment_status
-    new_order.save()
+    with django_capture_on_commit_callbacks(execute=True):
+        new_order.status = new_payment_status
+        new_order.save()
     if email_sent:
-        # emails to customer only
+        # emails to customer only, with the shop reply-to address
         assert len(mail.outbox) == 3
         assert mail.outbox[2].to == ["test@test.com"]
+        assert mail.outbox[2].reply_to == ["shop@test.com"]
         assert mail.outbox[2].subject == f"Order '{new_order.ref}' {subject}"
     else:
         assert len(mail.outbox) == 2
+
+
+def test_emails_not_sent_until_transaction_commits(
+    django_capture_on_commit_callbacks, shop_settings
+):
+    with django_capture_on_commit_callbacks(execute=False) as callbacks:
+        baker.make(Order, status=Order.Status.PROCESSING, email="test@test.com")
+    assert len(mail.outbox) == 0
+    # one callback each for the customer and admin emails
+    assert len(callbacks) == 2
+
+    for callback in callbacks:
+        callback()
+    assert len(mail.outbox) == 2
+
+
+def test_email_send_failure_is_logged_not_raised(
+    django_capture_on_commit_callbacks, caplog
+):
+    with patch(
+        "shop.signals.EmailMessage.send", side_effect=SMTPException("Mail error")
+    ):
+        with django_capture_on_commit_callbacks(execute=True):
+            new_order = baker.make(
+                Order, status=Order.Status.PROCESSING, email="test@test.com"
+            )
+
+    assert Order.objects.filter(id=new_order.id).exists()
+    assert len(mail.outbox) == 0
+    assert (
+        f"Error sending email 'Order '{new_order.ref}' has been received' "
+        "to ['test@test.com']" in caplog.text
+    )
