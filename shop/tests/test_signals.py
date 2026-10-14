@@ -9,6 +9,8 @@ from django.core import mail
 
 from salesman.core.utils import get_salesman_model
 
+from ..models import ProductVariant
+
 
 Order = get_salesman_model("Order")
 
@@ -53,6 +55,45 @@ def test_delete_basket_item_updates_stock(basket):
     # deleting the basket item puts the quanity back in stock
     basket_item.delete()
     assert variant.stock == 5
+
+
+def test_basket_item_save_twice_does_not_double_count_stock(basket):
+    # 5 in stock initially, 2 in basket
+    basket_item = basket.items.first()
+    variant = basket_item.product
+    basket_item.quantity = 3
+    basket_item.save()
+    variant.refresh_from_db()
+    assert variant.stock == 2
+    # saving again with no change doesn't change stock
+    basket_item.save()
+    variant.refresh_from_db()
+    assert variant.stock == 2
+
+
+def test_concurrent_basket_stock_updates(product):
+    # Two baskets holding separately loaded (stale) copies of the same variant
+    # must not overwrite each other's stock changes
+    variant = baker.make("shop.ProductVariant", product=product, price=10, stock=5)
+    variant_1 = ProductVariant.objects.get(id=variant.id)
+    variant_2 = ProductVariant.objects.get(id=variant.id)
+    basket_1 = baker.make("shop.Basket")
+    basket_2 = baker.make("shop.Basket")
+
+    basket_1.add(variant_1, quantity=2)
+    basket_2.add(variant_2, quantity=1)
+
+    variant.refresh_from_db()
+    assert variant.stock == 2
+
+
+def test_delete_basket_after_order_keeps_order_items_out_of_stock(basket):
+    # 5 in stock initially, 2 in basket
+    variant = basket.items.first().product
+    Order.objects.create_from_basket(basket, request=None)
+    basket.delete()
+    variant.refresh_from_db()
+    assert variant.stock == 3
 
 
 @pytest.mark.parametrize(

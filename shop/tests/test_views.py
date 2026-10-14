@@ -419,6 +419,56 @@ def test_update_quantity(rf, basket):
     assert basket.quantity == 3
 
 
+@pytest.mark.parametrize(
+    "new_quantity,updated,expected_stock",
+    [
+        # 5 in stock initially; basket has 2, so 3 left in stock
+        (5, True, 0),
+        (6, False, 3),
+        (1, True, 4),
+    ],
+)
+def test_update_quantity_checks_stock(rf, basket, new_quantity, updated, expected_stock):
+    basket_item = basket.items.first()
+    variant = basket_item.product
+    assert variant.stock == 3
+    data = {"quantity": new_quantity, "product_id": variant.id}
+    request = rf.post(
+        reverse("shop:update_quantity", args=(basket_item.ref,)), data=data
+    )
+    request.session = {"BASKET_ID": basket.id}
+
+    resp = update_quantity(request, basket_item.ref)
+
+    basket = Basket.objects.get(id=basket.id)
+    variant.refresh_from_db()
+    assert variant.stock == expected_stock
+    if updated:
+        assert basket.quantity == new_quantity
+        assert "Basket updated" in resp.content.decode()
+    else:
+        assert basket.quantity == 2
+        assert "Quantity requested is not available" in resp.content.decode()
+
+
+def test_update_quantity_uses_basket_item_product(rf, basket, product):
+    # The stock check uses the basket item's product, not the posted product_id
+    basket_item = basket.items.first()
+    other_variant = baker.make(
+        "shop.ProductVariant", product=product, variant_name="Large", stock=100
+    )
+    data = {"quantity": 50, "product_id": other_variant.id}
+    request = rf.post(
+        reverse("shop:update_quantity", args=(basket_item.ref,)), data=data
+    )
+    request.session = {"BASKET_ID": basket.id}
+
+    resp = update_quantity(request, basket_item.ref)
+
+    assert Basket.objects.get(id=basket.id).quantity == 2
+    assert "Quantity requested is not available" in resp.content.decode()
+
+
 def test_update_quantity_nothing_to_update(rf, basket):
     # basket has 1 variant, quantity 2
     basket_item = basket.items.first()
@@ -452,7 +502,7 @@ def test_update_quantity_with_error(rf, basket):
 
     with mock.patch("shop.views.BasketViewSet.as_view") as mock_basket_as_view:
         mock_basket_as_view.return_value = mock_as_view_resp(
-            status_code=400, data={"quantity": 4}
+            status_code=400, data={"quantity": 4, "product_id": variant_id}
         )
         resp = update_quantity(request, basket_item.ref)
 

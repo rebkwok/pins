@@ -2,6 +2,7 @@ from urllib.parse import parse_qsl, urlparse
 import logging
 
 from django.contrib import messages
+from django.db import transaction
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render, get_object_or_404
 from django.template.response import TemplateResponse
@@ -188,18 +189,22 @@ def _change_quantity(request, product_id, new_value, can_increase=True):
 def add_to_basket(request, product_id):
     # product_id in the URL is the PRODUCT
     # product_id in POST is the variant
-    variant = ProductVariant.objects.get(id=request.POST.get("product_id"))
-    # check we can increase
-
-    # add_to_basket is called from the shop page, not the basket page; we're
-    # adding this entire quantity to the basket, but we're not incrementing
-    # it, so just check we can add the current quantity
-    can_increase = _can_increase_quantity(
-        request, variant, int(request.POST.get("quantity")), in_basket=False
-    )
+    with transaction.atomic():
+        # Lock the variant until the item has been added, so that concurrent
+        # requests can't both reserve the last items in stock
+        variant = ProductVariant.objects.select_for_update().get(
+            id=request.POST.get("product_id")
+        )
+        # add_to_basket is called from the shop page, not the basket page; we're
+        # adding this entire quantity to the basket, but we're not incrementing
+        # it, so just check we can add the current quantity
+        can_increase = _can_increase_quantity(
+            request, variant, int(request.POST.get("quantity")), in_basket=False
+        )
+        if can_increase:
+            resp = BasketViewSet.as_view({"post": "create"})(request)
 
     if can_increase:
-        resp = BasketViewSet.as_view({"post": "create"})(request)
         new_basket_quantity = get_basket_quantity(request)
         # refresh variant to ensure stock is up to date
         variant.refresh_from_db()
@@ -255,17 +260,38 @@ def update_quantity(request, ref):
     # Called from basket
     # Here product ID is the variant ID
     product_id = int(request.POST.get("product_id"))
+    new_quantity = int(request.POST.get("quantity"))
     request.method = "GET"
     current_item_resp = BasketViewSet.as_view({"get": "retrieve"})(request, ref=ref)
+    current_quantity = current_item_resp.data["quantity"]
 
-    if current_item_resp.data["quantity"] == int(request.POST.get("quantity")):
+    if current_quantity == new_quantity:
         # nothing to do
         result_html = f"<div id='updated_{product_id}' class='alert-info' hx-swap-oob='true'></div>"
     else:
-        request.method = "PUT"
-        resp = BasketViewSet.as_view({"put": "update"})(request, ref=ref)
+        with transaction.atomic():
+            # Lock the variant until the item has been updated, so that concurrent
+            # requests can't both reserve the last items in stock.
+            # Use the basket item's product, not the posted product_id.
+            variant = ProductVariant.objects.select_for_update().get(
+                id=current_item_resp.data["product_id"]
+            )
+            # Decreasing is always allowed; stock already excludes the current
+            # basket quantity
+            can_update = (
+                new_quantity < current_quantity
+                or variant.stock + current_quantity - new_quantity >= 0
+            )
+            if can_update:
+                request.method = "PUT"
+                resp = BasketViewSet.as_view({"put": "update"})(request, ref=ref)
 
-        if resp.status_code != 200:
+        if not can_update:
+            result_html = (
+                f"<div id='updated_{product_id}' class='alert-danger' hx-swap-oob='true'>"
+                "Quantity requested is not available</div>"
+            )
+        elif resp.status_code != 200:
             result_html = f"<div id='updated_{product_id}' class='alert-danger' hx-swap-oob='true'>Error</div>"
         else:
             basket = get_basket(request)

@@ -4,6 +4,7 @@ import logging
 from django.conf import settings
 from django.core.mail import EmailMessage
 from django.db import transaction
+from django.db.models import F
 from django.db.models.signals import post_delete, post_init, post_save
 from django.dispatch import receiver
 from django.urls import reverse
@@ -108,6 +109,16 @@ def send_new_order_notifications(sender, instance, created, **kwargs):
             send_email(subject, message, notify_emails, reply_to)
 
 
+def adjust_stock(variant, change):
+    """
+    Add change (which may be negative) to the variant's stock. Uses an F
+    expression so concurrent updates can't overwrite each other, then refreshes
+    the in-memory stock value.
+    """
+    ProductVariant.objects.filter(pk=variant.pk).update(stock=F("stock") + change)
+    variant.refresh_from_db(fields=["stock"])
+
+
 @receiver(post_init, sender=BasketItem)
 def post_init_item(sender, instance, **kwargs):
     # Remember current quantity on the instance
@@ -119,15 +130,17 @@ def post_save_item(sender, instance, **kwargs):
     if instance.product:
         quantity_diff = instance._current_quantity - instance.quantity
         # positive diff means items have been taken out of basket, so add to stock
-        instance.product.stock += quantity_diff
-        instance.product.save()
+        if quantity_diff:
+            adjust_stock(instance.product, quantity_diff)
+    # Update the remembered quantity, so saving this instance again doesn't
+    # adjust stock again
+    instance._current_quantity = instance.quantity
 
 
 @receiver(post_delete, sender=BasketItem)
 def post_delete_basket_item(sender, instance, **kwargs):
     if instance.product:
-        instance.product.stock += instance.quantity
-        instance.product.save()
+        adjust_stock(instance.product, instance.quantity)
 
 
 @receiver(post_delete, sender=Basket)
@@ -141,8 +154,8 @@ def post_delete_item(sender, instance, **kwargs):
             # basket deleted post-order creation, items from basket have been replaced
             # in stock, so we need to update the stock based on the order items
             for item in order.get_items():
-                item.product.stock -= item.quantity
-                item.product.save()
+                if item.product:
+                    adjust_stock(item.product, -item.quantity)
 
 
 @receiver(post_save, sender=ProductVariant)
