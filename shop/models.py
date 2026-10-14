@@ -1,5 +1,5 @@
 from datetime import timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 import logging
 from django.conf import settings
@@ -359,11 +359,20 @@ class ProductVariant(Orderable):
             if sale_categories.exists():
                 return sale_categories.first()
 
+    def get_discount_amount(self, sale_item):
+        """
+        Per-unit discount for this variant from the given sale item, rounded to the
+        nearest penny. Used for both the displayed sale price and the basket discount,
+        so the basket always charges quantity x the displayed price.
+        """
+        return (self.price * Decimal(sale_item.discount) / 100).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+
     def get_discounted_price(self):
         sale_item = self.get_sale_item()
         if sale_item:
-            discount = (self.price * Decimal(sale_item.discount / 100)).quantize(Decimal("0.01"))
-            return self.price - discount
+            return self.price - self.get_discount_amount(sale_item)
 
     @property
     def code(self):
