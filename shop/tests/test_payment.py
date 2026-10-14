@@ -13,6 +13,7 @@ from shop.payment import PayInAdvance, PayByStripe, stripe_webhook_view
 Basket = get_salesman_model("Basket")
 
 Order = get_salesman_model("Order")
+OrderPayment = get_salesman_model("OrderPayment")
 
 pytestmark = pytest.mark.django_db
 
@@ -364,3 +365,127 @@ def test_webhook_other_status_ignored(mock_webhook, client, get_mock_webhook_eve
     resp = client.post(reverse("shop-stripe-webhook"), data={}, headers=headers)
     assert resp.status_code == 200
     assert resp.content.decode() == "Event ignored"
+
+
+def post_webhook(client):
+    headers = {"STRIPE_SIGNATURE": f"v1=dummy,t={int(datetime.now(UTC).timestamp())}"}
+    return client.post(reverse("shop-stripe-webhook"), data={}, headers=headers)
+
+
+@patch("salesman_stripe.payment.stripe.Webhook")
+def test_webhook_completed_duplicate_event(
+    mock_webhook, client, basket, get_mock_webhook_event
+):
+    basket = basket_from_checkout(basket)
+    basket.save()
+    mock_webhook.construct_event.return_value = get_mock_webhook_event(
+        client_reference_id=f"basket_{basket.id}",
+        amount_total=basket.total * 100,
+    )
+    resp = post_webhook(client)
+    assert resp.content.decode() == "Order fulfilled"
+
+    # Stripe sends the same event again
+    resp = post_webhook(client)
+    assert resp.status_code == 200
+    assert resp.content.decode() == "Order already fulfilled"
+    assert Order.objects.count() == 1
+    assert OrderPayment.objects.count() == 1
+
+
+@patch("salesman_stripe.payment.stripe.Webhook")
+def test_webhook_completed_missing_basket(
+    mock_webhook, client, get_mock_webhook_event, caplog
+):
+    mock_webhook.construct_event.return_value = get_mock_webhook_event(
+        client_reference_id="basket_1234", amount_total=1000
+    )
+    resp = post_webhook(client)
+    # 200, so Stripe doesn't keep retrying
+    assert resp.status_code == 200
+    assert resp.content.decode() == "Missing basket"
+    assert not Order.objects.exists()
+    assert "Stripe payment payment-intent-id received for missing basket 1234" in caplog.text
+
+
+@patch("salesman_stripe.payment.stripe.Webhook")
+def test_webhook_completed_invalid_reference(
+    mock_webhook, client, get_mock_webhook_event, caplog
+):
+    mock_webhook.construct_event.return_value = get_mock_webhook_event(
+        client_reference_id="unknown", amount_total=1000, id="session-id"
+    )
+    resp = post_webhook(client)
+    assert resp.status_code == 200
+    assert resp.content.decode() == "Invalid session reference"
+    assert "Invalid Stripe session reference: session-id" in caplog.text
+
+
+@patch("salesman_stripe.payment.stripe.Webhook")
+def test_webhook_completed_empty_basket(
+    mock_webhook, client, basket, get_mock_webhook_event, caplog
+):
+    # Payment completed after the basket's items expired
+    basket = basket_from_checkout(basket)
+    basket.save()
+    basket.clear()
+    mock_webhook.construct_event.return_value = get_mock_webhook_event(
+        client_reference_id=f"basket_{basket.id}", amount_total=2000
+    )
+    resp = post_webhook(client)
+    assert resp.status_code == 200
+    assert resp.content.decode() == "Order fulfilled"
+
+    # Order and payment are recorded, and the order is flagged
+    order = Order.objects.get()
+    assert order.amount_paid == 20
+    notes = list(order.notes.values_list("message", flat=True))
+    assert len(notes) == 2
+    assert "basket was empty" in notes[0]
+    assert "doesn't match the order total" in notes[1]
+    assert "basket was empty" in caplog.text
+
+
+@patch("salesman_stripe.payment.stripe.Webhook")
+def test_webhook_completed_amount_mismatch(
+    mock_webhook, client, basket, get_mock_webhook_event
+):
+    basket = basket_from_checkout(basket)
+    basket.save()
+    mock_webhook.construct_event.return_value = get_mock_webhook_event(
+        client_reference_id=f"basket_{basket.id}", amount_total=1500
+    )
+    resp = post_webhook(client)
+    assert resp.content.decode() == "Order fulfilled"
+
+    order = Order.objects.get()
+    assert order.amount_paid == 15
+    assert [note.message for note in order.notes.all()] == [
+        "Payment payment-intent-id of £15.00 doesn't match the order total of £20.00."
+    ]
+    assert not order.notes.first().public
+
+
+@patch("salesman_stripe.payment.stripe.Webhook")
+def test_webhook_completed_existing_order(
+    mock_webhook, client, order, get_mock_webhook_event
+):
+    mock_webhook.construct_event.return_value = get_mock_webhook_event(
+        client_reference_id=f"order_{order.id}", amount_total=order.total * 100
+    )
+    resp = post_webhook(client)
+    assert resp.content.decode() == "Order fulfilled"
+    resp = post_webhook(client)
+    assert resp.content.decode() == "Order already fulfilled"
+    assert order.payments.count() == 1
+    assert not order.notes.exists()
+
+
+@patch("salesman_stripe.payment.stripe.Webhook")
+def test_webhook_completed_missing_order(mock_webhook, client, get_mock_webhook_event):
+    mock_webhook.construct_event.return_value = get_mock_webhook_event(
+        client_reference_id="order_1234", amount_total=1000
+    )
+    resp = post_webhook(client)
+    assert resp.status_code == 200
+    assert resp.content.decode() == "Missing order"
