@@ -1,0 +1,19 @@
+{% if product.out_of_stock %}
+    <div class="text-danger">Out of stock</div>
+{% else %}
+    <select
+        {% comment %} name must be product id for api call - actual product_variant id {% endcomment %}
+        name="product_id" 
+        required="" 
+        id="id_product_{{ product_id }}"
+        class="form-control"
+    >
+        {% for variant in product.live_variants %}
+            {% if variant.stock > 0 %}
+                <option value="{{ variant.id }}">{{ variant.name_and_price }} ({{ variant.stock }} in stock)</option>
+            {% else %}
+                <option disabled=disabled value="{{ variant.id }}">{{ variant.name_and_price }} (out of stock)</option>
+            {% endif %}
+        {% endfor %}
+    </select>
+{% endif %}

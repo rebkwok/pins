@@ -1,0 +1,37 @@
+{% extends "shop/base.html" %}
+{% load wagtailcore_tags wagtailimages_tags %}
+
+{% block content %}
+    {% include "shop/includes/header-hero.html" with shop=True %}
+
+    <div class="container shop-detail">
+        <div class="row">
+            <div class="col-md-12">
+                    {% if page.introduction %}
+                        <p class="shop-detail__introduction">
+                            {{ page.introduction }}
+                        </p>
+                    {% endif %}
+
+                        {{ page.body|richtext }}
+                    
+                {% for category in page.categories %}
+                    {% if category.live_products %}
+                        <h3>
+                            <a href="{% pageurl category %}">{{ category.title }}</a>
+                        </h3>
+                        <div class="container product-listing-card__container pt-2">
+                            <div class="product-listing-card__grid">
+                                {% for product in category.live_products %}
+                                    <div>
+                                        {% include "shop/includes/product-listing-card.html" %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+{% endblock content %}

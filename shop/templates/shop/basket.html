@@ -1,0 +1,150 @@
+{% extends "shop/base.html" %}
+{% load wagtailcore_tags wagtailimages_tags static %}
+
+{% block title %}Basket{% endblock %}
+
+
+{% block content %}
+    {% include "shop/includes/header-hero.html" with title="Basket" %}
+    
+    
+    <div class="container shop-basket">
+        <div class="row">
+            {% if basket.items %}
+            <div class="basket-countdown-alert" id="basket-countdown-container">Basket will timeout in <span id="countdown" hx-get={% url 'shop:basket_timeout' basket.id %} hx-trigger="every 1s"><i class="far fa-clock"></i></span></div>
+            {% endif %}
+            <div id="basket_timeout" style="display:none;">{{ basket.timeout|date:"d M Y H:i:s" }}</div>
+                {% if basket.items %}
+                <div class="col-md-12">
+                    {% for product_identifier, items in basket.items.items %}
+                        <div id="row-{{ product_identifier }}">
+                            <div class="row"><h2>{{ items.0.product_type }} ({{ items.0.category }})</h2></div>
+                            {% for item in items %}
+                            <div id="row-{{ item.product_id }}" class="row">
+                                <div class="col">{{ item.product.name }}</div>
+                                <div class="col">
+                                    <form class="shop-form" action="" method="POST">
+                                        {% csrf_token %}
+                                        <div class="input-group quantity mt-2 mb-1">
+                                            <div class="input-group-prepend">
+                                                <span 
+                                                    id="id_dec_wrapper_{{ item.product_id }}"
+                                                    class="input-group-text"
+                                                    hx-trigger="click"
+                                                    hx-target="#id_quantity_wrapper_{{ item.product_id }}"
+                                                    hx-get="{% url 'shop:decrease_quantity' item.product_id %}?ref=basket&product_id={{ item.product_id }}"
+                                                    hx-include="[id='id_quantity_{{ item.product_id }}']"  
+                                                >-</span>
+                                            </div>
+                                            <span id="id_quantity_wrapper_{{ item.product_id }}">
+                                                {% include "shop/includes/quantity_field.html" with product_id=item.product_id value=item.quantity %}
+                                            </span>
+                                            <div class="input-group-append">
+                                                <span 
+                                                    id="id_inc_wrapper_{{ item.product_id }}"
+                                                    class="input-group-text"
+                                                    hx-trigger="click"
+                                                    hx-target="#id_quantity_wrapper_{{ item.product_id }}"
+                                                    hx-get="{% url 'shop:increase_quantity' item.product_id %}?ref=basket&product_id={{ item.product_id }}"
+                                                    hx-include="[id='id_quantity_{{ item.product_id }}']"  
+                                                >+</span>
+                                            </div>
+                                            <input type="hidden" 
+                                                value="Update"
+                                                hx-post="{% url 'shop:update_quantity' item.ref %}"
+                                                hx-trigger="quantity-changed from:body"
+                                                hx-sync="#id_inc_wrapper_{{ item.product_id }}:queue first"
+                                            >
+                                            <input type="hidden" 
+                                                value="Update"
+                                                hx-post="{% url 'shop:update_quantity' item.ref %}"
+                                                hx-trigger="quantity-changed from:body"
+                                                hx-sync="#id_dec_wrapper_{{ item.product_id }}:queue first"
+                                            >
+                                            <button type="submit" 
+                                                class="btn basket-btn basket-btn-danger ml-4"
+                                                value="X"
+                                                hx-post="{% url 'shop:delete_basket_item' item.ref %}"
+                                                hx-trigger="click"
+                                            >
+                                                <i class="fa-regular fa-trash-can"></i>
+                                            </button>
+                                        </div>
+                                        <input type="hidden" name="product_id" value="{{ item.product_id }}">
+                                        <div id="updated_{{ item.product_id }}"></div>
+                                    </form>
+                                </div>
+                                <div class="col">
+                                    {% if item.extra_rows %}<span class="text-strikethrough text-danger">
+                                    £<span id="subtotal_{{ item.product_id }}">{{ item.subtotal }}</span></span>    
+                                    {% endif %}
+                                    £<span id="total_{{ item.product_id }}">{{ item.total }}</span>
+                                </div>
+                                <div class="col">
+                                {% if item.extra_rows %}
+                                    {% for extra_row in item.extra_rows %}
+                                        {{ extra_row.label }}<br>
+                                    {% endfor %}
+                                {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                </div>
+                <div class="col-md-12" id="basket-extra">
+                {% include "shop/includes/basket_extra.html" with extra_rows=basket.extra_rows %}
+                </div>
+                <div class="col-md-12">
+                    <hr class="mt-4 mb-4">
+                    <div id="basket-total-and-payment">
+                        <h3>Total: £<span id="total">{{ basket.total }}</span></h3>
+                    <hr class="mt-2 mb-4">
+                    <div class="col-md-12">
+                    
+                    <div class="row">
+                        <h4>Select shipping {% if payment_methods|length > 1 %}and payment {% endif %}method</h4>
+                    </div>
+                    
+                    <div class="row">
+                        <form action="{% url 'shop:checkout' %}" method="GET">
+                            {% if payment_methods|length > 1 %}
+                                <h6>Payment method</h6>
+                                {% for method in payment_methods %}
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="payment-method" id="id_{{ method.identifier }}" value="{{ method.identifier }}" {% if forloop.first %}checked{% endif %}>
+                                    <label class="form-check-label" for="id_{{ method.identifier }}">
+                                    {{ method.label }}
+                                    </label>
+                                    <div><em class="text-muted text-italic">{{ method.help }}</em></div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <input type="hidden" name="payment-method" id="id_{{ payment_methods.0.identifier }}" value="{{ payment_methods.0.identifier }}">
+                            {% endif %}
+                            {% if payment_methods|length > 1 %}
+                                <h6>Shipping method</h6>
+                            {% endif %}
+                            {% for method in shipping_methods %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="shipping-method" id="id_{{ method.0 }}" value="{{ method.0 }}" {% if forloop.first %}checked{% endif %}>
+                                <label class="form-check-label" for="id_{{ method.0 }}">
+                                {{ method.1 }}
+                                </label>
+                                <div><em class="text-muted text-italic">{{ method.2 }}</em></div>
+                            </div>
+                            {% endfor %}
+
+                            <input class="btn mt-2 mb-2 btn btn-primary" type="submit" value="Checkout">
+                        </form>
+                    </div>
+                </div>
+                </div>
+            {% else %}
+            <div class="col-md-12">
+                <p>Basket is empty.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock content %}

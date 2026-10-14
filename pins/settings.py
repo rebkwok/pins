@@ -118,6 +118,14 @@ INSTALLED_APPS = [
     "crispy_bootstrap5",
     "paypal.standard.ipn",
     "payments",
+    "salesman.core",
+    "salesman.basket",
+    "salesman.checkout",
+    "salesman.orders",
+    "salesman.admin",
+    "rest_framework",
+    "shop",
+    "salesman_stripe",
 ]
 
 
@@ -132,6 +140,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    "shop.middleware.clear_expired_baskets_middleware",
 ]
 
 # Auth stuff
@@ -182,6 +191,7 @@ TEMPLATES = [
                 "wagtail.contrib.settings.context_processors.settings",
                 "home.context_processors.home",
                 "fundraising.context_processors.recipes",
+                "shop.context_processors.shop_context",
             ],
         },
     },
@@ -443,23 +453,28 @@ else:
             'home': {
                 'handlers': ['console'],
                 'level': 'INFO',
-                'propogate': True,
+                'propagate': True,
             },
             'dogs': {
                 'handlers': ['console'],
                 'level': 'INFO',
-                'propogate': True,
+                'propagate': True,
             },
             'dashboard': {
                 'handlers': ['console'],
                 'level': 'INFO',
-                'propogate': True,
+                'propagate': True,
             },
             'search': {
                 'handlers': ['console'],
                 'level': 'INFO',
-                'propogate': True,
+                'propagate': True,
             },
+            "shop": {
+                "handlers": ["console"],
+                "level": "INFO",
+                "propagate": True,
+            }
         },
     }
 
@@ -568,3 +583,44 @@ RECIPE_SUBMISSIONS_OPEN=env.bool("RECIPE_SUBMISSIONS_OPEN", default=False)
 
 # Image uploads
 WAGTAILIMAGES_EXTENSIONS =  ["jpg", "jpeg", "png"]
+
+
+# Salesman
+
+SALESMAN_ADMIN_REGISTER = False
+SALESMAN_BASKET_MODEL = "shop.Basket"
+SALESMAN_BASKET_ITEM_MODEL = "shop.BasketItem"
+SALESMAN_ORDER_MODEL = "shop.Order"
+SALESMAN_ORDER_ITEM_MODEL = "shop.OrderItem"
+SALESMAN_ORDER_PAYMENT_MODEL = "shop.OrderPayment"
+SALESMAN_ORDER_NOTE_MODEL = "shop.OrderNote"
+SALESMAN_ORDER_SERIALIZER = "shop.serializers.OrderSerializer"
+SALESMAN_PRODUCT_TYPES = {
+    "shop.ProductVariant": "shop.serializers.ProductVariantSerializer",
+}
+SALESMAN_PAYMENT_METHODS = [
+    # "shop.payment.PayInAdvance",
+    "shop.payment.PayByStripe",
+]
+SALESMAN_BASKET_MODIFIERS = [
+    "shop.modifiers.ShippingCostModifier",
+    "shop.modifiers.SaleModifier",
+]
+
+SALESMAN_STRIPE_SECRET_KEY = env.str("SALESMAN_STRIPE_SECRET_KEY")
+SALESMAN_STRIPE_WEBHOOK_SECRET = env.str("SALESMAN_STRIPE_WEBHOOK_SECRET")
+
+# Account ID for Stripe connect account
+STRIPE_CONNECTED_ACCOUNT = env.str("STRIPE_CONNECTED_ACCOUNT")
+
+# Payment method label used when displayed in the basket.
+SALESMAN_STRIPE_PAYMENT_LABEL = "Pay with Stripe"
+
+# Default ISO currency used for payments (https://stripe.com/docs/currencies)
+SALESMAN_STRIPE_DEFAULT_CURRENCY = "gbp"
+
+SALESMAN_STRIPE_WEBHOOK_URL = "/stripe/webhook/"
+# Default paid status for fullfiled orders.
+SALESMAN_STRIPE_PAID_STATUS = "PROCESSING"
+
+BASKET_TIMEOUT_MINUTES = env.int("BASKET_TIMEOUT_MINUTES", 15)

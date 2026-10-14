@@ -1,0 +1,28 @@
+{% extends "shop/base.html" %}
+{% load wagtailcore_tags wagtailimages_tags %}
+
+{% block title %}{{ product.category_page.title }} - {{ product.name }}{% endblock %}
+
+{% block content %}
+    {% include "shop/includes/header-hero.html" with title=product.name %}
+
+    <div class="container category-detail">
+        <div class="row">            
+            <div class="col">
+                <div class="container product-listing-card__container pt-2">
+                    <div>
+                        {% include "shop/includes/product-listing-card.html" %}
+                    </div>
+                </div>
+            </div>
+            {% if product.description %}
+            <div class="col">
+                <div class="container product-listing-card__container pt-0">
+                    <p><strong>Description</strong></p>
+                    <p>{{ product.description|richtext }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock content %}

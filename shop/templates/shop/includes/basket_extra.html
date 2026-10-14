@@ -1,0 +1,13 @@
+{% if extra_rows %}
+    <hr class="mt-2 mb-4"/>
+
+    {% for extra_row in extra_rows %}
+        <div class="row">
+            <div class="col">{{ extra_row.label}}</div>
+            {% if not is_checkout %}
+                <div class="col"></div>
+            {% endif %}
+            <div class="col">£{{extra_row.amount}}</div> 
+        </div>    
+    {% endfor %}
+{% endif %}
