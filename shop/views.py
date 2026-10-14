@@ -434,6 +434,10 @@ def _order_status(request, token, new=False):
 def basket_timeout(request, basket_id):
     basket = get_object_or_404(Basket, id=basket_id)
     if basket.items.exists():
+        if basket.timeout is None:
+            # Shouldn't happen, as the timeout is set whenever items are added,
+            # but make sure the items will be released eventually
+            basket.reset_timeout()
         time_left = basket.timeout - timezone.now()
         if time_left.total_seconds() >= 0:
             return HttpResponse(f"{time_left.seconds // 60}m {time_left.seconds % 60}s")

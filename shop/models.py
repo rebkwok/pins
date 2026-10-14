@@ -80,6 +80,14 @@ class Basket(BaseBasket):
         super().update(request)
         self.reset_timeout()
 
+    def merge(self, other):
+        super().merge(other)
+        # salesman's merge adds the other basket's items without calling
+        # update(), so start the timeout here; otherwise the merged items would
+        # never expire
+        if self.items.exists():
+            self.reset_timeout()
+
     def reset_timeout(self):
         logger.info("Resetting basket timeout")
         self.timeout = timezone.now() + timedelta(
@@ -89,10 +97,42 @@ class Basket(BaseBasket):
 
     @classmethod
     def clear_expired(cls):
-        expired = cls.objects.filter(timeout__lt=timezone.now())
+        """
+        Remove the items from baskets whose timeout has passed, returning them
+        to stock. Only baskets that still have items are cleared, and their
+        timeout is reset so that they aren't processed again.
+        Returns the number of baskets cleared.
+        """
+        expired = cls.objects.filter(
+            timeout__lt=timezone.now(), items__isnull=False
+        ).distinct()
+        count = 0
         for basket in expired:
             basket.clear()
-        logger.info("Expired baskets cleared")
+            basket.timeout = None
+            basket.save(update_fields=["timeout"])
+            count += 1
+        if count:
+            logger.info("Cleared %s expired basket(s)", count)
+        return count
+
+    @classmethod
+    def delete_stale(cls, days):
+        """
+        Delete empty baskets that haven't been updated for the given number of days.
+        Baskets that an order has been created from (with basket_id in extra) are
+        skipped, as deleting them adjusts stock for the order (see signals).
+        Returns the number of baskets deleted.
+        """
+        cutoff = timezone.now() - timedelta(days=days)
+        stale = cls.objects.filter(
+            items__isnull=True, date_updated__lt=cutoff
+        ).exclude(extra__has_key="basket_id")
+        _, deleted = stale.delete()
+        count = deleted.get(cls._meta.label, 0)
+        if count:
+            logger.info("Deleted %s stale empty basket(s)", count)
+        return count
 
 
 class BasketItem(BaseBasketItem):
