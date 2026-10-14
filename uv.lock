@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.13"
 
 [[package]]
@@ -735,6 +735,24 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/bd/a2/480cd2df8031c30afe0d67b0a5e6299ced20f2e65135a3c160c4031d7052/django_recaptcha-4.1.0.tar.gz", hash = "sha256:73097b958733f65b729d4e4630c51fc2bf147aca6f026017d18898dfc25cb4c5", size = 28676, upload-time = "2025-03-28T13:52:26.589Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8b/e7/0765f98e4953e26573512284995648c439b0eb252877b655683d28c90be2/django_recaptcha-4.1.0-py3-none-any.whl", hash = "sha256:463aa65967e973de466b28ce8e8b6abb2faffb1ce0c7faa1bf0e5b041e0497cb", size = 39473, upload-time = "2025-03-28T13:52:24.92Z" },
+]
+
+[[package]]
+name = "django-salesman"
+version = "1.3.0"
+source = { git = "https://github.com/rebkwok/django-salesman.git?rev=12a6cdb0d36bbd544590c151aa2e0422fb72489e#12a6cdb0d36bbd544590c151aa2e0422fb72489e" }
+dependencies = [
+    { name = "django" },
+    { name = "djangorestframework" },
+]
+
+[[package]]
+name = "django-salesman-stripe"
+version = "0.1.6"
+source = { git = "https://github.com/rebkwok/django-salesman-stripe.git?rev=d35f897b86b52beb716bdf3d443c117ade5b9d47#d35f897b86b52beb716bdf3d443c117ade5b9d47" }
+dependencies = [
+    { name = "django-salesman" },
+    { name = "stripe" },
 ]
 
 [[package]]
@@ -1743,6 +1761,8 @@ dependencies = [
     { name = "django-extensions" },
     { name = "django-paypal" },
     { name = "django-recaptcha" },
+    { name = "django-salesman" },
+    { name = "django-salesman-stripe" },
     { name = "django-ses", extra = ["events"] },
     { name = "django-storages", extra = ["boto3"] },
     { name = "envdir" },
@@ -1751,9 +1771,11 @@ dependencies = [
     { name = "html2text" },
     { name = "htmx" },
     { name = "psycopg2" },
+    { name = "pygments" },
     { name = "pymemcache" },
     { name = "reportlab" },
     { name = "shortuuid" },
+    { name = "stripe" },
     { name = "wagtail" },
     { name = "wagtail-django-recaptcha" },
     { name = "wagtail-json-widget" },
@@ -1773,6 +1795,7 @@ dev = [
     { name = "pytest-env" },
     { name = "pytest-freezer" },
     { name = "pytest-xdist" },
+    { name = "requests-mock" },
     { name = "wagtail-factories" },
 ]
 
@@ -1787,6 +1810,8 @@ requires-dist = [
     { name = "django-extensions", specifier = "<=4.1" },
     { name = "django-paypal", specifier = "<=2.1" },
     { name = "django-recaptcha", specifier = "<=4.1.0" },
+    { name = "django-salesman", git = "https://github.com/rebkwok/django-salesman.git?rev=12a6cdb0d36bbd544590c151aa2e0422fb72489e" },
+    { name = "django-salesman-stripe", git = "https://github.com/rebkwok/django-salesman-stripe.git?rev=d35f897b86b52beb716bdf3d443c117ade5b9d47" },
     { name = "django-ses", extras = ["events"], specifier = "<=4.8.0" },
     { name = "django-storages", extras = ["boto3"], specifier = "<=1.14.6" },
     { name = "envdir", specifier = "<=1.0.1" },
@@ -1795,9 +1820,11 @@ requires-dist = [
     { name = "html2text", specifier = "<=2025.4.15" },
     { name = "htmx", specifier = "<=0.0.0" },
     { name = "psycopg2", specifier = "<=2.9.12" },
+    { name = "pygments", specifier = "<=2.21.0" },
     { name = "pymemcache", specifier = "<=4.0.0" },
     { name = "reportlab", specifier = "<=5.0.1" },
     { name = "shortuuid", specifier = "<=1.0.13" },
+    { name = "stripe", specifier = ">=16.0.0,<17" },
     { name = "wagtail", specifier = "<=8.0" },
     { name = "wagtail-django-recaptcha", specifier = "<=2.2.0" },
     { name = "wagtail-json-widget", specifier = "<=0.0.9" },
@@ -1817,6 +1844,7 @@ dev = [
     { name = "pytest-env", specifier = "<=1.7.0" },
     { name = "pytest-freezer", specifier = "<=0.4.9" },
     { name = "pytest-xdist", specifier = "<=3.8.0" },
+    { name = "requests-mock", specifier = ">=1.12.1" },
     { name = "wagtail-factories", specifier = "<=4.5.0" },
 ]
 
@@ -2325,6 +2353,18 @@ wheels = [
 ]
 
 [[package]]
+name = "requests-mock"
+version = "1.12.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/92/32/587625f91f9a0a3d84688bf9cfc4b2480a7e8ec327cefd0ff2ac891fd2cf/requests-mock-1.12.1.tar.gz", hash = "sha256:e9e12e333b525156e82a3c852f22016b9158220d2f47454de9cae8a77d371401", size = 60901, upload-time = "2024-03-29T03:54:29.446Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/97/ec/889fbc557727da0c34a33850950310240f2040f3b1955175fdb2b36a8910/requests_mock-1.12.1-py2.py3-none-any.whl", hash = "sha256:b1e37054004cdd5e56c84454cc7df12b25f90f382159087f4b6915aaeef39563", size = 27695, upload-time = "2024-03-29T03:54:27.64Z" },
+]
+
+[[package]]
 name = "s3transfer"
 version = "0.19.2"
 source = { registry = "https://pypi.org/simple" }
@@ -2408,6 +2448,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ba/b8/73a0e6a6e079a9d9cfa64113d771e421640b6f679a52eeb9b32f72d871a1/starlette-0.50.0.tar.gz", hash = "sha256:a2a17b22203254bcbc2e1f926d2d55f3f9497f769416b3190768befe598fa3ca", size = 2646985, upload-time = "2025-11-01T15:25:27.516Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d9/52/1064f510b141bd54025f9b55105e26d1fa970b9be67ad766380a3c9b74b0/starlette-0.50.0-py3-none-any.whl", hash = "sha256:9e5391843ec9b6e472eed1365a78c8098cfceb7a74bfd4d6b1c0c0095efb3bca", size = 74033, upload-time = "2025-11-01T15:25:25.461Z" },
+]
+
+[[package]]
+name = "stripe"
+version = "16.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0b/a7/4a8546b293a09f39a2b55ca8a11539ae9654126df59065868c5d3993f0dd/stripe-16.0.0.tar.gz", hash = "sha256:5016068d54aebb43e61b3c377ef45bede4e0b4eb1817d7a12af81630c55a23d2", size = 1665584, upload-time = "2026-10-01T00:42:03.388Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b5/de/5141ae3990862cc3d61a1cdd4acff72bcb587afb7b4d31c52eaddbb6bc8f/stripe-16.0.0-py3-none-any.whl", hash = "sha256:6a401baf2fc19c59ccb59005e674f8da8fa256e8db319ad8c50292f4cddf8c26", size = 2543794, upload-time = "2026-10-01T00:42:01.65Z" },
 ]
 
 [[package]]
