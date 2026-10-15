@@ -318,3 +318,20 @@ def test_basket_timeout_other_basket(basket_client, basket):
 def test_basket_timeout_no_basket(client, basket):
     resp = client.get(reverse("shop:basket_timeout", args=(basket.id,)))
     assert resp.status_code == 404
+
+
+# Salesman API
+
+
+@pytest.mark.parametrize("url", ["/api/basket/", "/api/checkout/", "/api/orders/"])
+def test_salesman_api_not_exposed(client, url):
+    # The salesman basket, checkout and orders API would bypass the shop views'
+    # checks (stock, live products, basket locked during payment)
+    assert client.get(url).status_code == 404
+    assert client.post(url, {}, content_type="application/json").status_code == 404
+
+
+def test_salesman_payment_urls_exposed():
+    assert reverse("stripe-success") == "/api/payment/stripe/success/"
+    assert reverse("stripe-cancel") == "/api/payment/stripe/cancel/"
+    assert reverse("stripe-webhook") == "/api/payment/stripe/webhook/"

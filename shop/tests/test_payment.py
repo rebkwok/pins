@@ -1,6 +1,5 @@
 from datetime import datetime, UTC
 from unittest.mock import Mock, patch
-from urllib.parse import urlparse, parse_qs
 
 import pytest
 
@@ -27,9 +26,10 @@ def test_pay_in_advance(rf, basket):
     redirect_url = payment.basket_payment(basket, request)
     assert not Basket.objects.filter(id=basket.id).exists()
 
-    parsed = urlparse(redirect_url)
-    token = parse_qs(parsed.query)["token"][0]
-    new_order = Order.objects.get(token=token)
+    new_order = Order.objects.get()
+    assert redirect_url == request.build_absolute_uri(
+        reverse("shop:new_order_status", args=(new_order.token,))
+    )
     assert new_order.extra == {"basket_id": basket_id}
     assert new_order.status == "HOLD"
 

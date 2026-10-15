@@ -5,18 +5,22 @@ import pytest
 
 from model_bakery import baker
 
+from django.contrib.auth.models import AnonymousUser
+from django.http import Http404
 from django.urls import reverse
 
+from salesman.checkout.payment import PaymentError, payment_methods_pool
 from salesman.core.utils import get_salesman_model
+
+from ..payment import PayByStripe, PayInAdvance
 
 from ..views import (
     add_to_basket,
     basket_view,
     decrease_quantity,
-    get_basket,
-    get_basket_item,
-    get_basket_total,
-    get_basket_quantity_and_total,
+    get_or_create_basket,
+    serialize_basket,
+    get_basket_item_data,
     _can_increase_quantity,
     increase_quantity,
     update_quantity,
@@ -28,101 +32,70 @@ from ..views import (
 
 
 Basket = get_salesman_model("Basket")
+Order = get_salesman_model("Order")
 
 pytestmark = pytest.mark.django_db
 
 
-def mock_as_view_resp(status_code, data):
-    class MockAsViewResp:
-        def __init__(self, *args, **kwargs):
-            self.status_code = status_code
-            self.data = data
-
-    return MockAsViewResp
-
-
-def test_get_basket(rf, freezer):
-    freezer.move_to("2023-10-10 10:00")
+def test_get_or_create_basket(rf):
     request = rf.get("/")
-    assert not Basket.objects.exists()
-    basket_resp = get_basket(request)
+    request.session = {}
+    basket = get_or_create_basket(request)
+    assert Basket.objects.get() == basket
+    assert request.session["BASKET_ID"] == basket.id
+    # the same basket is returned for the session
+    assert get_or_create_basket(request) == basket
     assert Basket.objects.count() == 1
-    assert basket_resp == {
-        "extra": {},
-        "extra_rows": [],
-        "id": Basket.objects.first().id,
-        "items": [],
-        "subtotal": "0.00",
-        "total": "0.00",
-        "timeout": datetime(2023, 10, 10, 10, 30, tzinfo=timezone.utc),
-    }
 
 
-def test_get_basket_total(rf):
-    request = rf.get("/")
-    basket_resp = get_basket_total(request)
-    assert basket_resp == "0.00"
-
-
-def test_get_basket_quantity_and_total(rf):
-    request = rf.get("/")
-    basket_resp = get_basket_quantity_and_total(request)
-    assert basket_resp == (0, "0.00")
-
-
-def test_get_existing_empty_basket(rf, freezer):
+def test_serialize_empty_basket(rf, freezer):
     freezer.move_to("2023-10-10 10:00")
     basket = baker.make(Basket)
     request = rf.get("/")
-    request.session = {"BASKET_ID": basket.id}
 
-    assert get_basket(request) == {
+    assert serialize_basket(request, basket) == {
         "extra": {},
         "extra_rows": [],
         "id": basket.id,
         "items": [],
         "subtotal": "0.00",
         "total": "0.00",
+        # serializing updates the basket, which resets its timeout
         "timeout": datetime(2023, 10, 10, 10, 30, tzinfo=timezone.utc),
     }
 
 
-def test_get_basket_with_items(rf, basket):
+def test_serialize_basket_with_items(rf, basket):
     request = rf.get("/")
-    request.session = {"BASKET_ID": basket.id}
-    basket_resp = get_basket(request)
-    basket_items = basket_resp.pop("items")
-    basket_resp.pop("timeout")
-    assert basket_resp == {
+    basket_data = serialize_basket(request, basket)
+    items_data = basket_data.pop("items")
+    basket_data.pop("timeout")
+    assert basket_data == {
         "extra": {"name": "Test User"},
         "extra_rows": [],
         "id": basket.id,
         "subtotal": "20.00",
         "total": "20.00",
     }
-    assert len(basket_items) == 1
-    basket_item = basket_items[0]
-    assert basket_item["quantity"] == 2
-    assert basket_item["product"]["name"] == "Test Product - Small"
+    assert len(items_data) == 1
+    item_data = items_data[0]
+    assert item_data["quantity"] == 2
+    assert item_data["product"]["name"] == "Test Product - Small"
+    # no link to salesman's basket API, which isn't exposed
+    assert "url" not in item_data
 
 
-def test_get_basket_item_no_item(rf, basket):
-    variant = basket.items.first().product
-    request = rf.get("/")
-    basket_resp = get_basket(request)
-    basket_item = get_basket_item(basket_resp, variant.id)
-    assert basket_item == {}
+def test_get_basket_item_data_no_item(rf, basket):
+    ref = basket.items.first().ref
+    basket_data = serialize_basket(rf.get("/"), baker.make(Basket))
+    assert get_basket_item_data(basket_data, ref) == {}
 
 
-def test_get_basket_item(rf, basket):
-    variant = basket.items.first().product
-    request = rf.get("/")
-    request.session = {"BASKET_ID": basket.id}
-    basket_resp = get_basket(request)
-    basket_item = get_basket_item(basket_resp, variant.id)
-    assert request.session["BASKET_ID"] == basket.id
-    assert basket_resp.get("id") == basket.id
-    assert basket_item["product"]["name"] == "Test Product - Small"
+def test_get_basket_item_data(rf, basket):
+    ref = basket.items.first().ref
+    basket_data = serialize_basket(rf.get("/"), basket)
+    item_data = get_basket_item_data(basket_data, ref)
+    assert item_data["product"]["name"] == "Test Product - Small"
 
 
 def test_get_product_detail_view(client, product):
@@ -244,7 +217,6 @@ def test_basket_view(rf, basket, product):
         {
             "identifier": "stripe",
             "label": "Pay with Stripe",
-            "error": None,
             "help": "Pay with stripe",
         }
     ]
@@ -261,8 +233,7 @@ def test_basket_view(rf, basket, product):
 
 def test_add_to_basket(rf, product):
     # setup empty basket
-    request = rf.get("/")
-    basket_id = get_basket(request)["id"]
+    basket_id = baker.make(Basket).id
     variant = baker.make(
         "shop.ProductVariant", product=product, variant_name="Small", price=10, stock=4
     )
@@ -344,36 +315,28 @@ def test_add_to_basket_out_of_stock(rf, basket, product):
     assert '<div class="text-danger">Out of stock</div>' in content
 
 
-def test_add_to_basket_with_error(rf, product):
-    # setup empty basket
-    request = rf.get("/")
-    basket_id = get_basket(request)["id"]
+def test_add_to_basket_without_product_type(rf, product):
+    # The product type is always a product variant, so isn't needed in the POST
     variant = baker.make(
         "shop.ProductVariant", product=product, variant_name="Small", price=10, stock=4
     )
     request = rf.post(
         reverse("shop:add_to_basket", args=(product.id,)),
-        {
-            "quantity": 3,
-            "product_id": variant.id,
-            "product_type": "shop.ProductVariant",
-        },
+        {"quantity": 3, "product_id": variant.id},
     )
-    request.session = {"BASKET_ID": basket_id}
+    request.session = {}
+    request.user = AnonymousUser()
+    resp = add_to_basket(request, product.id)
 
-    with mock.patch("shop.views.BasketViewSet.as_view") as mock_basket_as_view:
-        mock_basket_as_view.return_value = mock_as_view_resp(
-            status_code=400, data={"quantity": 0}
-        )
-        resp = add_to_basket(request, product.id)
-    content = resp.content.decode()
-    assert "Something went wrong" in content
+    assert "Added!" in resp.content.decode()
+    basket = Basket.objects.get()
+    assert basket.quantity == 3
+    assert request.session["BASKET_ID"] == basket.id
 
 
 def test_add_to_basket_cant_increase(rf, product):
     # setup empty basket
-    request = rf.get("/")
-    basket_id = get_basket(request)["id"]
+    basket_id = baker.make(Basket).id
     # variant with 1 in stock
     variant = baker.make(
         "shop.ProductVariant", product=product, variant_name="Small", price=10, stock=1
@@ -451,8 +414,8 @@ def test_update_quantity_checks_stock(rf, basket, new_quantity, updated, expecte
         assert "Quantity requested is not available" in resp.content.decode()
 
 
-def test_update_quantity_uses_basket_item_product(rf, basket, product):
-    # The stock check uses the basket item's product, not the posted product_id
+def test_update_quantity_wrong_product(rf, basket, product):
+    # The posted product_id must be the basket item's product
     basket_item = basket.items.first()
     other_variant = baker.make(
         "shop.ProductVariant", product=product, variant_name="Large", stock=100
@@ -462,11 +425,11 @@ def test_update_quantity_uses_basket_item_product(rf, basket, product):
         reverse("shop:update_quantity", args=(basket_item.ref,)), data=data
     )
     request.session = {"BASKET_ID": basket.id}
+    request.user = AnonymousUser()
 
-    resp = update_quantity(request, basket_item.ref)
-
+    with pytest.raises(Http404):
+        update_quantity(request, basket_item.ref)
     assert Basket.objects.get(id=basket.id).quantity == 2
-    assert "Quantity requested is not available" in resp.content.decode()
 
 
 def test_update_quantity_nothing_to_update(rf, basket):
@@ -486,34 +449,6 @@ def test_update_quantity_nothing_to_update(rf, basket):
     # refresh_from_db isn't enough to get the update basket here
     basket = Basket.objects.get(id=basket.id)
     assert basket.quantity == 2
-
-
-def test_update_quantity_with_error(rf, basket):
-    # basket has 1 variant, quantity 2
-    basket_item = basket.items.first()
-    variant_id = basket_item.product.id
-    # product ID in post is the product variant
-    # update to same quantity
-    data = {"quantity": 2, "product_id": variant_id}
-    request = rf.post(
-        reverse("shop:update_quantity", args=(basket_item.ref,)), data=data
-    )
-    request.session = {"BASKET_ID": basket.id}
-
-    with mock.patch("shop.views.BasketViewSet.as_view") as mock_basket_as_view:
-        # the basket item is found, but updating it fails
-        mock_basket_as_view.side_effect = [
-            mock_as_view_resp(
-                status_code=200, data={"quantity": 4, "product_id": variant_id}
-            ),
-            mock_as_view_resp(status_code=400, data={}),
-        ]
-        resp = update_quantity(request, basket_item.ref)
-
-    # refresh_from_db isn't enough to get the update basket here
-    basket = Basket.objects.get(id=basket.id)
-    assert basket.quantity == 2
-    assert "Error" in resp.content.decode()
 
 
 ### Delete items from basket
@@ -615,26 +550,19 @@ def test_delete_basket_item_other_products_left(rf, basket, category_page):
     assert basket.total == 5
 
 
-def test_delete_basket_item_with_error(rf, basket):
+def test_delete_basket_item_unknown_ref(rf, basket):
     basket_item = basket.items.first()
-    variant_id = basket_item.product.id
-    data = {"product_id": variant_id}
     request = rf.post(
-        reverse("shop:update_quantity", args=(basket_item.ref,)), data=data
+        reverse("shop:delete_basket_item", args=("unknown",)),
+        {"product_id": basket_item.product.id},
     )
     request.session = {"BASKET_ID": basket.id}
+    request.user = AnonymousUser()
 
-    with mock.patch("shop.views.BasketViewSet.as_view") as mock_basket_as_view:
-        mock_basket_as_view.return_value = mock_as_view_resp(
-            status_code=400, data={"quantity": 2}
-        )
-        resp = delete_basket_item(request, basket_item.ref)
-
-    # refresh_from_db isn't enough to get the update basket here
-    basket = Basket.objects.get(id=basket.id)
+    with pytest.raises(Http404):
+        delete_basket_item(request, "unknown")
     # no change to basket
-    assert basket.quantity == 2
-    assert "Error" in resp.content.decode()
+    assert Basket.objects.get(id=basket.id).quantity == 2
 
 
 ## CHECKOUT VIEW
@@ -652,31 +580,40 @@ def test_get_checkout_view(rf, basket):
     assert basket.shipping_method == "deliver"
 
 
-@mock.patch("shop.views.CheckoutViewSet.as_view")
-def test_post_checkout_view(mock_checkout, rf, basket):
-    mock_checkout.return_value = mock_as_view_resp(
-        status_code=201, data={"url": "https://test-checkout"}
-    )
+CHECKOUT_FORM_DATA = {
+    "email": "test@test.com",
+    "email1": "test@test.com",
+    "name": "Test",
+    "payment_method": "stripe",
+    "shipping_method": "collect",
+    "billing_address": "-",
+    "shipping_address": "-",
+}
 
-    form_data = {
-        "email": "test@test.com",
-        "email1": "test@test.com",
-        "name": "Test",
-        "payment_method": "stripe",
-        "shipping_method": "collect",
-        "billing_address": "-",
-        "shipping_address": "-",
-    }
+
+def checkout_request(rf, basket, payment_method="stripe"):
     request = rf.post(
-        reverse("shop:checkout") + "?payment-method=stripe&shipping-method=collect",
-        data=form_data,
+        reverse("shop:checkout")
+        + f"?payment-method={payment_method}&shipping-method=collect",
+        data={**CHECKOUT_FORM_DATA, "payment_method": payment_method},
     )
     request.session = {"BASKET_ID": basket.id}
-    resp = checkout_view(request)
+    request.user = AnonymousUser()
+    return request
 
-    # redirects to the stripe payment method from the mock checkout call
+
+@mock.patch("shop.payment.PayByStripe.basket_payment")
+def test_post_checkout_view(mock_basket_payment, rf, basket):
+    mock_basket_payment.return_value = "https://test-checkout"
+    resp = checkout_view(checkout_request(rf, basket))
+
+    # redirects to the stripe checkout url
     assert resp.status_code == 302
     assert resp.url == "https://test-checkout"
+    # customer details are saved on the basket before the payment is started
+    (paid_basket, _), _ = mock_basket_payment.call_args
+    assert paid_basket.id == basket.id
+    assert paid_basket.extra["email"] == "test@test.com"
 
 
 def test_post_checkout_view_invalid_form(rf, basket):
@@ -701,67 +638,39 @@ def test_post_checkout_view_invalid_form(rf, basket):
     assert resp.context_data["form"].errors == {"email1": ["Email fields do not match"]}
 
 
-@mock.patch("shop.views.CheckoutViewSet.as_view")
-@mock.patch("shop.views.payment_methods_pool.get_payments")
-def test_post_checkout_view_non_stripe_payment_method(
-    mock_get_payments, mock_checkout, rf, basket
-):
+def test_post_checkout_view_non_stripe_payment_method(rf, basket):
     # pay-in-advance isn't currently enabled in settings
-    mock_get_payments.return_value = [
-        mock.Mock(identifier="stripe"),
-        mock.Mock(identifier="pay-in-advance"),
-    ]
-    mock_checkout.return_value = mock_as_view_resp(
-        status_code=201, data={"url": "https://test-checkout?token=foo"}
-    )
+    with mock.patch.object(
+        payment_methods_pool, "_payments", [PayByStripe(), PayInAdvance()]
+    ):
+        request = checkout_request(rf, basket, "pay-in-advance")
+        resp = checkout_view(request)
 
-    form_data = {
-        "email": "test@test.com",
-        "email1": "test@test.com",
-        "name": "Test",
-        "payment_method": "stripe",
-        "shipping_method": "collect",
-        "billing_address": "-",
-        "shipping_address": "-",
-    }
-    request = rf.post(
-        reverse("shop:checkout")
-        + "?payment-method=pay-in-advance&shipping-method=collect",
-        data=form_data,
-    )
-    request.session = {"BASKET_ID": basket.id}
-    resp = checkout_view(request)
-
-    # redirects to the new order status using the token from the mock checkout call
+    # pay in advance creates the order and redirects to the new order status
+    order = Order.objects.get()
+    assert order.status == Order.Status.HOLD
     assert resp.status_code == 302
-    assert resp.url == reverse("shop:new_order_status", args=("foo",))
-
-
-@mock.patch("shop.views.CheckoutViewSet.as_view")
-def test_post_checkout_view_error(mock_checkout, rf, basket):
-    mock_checkout.return_value = mock_as_view_resp(
-        status_code=400, data={"url": "https://test-checkout?token=foo"}
+    assert resp.url == request.build_absolute_uri(
+        reverse("shop:new_order_status", args=(order.token,))
     )
 
-    form_data = {
-        "email": "test@test.com",
-        "email1": "test@test.com",
-        "name": "Test",
-        "payment_method": "stripe",
-        "shipping_method": "collect",
-        "billing_address": "-",
-        "shipping_address": "-",
-    }
-    request = rf.post(
-        reverse("shop:checkout") + "?payment-method=stripe&shipping-method=collect",
-        data=form_data,
-    )
-    request.session = {"BASKET_ID": basket.id}
-    resp = checkout_view(request)
 
-    # redirects to the new order status using the token from the mock checkout call
+@mock.patch("shop.payment.PayByStripe.basket_payment")
+def test_post_checkout_view_error(mock_basket_payment, rf, basket):
+    mock_basket_payment.side_effect = PaymentError("Stripe error")
+    resp = checkout_view(checkout_request(rf, basket))
     assert resp.status_code == 200
-    assert "checkout_error" in resp.context_data
+    assert resp.context_data["checkout_error"]
+
+
+def test_post_checkout_view_invalid_payment_method_in_form(rf, basket):
+    # The posted payment method is validated by salesman's checkout serializer
+    request = checkout_request(rf, basket)
+    request.POST = request.POST.copy()
+    request.POST["payment_method"] = "unknown"
+    resp = checkout_view(request)
+    assert resp.status_code == 200
+    assert resp.context_data["checkout_error"]
 
 
 ### ORDER STATUS VIEWS
