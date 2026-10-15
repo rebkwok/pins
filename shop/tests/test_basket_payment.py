@@ -207,6 +207,7 @@ def test_basket_view_payment_open(basket_client, paying_basket, requests_mock):
     assert "Payment in progress" in content
     assert 'href="https://stripe-session-url"' in content
     assert reverse("shop:cancel_payment") in content
+    assert "Cancel payment and return to basket" in content
 
 
 def test_basket_view_payment_completed(basket_client, paying_basket, requests_mock):
