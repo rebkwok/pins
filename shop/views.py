@@ -495,15 +495,11 @@ def order_status_view(request, token):
 
 def _order_status(request, token, new=False):
     order = get_object_or_404(Order, token=token)
-    serialized_order = order.serializable_data()
-    order_as_basket = get_basket_context(serialized_order)["basket"]
+    # Group the order items by product, as for the basket
+    order_as_basket = get_basket_context(order.serializable_data())["basket"]
     context = {
-        "order": {
-            **serialized_order,
-            **order_as_basket,
-            "amount_outstanding": order.amount_outstanding,
-            "amount_paid": order.amount_paid,
-        },
+        "order": order,
+        "items_by_product": order_as_basket["items"],
         "new_order": new,
         "hide_basket": True,
     }

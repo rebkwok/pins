@@ -758,21 +758,25 @@ def test_post_checkout_view_error(mock_checkout, rf, basket):
 def test_order_status_view(rf, order):
     request = rf.get("/")
     resp = order_status_view(request, order.token)
-    order_context = resp.context_data["order"]
-    # order has relevant order info, plus rejigged basket info
-    # These are not on the serialised object
-    assert "amount_outstanding" in order_context
-    assert "amount_paid" in order_context
+    assert resp.context_data["order"] == order
+    items_by_product = resp.context_data["items_by_product"]
     # items are organised by product identifier
-    assert len(order_context["items"]["test-category-test-product"]) == 1
+    assert len(items_by_product["test-category-test-product"]) == 1
     # and has category added in
     assert (
-        order_context["items"]["test-category-test-product"][0]["category"]
+        items_by_product["test-category-test-product"][0]["category"]
         == "Test Category"
     )
     assert resp.context_data["hide_basket"]
     assert not resp.context_data["new_order"]
-    assert "Amount paid: £0" in resp.rendered_content
+    content = resp.rendered_content
+    assert f"Ref: {order.ref}" in content
+    assert "Status: Created" in content
+    assert "Test Product - Small (Test Category) - 2 - £20.00" in content
+    assert "Shipping method: Collect in store" in content
+    assert "Order total: £20.00" in content
+    assert "Amount paid: £0.00" in content
+    assert "Amount outstanding: £20.00" in content
     assert "Thank you for your order!" not in resp.rendered_content
 
 
