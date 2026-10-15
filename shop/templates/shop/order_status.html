@@ -20,20 +20,20 @@
                     <li>Status: {{ order.status_display }}</li>
                     <li>Items ordered:
                         <ul>
-                        {% for products in order.items.values %}
+                        {% for products in items_by_product.values %}
                             {% for product in products %}
-                            <li>{{ product.product.name }} ({{ product.category }}) - {{ product.quantity }} - £{{ product.total }}</li>
+                            <li>{{ product.product_data.name }} ({{ product.category }}) - {{ product.quantity }} - £{{ product.total|floatformat:2 }}</li>
                             {% endfor %}
                         {% endfor %}
                         </ul>
                     <li>Order date: {{ order.date_created|date:"d M Y" }}</li>
-                    <li>Shipping method: {{ order.shipping_method }}</li>
+                    <li>Shipping method: {{ order.get_shipping_method_display }}</li>
                     {% if order.shipping_method != "collect" %}
                         <li>Shipping address: {{ order.shipping_address }}</li>
                     {% endif %}
-                    <li>Order total: £{{ order.total }}</li>
-                    <li>Amount paid: £{{ order.amount_paid }}</li>
-                    <li>Amount outstanding: £{{ order.amount_outstanding }}</li>
+                    <li>Order total: £{{ order.total|floatformat:2 }}</li>
+                    <li>Amount paid: £{{ order.amount_paid|floatformat:2 }}</li>
+                    <li>Amount outstanding: £{{ order.amount_outstanding|floatformat:2 }}</li>
                 </ul>
             </div>
         </div>
