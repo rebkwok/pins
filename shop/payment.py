@@ -75,7 +75,7 @@ class PayInAdvance(PaymentMethod):
         basket.extra["name"] = request.POST.get("name")
         order = Order.objects.create_from_basket(basket, request, status="HOLD")
         basket.delete()
-        url = reverse("salesman-order-last") + f"?token={order.token}"
+        url = reverse("shop:new_order_status", args=(order.token,))
         return request.build_absolute_uri(url)
 
 

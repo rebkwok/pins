@@ -1,4 +1,3 @@
-from urllib.parse import parse_qsl, urlparse
 import logging
 
 from django.contrib import messages
@@ -13,12 +12,13 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 from django.views.generic import DetailView
 import stripe
-from salesman.basket.views import BasketViewSet
-from salesman.checkout.payment import payment_methods_pool
-from salesman.checkout.views import CheckoutViewSet
+from salesman.checkout.payment import PaymentError, payment_methods_pool
+from salesman.checkout.serializers import CheckoutSerializer
+from salesman.conf import app_settings as salesman_settings
 from salesman.core.utils import get_salesman_model
 
 from .forms import CheckoutForm
+from .basket_serializers import BasketSerializer
 from .models import ProductVariant, Product, SHIPPING_METHODS
 from .payment import PAYMENT_METHOD_DESCRIPTIONS, PayByStripe
 
@@ -26,6 +26,7 @@ from .payment import PAYMENT_METHOD_DESCRIPTIONS, PayByStripe
 logger = logging.getLogger(__name__)
 
 Basket = get_salesman_model("Basket")
+BasketItem = get_salesman_model("BasketItem")
 Order = get_salesman_model("Order")
 
 
@@ -47,11 +48,25 @@ def _get_int(data, key, default=None, min_value=None):
     return value
 
 
-def get_basket(request):
-    request.method = "GET"
-    resp = BasketViewSet.as_view({"get": "list"})(request)
-    data = resp.data
-    data["timeout"] = Basket.objects.get(id=data["id"]).timeout
+def get_or_create_basket(request):
+    """The request's basket, created if it doesn't exist yet"""
+    basket, _ = Basket.objects.get_or_create_from_request(request)
+    return basket
+
+
+def serialize_basket(request, basket):
+    """
+    Serialized basket data (a dict, with items as a list of dicts) for templates
+    and htmx responses. Serializing updates the basket instance (calculating
+    totals and extra rows, and resetting its timeout).
+    """
+    serializer = BasketSerializer(
+        basket, context={"request": request, "basket": basket}
+    )
+    data = dict(serializer.data)
+    # serializer.data updates the basket instance in place (see docstring), so this
+    # is the timeout after it's been reset; it must come after serializer.data
+    data["timeout"] = basket.timeout
     return data
 
 
@@ -121,46 +136,36 @@ def get_existing_basket_quantity(request):
 
 
 def get_basket_quantity(request):
-    request.method = "GET"
-    resp = BasketViewSet.as_view({"get": "quantity"})(request)
-    return resp.data["quantity"]
+    return get_or_create_basket(request).quantity
 
 
-def get_basket_total(request):
-    return get_basket(request)["total"]
-
-
-def get_basket_quantity_and_total(request):
-    return get_basket_quantity(request), get_basket(request)["total"]
-
-
-def get_basket_item(basket, product_id):
-    if not basket["items"]:
-        return {}
+def get_basket_item_data(basket_data, ref):
+    """
+    The serialized item with this ref from serialized basket data, or {}
+    """
     return next(
-        (
-            item
-            for item in basket["items"]
-            if int(item["product_id"]) == int(product_id)
-        ),
+        (item_data for item_data in basket_data["items"] if item_data["ref"] == ref),
         {},
     )
 
 
-def get_basket_context(basket):
-    basket_quantity = _get_basket_quantity(basket)
+def get_basket_context(basket_data):
+    """
+    Template context for serialized basket data (or serialized order data).
+    Groups the items by product (keyed by product identifier), adding the product
+    name and category to each item. Note this modifies basket_data.
+    """
+    basket_quantity = sum(
+        int(item_data["quantity"]) for item_data in basket_data.get("items", [])
+    )
     items_by_product = {}
-    for item in basket.get("items", []):
-        product_type = ProductVariant.objects.get(id=item["product_id"]).product
-        item["product_type"] = product_type.name
-        item["category"] = product_type.category_page.title
-        items_by_product.setdefault(product_type.identifier, []).append(item)
-    basket["items"] = items_by_product
-    return {"basket": basket, "basket_quantity": basket_quantity}
-
-
-def _get_basket_quantity(basket):
-    return sum(int(item["quantity"]) for item in basket.get("items", []))
+    for item_data in basket_data.get("items", []):
+        product = ProductVariant.objects.get(id=item_data["product_id"]).product
+        item_data["product_type"] = product.name
+        item_data["category"] = product.category_page.title
+        items_by_product.setdefault(product.identifier, []).append(item_data)
+    basket_data["items"] = items_by_product
+    return {"basket": basket_data, "basket_quantity": basket_quantity}
 
 
 def _can_increase_quantity(request, variant, value, in_basket=False):
@@ -170,9 +175,13 @@ def _can_increase_quantity(request, variant, value, in_basket=False):
         # is already incorporated into stock numbers
         # we need to check the actual basket quantity because user may have increase/decreased
         # value in the form field without actually updating
-        current_quantity = get_basket_item(get_basket(request), variant.id).get(
-            "quantity", 0
+        basket = get_existing_basket(request)
+        item = (
+            basket.find(BasketItem.get_product_ref(variant))
+            if basket is not None
+            else None
         )
+        current_quantity = item.quantity if item is not None else 0
         logger.info("Current quantity %s", current_quantity)
         logger.info("Stock %s", variant.stock)
         logger.info("New quantity %s", value)
@@ -292,53 +301,44 @@ def add_to_basket(request, product_id):
             request, variant, quantity, in_basket=False
         )
         if can_increase:
-            resp = BasketViewSet.as_view({"post": "create"})(request)
+            basket = get_or_create_basket(request)
+            basket.add(variant, quantity=quantity)
+            # Calculate totals and reset the basket timeout
+            basket.update(request)
 
     if can_increase:
-        new_basket_quantity = get_basket_quantity(request)
         # refresh variant to ensure stock is up to date
         variant.refresh_from_db()
-        resp_str = f"<div>{_basket_icon_html(request, new_basket_quantity)}</div>"
-        if resp.status_code == 201:
-            resp_str += f"""
-                <div id='added_{product_id}' class='alert-success mt-2' hx-swap-oob='true'>Added!</div>
-            """
-            # update variant dropdown, including out of stock message
-            variant_html = render_to_string(
-                "shop/includes/select_variant_field.html",
-                {"product": variant.product, "product_id": product_id},
+        resp_str = f"<div>{_basket_icon_html(request, basket.quantity)}</div>"
+        resp_str += f"""
+            <div id='added_{product_id}' class='alert-success mt-2' hx-swap-oob='true'>Added!</div>
+        """
+        # update variant dropdown, including out of stock message
+        variant_html = render_to_string(
+            "shop/includes/select_variant_field.html",
+            {"product": variant.product},
+            request,
+        )
+        resp_str += f"<div id='id_select_variant_wrapper_{ product_id }' hx-swap-oob='true'>{variant_html}</div>"
+
+        if variant.product.out_of_stock():
+            # hide quantity change and add-to-basket button
+            resp_str += f"<div id='change_quantity_wrapper_{ product_id }' hx-swap-oob='true'></div>"
+        else:
+            # set quantity back to 1
+            quantity_to_add_html = render_to_string(
+                "shop/includes/quantity_field.html",
+                {"product_id": product_id, "value": 1},
                 request,
             )
-            resp_str += f"<div id='id_select_variant_wrapper_{ product_id }' hx-swap-oob='true'>{variant_html}</div>"
-
-            if variant.product.out_of_stock():
-                # hide quantity change and add-to-basket button
-                resp_str += f"<div id='change_quantity_wrapper_{ product_id }' hx-swap-oob='true'></div>"
-            else:
-                # set quantity back to 1
-                quantity_to_add_html = render_to_string(
-                    "shop/includes/quantity_field.html",
-                    {"product_id": product_id, "value": 1},
-                    request,
-                )
-                resp_str += f"""
-                    <div id='id_quantity_wrapper_{ product_id }' hx-swap-oob='true'>{quantity_to_add_html}</div>
-                """
-        else:
-            logger.error(
-                "Error adding to basket: status_code %s resp %s",
-                resp.status_code,
-                resp.data,
-            )
             resp_str += f"""
-                <div id='added_{product_id}' class='alert-danger mt-2' hx-swap-oob='true'>Something went wrong</div>
-                """
+                <div id='id_quantity_wrapper_{ product_id }' hx-swap-oob='true'>{quantity_to_add_html}</div>
+            """
     else:
-        logger.error(
-            "Error adding to basket: can't increase quantity %r", get_basket(request)
+        logger.info(
+            "Can't add %s x %s to basket: %s in stock", quantity, variant, variant.stock
         )
-        basket_quantity = get_basket_quantity(request)
-        resp_str = f"<div>{_basket_icon_html(request, basket_quantity)}</div>"
+        resp_str = f"<div>{_basket_icon_html(request, get_existing_basket_quantity(request))}</div>"
         resp_str += f"""
         <div id='added_{product_id}' class='alert-danger mt-2' hx-swap-oob='true'>Quantity requested is not available</div>
         """
@@ -354,12 +354,8 @@ def update_quantity(request, ref):
     new_quantity = _get_int(request.POST, "quantity", min_value=1)
     if _payment_in_progress(request):
         return _payment_in_progress_item_response(product_id)
-    request.method = "GET"
-    current_item_resp = BasketViewSet.as_view({"get": "retrieve"})(request, ref=ref)
-    if current_item_resp.status_code != 200:
-        # no item with this ref in the basket
-        raise Http404
-    current_quantity = current_item_resp.data["quantity"]
+    basket, item = _find_basket_item(request, ref, product_id)
+    current_quantity = item.quantity
 
     if current_quantity == new_quantity:
         # nothing to do
@@ -368,9 +364,8 @@ def update_quantity(request, ref):
         with transaction.atomic():
             # Lock the variant until the item has been updated, so that concurrent
             # requests can't both reserve the last items in stock.
-            # Use the basket item's product, not the posted product_id.
             variant = ProductVariant.objects.select_for_update().get(
-                id=current_item_resp.data["product_id"]
+                id=item.product_id
             )
             # Decreasing is always allowed; stock already excludes the current
             # basket quantity
@@ -379,31 +374,29 @@ def update_quantity(request, ref):
                 or variant.stock + current_quantity - new_quantity >= 0
             )
             if can_update:
-                request.method = "PUT"
-                resp = BasketViewSet.as_view({"put": "update"})(request, ref=ref)
+                item.quantity = new_quantity
+                item.save(update_fields=["quantity", "date_updated"])
 
         if not can_update:
             result_html = (
                 f"<div id='updated_{product_id}' class='alert-danger' hx-swap-oob='true'>"
                 "Quantity requested is not available</div>"
             )
-        elif resp.status_code != 200:
-            result_html = f"<div id='updated_{product_id}' class='alert-danger' hx-swap-oob='true'>Error</div>"
         else:
-            basket = get_basket(request)
+            basket_data = serialize_basket(request, basket)
             basket_extra_html = render_to_string(
                 "shop/includes/basket_extra.html",
-                {"extra_rows": basket["extra_rows"]},
+                {"extra_rows": basket_data["extra_rows"]},
                 request,
             )
-            basket_item = get_basket_item(basket, product_id)
-            subtotal = basket_item.get("subtotal", 0)
-            total = basket_item.get("total", 0)
+            item_data = get_basket_item_data(basket_data, ref)
+            subtotal = item_data.get("subtotal", 0)
+            total = item_data.get("total", 0)
             result_html = f"""
                 <span id='subtotal_{product_id}' hx-swap-oob='true'>{subtotal}</span>
                 <span id='total_{product_id}' hx-swap-oob='true'>{total}</span>
-                <span id='quantity_{product_id}' hx-swap-oob='true'>{resp.data['quantity']}</span>
-                <span id='total' hx-swap-oob='true'>{basket['total']}</span>
+                <span id='quantity_{product_id}' hx-swap-oob='true'>{item.quantity}</span>
+                <span id='total' hx-swap-oob='true'>{basket_data['total']}</span>
                 <div id='updated_{product_id}' class='alert-success' hx-swap-oob='true'>Basket updated</div>
                 <div id='basket-extra' class='col-md-12' hx-swap-oob='true'>{basket_extra_html}</div>
             """
@@ -417,52 +410,53 @@ def delete_basket_item(request, ref):
     if _payment_in_progress(request):
         return _payment_in_progress_item_response(product_id)
 
-    request.method = "DELETE"
-    # The serialised basket identifies products (NOT variants) with their idenitifier, not id
-    # Find the relevant product idenitifier
-    product_identifier = get_object_or_404(ProductVariant, id=product_id).product.identifier
-    # Delete the item
-    resp = BasketViewSet.as_view({"delete": "destroy"})(request, ref=ref)
+    basket, _ = _find_basket_item(request, ref, product_id)
+    # The serialised basket identifies products (NOT variants) with their identifier
+    variant = ProductVariant.objects.filter(id=product_id).first()
+    product_identifier = variant.product.identifier if variant else None
+    basket.remove(ref)
+    basket_data = serialize_basket(request, basket)
 
-    if resp.status_code != 204:
-        resp_str = f"""
-            <div id='updated_{product_id}' class='alert-danger' hx-swap-oob='true'>Error</div>
-        """
+    # Does the basket still have any items (variants) for this product?
+    any_product_items = any(
+        other_item.product is not None
+        and other_item.product.product.identifier == product_identifier
+        for other_item in basket.get_items()
+    )
+    if product_identifier is not None and not any_product_items:
+        # No items for this product, hide the entire product row
+        resp_str = f"<div id='row-{product_identifier}' hx-swap-oob='true'></div>"
     else:
-        # The item deletion was successful
-        # Get the new basket quantity and the new basket
-        request.method = "GET"
-        new_basket_quantity = get_basket_quantity(request)
-        basket = get_basket(request)
-        # Does the basket still have any items (variants) for this product?
-        any_product_items = any(
-            1
-            for item in basket["items"]
-            if ProductVariant.objects.get(id=item["product_id"]).product.identifier
-            == product_identifier
-        )
+        # Some items for this product, just hide the single variant row
+        resp_str = f"<div id='row-{product_id}' hx-swap-oob='true'></div>"
 
-        if not any_product_items:
-            # No items for this product, hide the entire product row
-            resp_str = f"<div id='row-{product_identifier}' hx-swap-oob='true'></div>"
-        else:
-            # Some items for this product, just hide the single variant row
-            resp_str = f"<div id='row-{product_id}' hx-swap-oob='true'></div>"
+    if basket.quantity == 0:
+        # No items in the basket
+        resp_str += "<div id='basket-total-and-payment' hx-swap-oob='true'><p>Basket is empty.</p></div>"
+    else:
+        # Still items left, update the total
+        resp_str += f"<span id='total' hx-swap-oob='true'>{basket_data['total']}</span>"
 
-        if new_basket_quantity == 0:
-            # No items in the basket
-            resp_str += "<div id='basket-total-and-payment' hx-swap-oob='true'><p>Basket is empty.</p></div>"
-        else:
-            # Still items left, update the total
-            resp_str += f"<span id='total' hx-swap-oob='true'>{basket['total']}</span>"
-
-        basket_extra_html = render_to_string(
-            "shop/includes/basket_extra.html",
-            {"extra_rows": basket["extra_rows"]},
-            request,
-        )
-        resp_str += f"<div id='basket-extra' class='col-md-12' hx-swap-oob='true'>{basket_extra_html}</div>"
+    basket_extra_html = render_to_string(
+        "shop/includes/basket_extra.html",
+        {"extra_rows": basket_data["extra_rows"]},
+        request,
+    )
+    resp_str += f"<div id='basket-extra' class='col-md-12' hx-swap-oob='true'>{basket_extra_html}</div>"
     return HttpResponse(resp_str)
+
+
+def _find_basket_item(request, ref, product_id):
+    """
+    The request's basket and its item with this ref. Raises 404 if there isn't
+    one, or if it isn't for the posted product (variant) id, which is used to
+    identify the elements to update in the response.
+    """
+    basket = get_existing_basket(request)
+    item = basket.find(ref) if basket is not None else None
+    if item is None or item.product_id != product_id:
+        raise Http404
+    return basket, item
 
 
 def _basket_icon_html(request, quantity):
@@ -500,13 +494,22 @@ def basket_view(request):
                 },
             )
 
-    basket = get_basket(request)
-    basket_context = get_basket_context(basket)
-    checkout_methods = CheckoutViewSet.as_view({"get": "list"})(request)
-    payment_methods = checkout_methods.data["payment_methods"]
-    shipping_methods = [("collect", "Collect in store"), ("deliver", "Delivery")]
-    for method in payment_methods:
-        method["help"] = PAYMENT_METHOD_DESCRIPTIONS[method["identifier"]]
+    # Viewing the basket page doesn't create a basket
+    basket_data = (
+        serialize_basket(request, existing_basket)
+        if existing_basket is not None
+        else {"items": []}
+    )
+    basket_context = get_basket_context(basket_data)
+    payment_methods = [
+        {
+            "identifier": method.identifier,
+            "label": method.label,
+            "help": PAYMENT_METHOD_DESCRIPTIONS[method.identifier],
+        }
+        for method in payment_methods_pool.get_payments("basket", request)
+    ]
+    shipping_methods = list(SHIPPING_METHODS.items())
     return TemplateResponse(
         request,
         "shop/basket.html",
@@ -538,6 +541,32 @@ def cancel_payment(request):
     return HttpResponseRedirect(reverse("shop:basket"))
 
 
+def _checkout(request, basket):
+    """
+    Process the checkout with salesman's checkout serializer: save the
+    customer's details on the basket and start the payment.
+    Returns the payment URL, or None if the checkout failed.
+    """
+    if not (
+        salesman_settings.SALESMAN_ALLOW_ANONYMOUS_USER_CHECKOUT
+        or request.user.is_authenticated
+    ):
+        return None
+    basket.update(request)
+    serializer = CheckoutSerializer(
+        data=request.POST, context={"request": request, "basket": basket}
+    )
+    if not serializer.is_valid():
+        logger.error("Checkout failed: %s", serializer.errors)
+        return None
+    try:
+        serializer.save()
+    except PaymentError as e:
+        logger.error("Checkout payment failed: %s", e)
+        return None
+    return serializer.data["url"]
+
+
 @require_http_methods(["GET", "POST"])
 def checkout_view(request):
     if _payment_in_progress(request):
@@ -555,6 +584,7 @@ def checkout_view(request):
         messages.error(request, "Please select a shipping and payment method.")
         return HttpResponseRedirect(reverse("shop:basket"))
     context = {"payment_method": payment_method, "shipping_method": shipping_method}
+    basket = get_or_create_basket(request)
 
     if request.method == "POST":
         form = CheckoutForm(
@@ -563,30 +593,24 @@ def checkout_view(request):
             data=request.POST,
         )
         if form.is_valid():
-            checkout = CheckoutViewSet.as_view({"post": "create"})(request)
-
-            if checkout.status_code == 201:
-                if payment_method == "stripe":
-                    return HttpResponseRedirect(checkout.data["url"])
-
-                parsed_url = urlparse(checkout.data["url"])
-                token = dict(parse_qsl(parsed_url.query))["token"]
-                return HttpResponseRedirect(
-                    reverse("shop:new_order_status", args=(token,))
-                )
+            url = _checkout(request, basket)
+            if url is not None:
+                # Stripe checkout, or the new order status page
+                return HttpResponseRedirect(url)
             context["checkout_error"] = True
     else:
         # update basket with shipping method
-        basket = Basket.objects.get(id=get_basket(request)["id"])
         basket.shipping_method = shipping_method
         basket.save()
         form = CheckoutForm(
             payment_method=payment_method, shipping_method=shipping_method
         )
 
-    request.method = "GET"
-    basket = get_basket(request)
-    context = {**context, "form": form, **get_basket_context(basket)}
+    context = {
+        **context,
+        "form": form,
+        **get_basket_context(serialize_basket(request, basket)),
+    }
 
     return TemplateResponse(request, "shop/checkout.html", context)
 
@@ -604,10 +628,10 @@ def order_status_view(request, token):
 def _order_status(request, token, new=False):
     order = get_object_or_404(Order, token=token)
     # Group the order items by product, as for the basket
-    order_as_basket = get_basket_context(order.serializable_data())["basket"]
+    order_data = get_basket_context(order.serializable_data())["basket"]
     context = {
         "order": order,
-        "items_by_product": order_as_basket["items"],
+        "items_by_product": order_data["items"],
         "new_order": new,
         "hide_basket": True,
     }

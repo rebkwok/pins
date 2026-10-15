@@ -8,6 +8,7 @@ from wagtail.documents import urls as wagtaildocs_urls
 from home import orders_urls
 from home import views as home_views
 from fundraising import urls
+from salesman.checkout.payment import payment_methods_pool
 from search import views as search_views
 from shop import urls as shop_urls
 from shop.payment import stripe_webhook_view
@@ -45,7 +46,10 @@ urlpatterns = [
     ),
     path("shop/", include(shop_urls)),
     path("stripe/webhook/", stripe_webhook_view, name="shop-stripe-webhook"),
-    path("api/", include("salesman.urls")),
+    # Only the payment urls (e.g. stripe success, cancel and webhook) from salesman;
+    # its basket, checkout and orders API would bypass the shop views' checks
+    # (stock, live products, basket locked during payment)
+    path("api/", include(payment_methods_pool.get_urls())),
 ]
 
 
