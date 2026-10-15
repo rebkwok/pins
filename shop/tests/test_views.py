@@ -54,7 +54,7 @@ def test_get_basket(rf, freezer):
         "items": [],
         "subtotal": "0.00",
         "total": "0.00",
-        "timeout": datetime(2023, 10, 10, 10, 15, tzinfo=timezone.utc),
+        "timeout": datetime(2023, 10, 10, 10, 30, tzinfo=timezone.utc),
     }
 
 
@@ -83,7 +83,7 @@ def test_get_existing_empty_basket(rf, freezer):
         "items": [],
         "subtotal": "0.00",
         "total": "0.00",
-        "timeout": datetime(2023, 10, 10, 10, 15, tzinfo=timezone.utc),
+        "timeout": datetime(2023, 10, 10, 10, 30, tzinfo=timezone.utc),
     }
 
 
@@ -824,12 +824,12 @@ def test_basket_timeout_view(client, basket, freezer):
 def test_basket_timeout_view_no_timeout(client, basket, freezer, settings):
     # A basket with items but no timeout starts a countdown, so the items
     # are released eventually
-    settings.BASKET_TIMEOUT_MINUTES = 15
+    settings.BASKET_TIMEOUT_MINUTES = 30
     freezer.move_to(datetime(2023, 10, 1, 12, 0, tzinfo=timezone.utc))
     Basket.objects.filter(id=basket.id).update(timeout=None)
     url = reverse("shop:basket_timeout", args=(basket.id,))
     resp = client.get(url, headers={"hx-request": True})
-    assert resp.content.decode() == "15m 0s"
+    assert resp.content.decode() == "30m 0s"
     basket.refresh_from_db()
-    assert basket.timeout == datetime(2023, 10, 1, 12, 15, tzinfo=timezone.utc)
+    assert basket.timeout == datetime(2023, 10, 1, 12, 30, tzinfo=timezone.utc)
 

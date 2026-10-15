@@ -57,7 +57,13 @@ def mock_stripe(requests_mock):
     )
     requests_mock.post(
         "https://api.stripe.com/v1/checkout/sessions",
-        json={"url": "https://stripe-session-url"},
+        json={
+            "id": "test-session",
+            "object": "checkout.session",
+            "url": "https://stripe-session-url",
+            # 2024-01-01 10:31 UTC
+            "expires_at": 1704105060,
+        },
     )
     # This is used for getting stripe session data on the success page
     requests_mock.get(
@@ -80,7 +86,8 @@ def stripe_session_data(**params):
     }
 
 
-def test_pay_by_stripe(mock_stripe, rf, basket):
+def test_pay_by_stripe(mock_stripe, rf, basket, freezer):
+    freezer.move_to("2024-01-01 10:00")
     basket = basket_from_checkout(basket)
     request = rf.post("/", {"name": "Test buyer"})
     payment = PayByStripe()
@@ -89,9 +96,17 @@ def test_pay_by_stripe(mock_stripe, rf, basket):
     assert basket.extra["name"] == "Test buyer"
     # basket still exists - not deleted  and order not created until the webhook is completed
     assert Basket.objects.filter(id=basket.id).exists()
+    # payment has started, so the basket is locked, and its items are held until
+    # 5 mins after the session expires
+    basket.refresh_from_db()
+    assert basket.payment_in_progress
+    assert basket.stripe_session_id == "test-session"
+    assert basket.stripe_session_url == "https://stripe-session-url"
+    assert basket.timeout == datetime(2024, 1, 1, 10, 36, tzinfo=UTC)
 
 
-def test_get_stripe_session_data(rf, mock_stripe, basket):
+def test_get_stripe_session_data(rf, mock_stripe, basket, freezer):
+    freezer.move_to("2024-01-01 10:00")
     basket = basket_from_checkout(basket)
     request = rf.post("/", {"name": "Test buyer"})
     payment = PayByStripe()
@@ -120,6 +135,8 @@ def test_get_stripe_session_data(rf, mock_stripe, basket):
             "transfer_data": {"destination": settings.STRIPE_CONNECTED_ACCOUNT},
         },
         "metadata": {"shipping_method": "collect"},
+        # 31 mins from now
+        "expires_at": int(datetime(2024, 1, 1, 10, 31, tzinfo=UTC).timestamp()),
     }
 
 
@@ -631,3 +648,15 @@ def test_webhook_completed_missing_order(mock_webhook, client, get_mock_webhook_
     resp = post_webhook(client)
     assert resp.status_code == 200
     assert resp.content.decode() == "Missing order"
+
+
+def test_stripe_session_expiry_follows_basket_timeout(
+    rf, mock_stripe, basket, freezer, settings
+):
+    settings.BASKET_TIMEOUT_MINUTES = 45
+    freezer.move_to("2024-01-01 10:00")
+    basket = basket_from_checkout(basket)
+    session_data = PayByStripe().get_stripe_session_data(basket, rf.post("/"))
+    assert session_data["expires_at"] == int(
+        datetime(2024, 1, 1, 10, 46, tzinfo=UTC).timestamp()
+    )

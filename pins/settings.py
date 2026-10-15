@@ -18,6 +18,8 @@ import sys
 
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 from .custom_logging import GroupWriteRotatingFileHandler, log_file_permissions
 
 logging.handlers.GroupWriteRotatingFileHandler = GroupWriteRotatingFileHandler
@@ -623,4 +625,12 @@ SALESMAN_STRIPE_WEBHOOK_URL = "/stripe/webhook/"
 # Default paid status for fullfiled orders.
 SALESMAN_STRIPE_PAID_STATUS = "PROCESSING"
 
-BASKET_TIMEOUT_MINUTES = env.int("BASKET_TIMEOUT_MINUTES", 15)
+# How long items are held in a basket. The Stripe checkout session expires 1 minute
+# after the basket timeout, and Stripe requires sessions to expire between 30
+# minutes and 24 hours after they're created.
+BASKET_TIMEOUT_MINUTES = env.int("BASKET_TIMEOUT_MINUTES", 30)
+if not 30 <= BASKET_TIMEOUT_MINUTES < 24 * 60:
+    raise ImproperlyConfigured(
+        "BASKET_TIMEOUT_MINUTES must be at least 30 and less than 1440 (24 hours); "
+        f"got {BASKET_TIMEOUT_MINUTES}"
+    )

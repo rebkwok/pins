@@ -5,6 +5,7 @@ from .views import (
     add_to_basket,
     basket_view,
     basket_timeout,
+    cancel_payment,
     checkout_view,
     decrease_quantity,
     delete_basket_item,
@@ -30,6 +31,7 @@ urlpatterns = [
     path("basket/", basket_view, name="basket"),
     path("basket-timeout/<int:basket_id>", basket_timeout, name="basket_timeout"),
     path("checkout/", checkout_view, name="checkout"),
+    path("checkout/cancel/", cancel_payment, name="cancel_payment"),
     path("order/<str:token>/new/", new_order_view, name="new_order_status"),
     path("order/<str:token>/", order_status_view, name="order_status"),
 ]
