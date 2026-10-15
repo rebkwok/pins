@@ -1,9 +1,11 @@
 from datetime import datetime, UTC
+from unittest.mock import Mock, patch
 from urllib.parse import urlparse, parse_qs
 
 import pytest
 
 from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
 from django.urls import reverse
 
 from salesman.core.utils import get_salesman_model
@@ -57,18 +59,25 @@ def mock_stripe(requests_mock):
         "https://api.stripe.com/v1/checkout/sessions",
         json={"url": "https://stripe-session-url"},
     )
-    # These are used for getting stripe session data
+    # This is used for getting stripe session data on the success page
     requests_mock.get(
         "https://api.stripe.com/v1/checkout/sessions/test-session",
-        json={
-            "customer": "customer-id-1",
-            "amount_total": 2000,
-        },
+        json=stripe_session_data(),
     )
-    requests_mock.get(
-        "https://api.stripe.com/v1/customers/customer-id-1",
-        json={"email": "test@test.com"},
-    )
+
+
+def stripe_session_data(**params):
+    return {
+        "id": "test-session",
+        "object": "checkout.session",
+        "customer": "customer-id-1",
+        "customer_details": {"email": "test@test.com"},
+        "amount_total": 2000,
+        "payment_status": "paid",
+        "payment_intent": "payment-intent-id",
+        "client_reference_id": "basket_1234",
+        **params,
+    }
 
 
 def test_pay_by_stripe(mock_stripe, rf, basket):
@@ -120,12 +129,142 @@ def test_cancel_view(rf):
     assert "Your payment was cancelled" in resp.content.decode()
 
 
-def test_success_view(rf, mock_stripe):
+def test_success_view(rf, requests_mock, basket):
+    basket = basket_from_checkout(basket)
+    basket.save()
+    session_mock = requests_mock.get(
+        "https://api.stripe.com/v1/checkout/sessions/test-session",
+        json=stripe_session_data(client_reference_id=f"basket_{basket.id}"),
+    )
     request = rf.get("/?session_id=test-session")
+    request.user = AnonymousUser()
     resp = PayByStripe.success_view(request)
     content = resp.content.decode()
+
+    # order is fulfilled without waiting for the webhook
+    order = Order.objects.get()
+    assert order.status == Order.Status.PROCESSING
+    assert order.amount_paid == 20
+    assert order.extra["stripe_session_id"] == "test-session"
+    assert not Basket.objects.filter(id=basket.id).exists()
+
+    assert f"Your order reference is <strong>{order.ref}</strong>" in content
     assert "You have been charged £20.00" in content
     assert "Your order confirmation has been emailed to test@test.com" in content
+    assert reverse("shop:order_status", args=(order.token,)) in content
+    # basket icon is hidden
+    assert "fa-basket-shopping" not in content
+    # only the session is retrieved from stripe (no separate customer request)
+    assert session_mock.call_count == 1
+    assert requests_mock.call_count == 1
+
+
+@patch("salesman_stripe.payment.stripe.Webhook")
+def test_success_view_then_webhook(
+    mock_webhook, rf, client, requests_mock, basket, get_mock_webhook_event
+):
+    basket = basket_from_checkout(basket)
+    basket.save()
+    requests_mock.get(
+        "https://api.stripe.com/v1/checkout/sessions/test-session",
+        json=stripe_session_data(client_reference_id=f"basket_{basket.id}"),
+    )
+    request = rf.get("/?session_id=test-session")
+    request.user = AnonymousUser()
+    PayByStripe.success_view(request)
+
+    mock_webhook.construct_event.return_value = get_mock_webhook_event(
+        id="test-session",
+        client_reference_id=f"basket_{basket.id}",
+        amount_total=2000,
+    )
+    resp = post_webhook(client)
+    assert resp.content.decode() == "Order already fulfilled"
+    assert Order.objects.count() == 1
+    assert OrderPayment.objects.count() == 1
+
+
+@patch("salesman_stripe.payment.stripe.Webhook")
+def test_webhook_then_success_view(
+    mock_webhook, rf, client, requests_mock, basket, get_mock_webhook_event
+):
+    basket = basket_from_checkout(basket)
+    basket.save()
+    mock_webhook.construct_event.return_value = get_mock_webhook_event(
+        id="test-session",
+        client_reference_id=f"basket_{basket.id}",
+        amount_total=2000,
+    )
+    post_webhook(client)
+    order = Order.objects.get()
+
+    requests_mock.get(
+        "https://api.stripe.com/v1/checkout/sessions/test-session",
+        json=stripe_session_data(client_reference_id=f"basket_{basket.id}"),
+    )
+    request = rf.get("/?session_id=test-session")
+    request.user = AnonymousUser()
+    content = PayByStripe.success_view(request).content.decode()
+
+    assert f"Your order reference is <strong>{order.ref}</strong>" in content
+    assert Order.objects.count() == 1
+    assert OrderPayment.objects.count() == 1
+
+
+def test_success_view_unpaid_session(rf, requests_mock, basket):
+    basket = basket_from_checkout(basket)
+    basket.save()
+    requests_mock.get(
+        "https://api.stripe.com/v1/checkout/sessions/test-session",
+        json=stripe_session_data(
+            client_reference_id=f"basket_{basket.id}", payment_status="unpaid"
+        ),
+    )
+    request = rf.get("/?session_id=test-session")
+    content = PayByStripe.success_view(request).content.decode()
+
+    assert not Order.objects.exists()
+    assert "Your order is being processed" in content
+    assert "confirmation email at test@test.com shortly" in content
+
+
+@pytest.mark.parametrize("url", ["/", "/?session_id=unknown-session"])
+def test_success_view_no_session(rf, requests_mock, url):
+    requests_mock.get(
+        "https://api.stripe.com/v1/checkout/sessions/unknown-session",
+        status_code=404,
+        json={"error": {"message": "No such checkout.session"}},
+    )
+    request = rf.get(url)
+    resp = PayByStripe.success_view(request)
+    assert resp.status_code == 200
+    content = resp.content.decode()
+    assert "Your order is being processed" in content
+    assert "You have been charged" not in content
+
+
+def test_success_view_fulfil_error(rf, requests_mock, basket, caplog):
+    # An error fulfilling the order from the success page is logged and left
+    # for the webhook to handle
+    basket = basket_from_checkout(basket)
+    basket.save()
+    requests_mock.get(
+        "https://api.stripe.com/v1/checkout/sessions/test-session",
+        json=stripe_session_data(client_reference_id=f"basket_{basket.id}"),
+    )
+    request = rf.get("/?session_id=test-session")
+    request.user = AnonymousUser()
+    with patch.object(
+        Order.objects, "create_from_basket", side_effect=Exception("Error")
+    ):
+        resp = PayByStripe.success_view(request)
+
+    assert resp.status_code == 200
+    assert "Your order is being processed" in resp.content.decode()
+    assert "Error fulfilling Stripe session test-session" in caplog.text
+    # nothing was changed, so the webhook can still fulfil the order
+    assert not Order.objects.exists()
+    assert Basket.objects.filter(id=basket.id).exists()
 
 
 # {
@@ -304,13 +443,16 @@ def test_success_view(rf, mock_stripe):
 # }
 
 
-from unittest.mock import Mock, patch
 
 
 @pytest.fixture
 def get_mock_stripe_session():
     def stripe_session(**params):
-        defaults = {"payment_intent": "payment-intent-id"}
+        defaults = {
+            "id": "session-id",
+            "payment_intent": "payment-intent-id",
+            "payment_status": "paid",
+        }
         options = {**defaults, **params}
         return Mock(**options)
 
