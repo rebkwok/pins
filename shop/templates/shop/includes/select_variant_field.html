@@ -5,7 +5,7 @@
         {% comment %} name must be product id for api call - actual product_variant id {% endcomment %}
         name="product_id" 
         required="" 
-        id="id_product_{{ product_id }}"
+        id="id_product_{{ product.id }}"
         class="form-control"
     >
         {% for variant in product.live_variants %}
