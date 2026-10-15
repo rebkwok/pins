@@ -5,14 +5,15 @@ from django.conf import settings
 from django.core.mail import EmailMessage
 from django.db import transaction
 from django.db.models import F
-from django.db.models.signals import post_delete, post_init, post_save
+from django.db.models import ProtectedError
+from django.db.models.signals import post_delete, post_init, post_save, pre_delete
 from django.dispatch import receiver
 from django.urls import reverse
 
 from salesman.core.utils import get_salesman_model
 from salesman.orders.signals import status_changed
 
-from .models import ShopSettings, ProductVariant
+from .models import ProductVariant, ShopSettings, order_items_for_variants
 
 
 BasketItem = get_salesman_model("BasketItem")
@@ -158,8 +159,17 @@ def post_delete_item(sender, instance, **kwargs):
                     adjust_stock(item.product, -item.quantity)
 
 
-@receiver(post_save, sender=ProductVariant)
-def update_price(sender, instance, **kwargs):
-    if instance.price is None or instance.price == "":
-        instance.price = instance.product.price
-        instance.save()
+@receiver(pre_delete, sender=ProductVariant)
+def protect_ordered_variants(sender, instance, **kwargs):
+    """
+    Don't delete variants that have been ordered (salesman similarly protects
+    variants that are in baskets). This includes when a product or category page
+    is deleted; deletion happens in a transaction, so nothing is deleted.
+    """
+    order_items = order_items_for_variants([instance.id])
+    if order_items.exists():
+        raise ProtectedError(
+            f"Cannot delete '{instance}' because it has been ordered.",
+            set(order_items),
+        )
+
