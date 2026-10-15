@@ -92,7 +92,8 @@ def test_delete_variant_after_basket_cleared(basket, variant):
 def test_message_for_several_variants(basket, product):
     other = baker.make("shop.ProductVariant", product=product, variant_name="Large", stock=5)
     basket.add(other, quantity=1)
-    assert protected_variants_message(product.variants.all()) == (
+    variant = basket.items.first().product
+    assert protected_variants_message([variant, other]) == (
         "Test Product - Small, Test Product - Large can't be deleted because they "
         "are in customers' baskets. Make them not live instead, so they can't be "
         "added to any more baskets."
