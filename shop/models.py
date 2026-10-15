@@ -5,8 +5,10 @@ import logging
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator
+from django.contrib.contenttypes.models import ContentType
 from django.db import models, transaction
 from django.urls import reverse
+from django.utils.html import format_html
 from django.utils.text import slugify
 from django.utils.safestring import mark_safe
 from django.utils import timezone
@@ -18,6 +20,7 @@ from salesman.orders.models import (
     BaseOrderPayment,
 )
 from modelcluster.models import ClusterableModel, ParentalKey
+from wagtail.admin.forms import WagtailAdminModelForm
 from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, MultiFieldPanel
 from wagtail.contrib.forms.models import validate_to_address
 from wagtail.contrib.settings.models import (
@@ -221,7 +224,7 @@ class CategoryPage(Page):
     ]
 
     parent_page_types = ["ShopPage"]
-    subpage_types = ["CategoryPage", "home.StandardPage"]
+    subpage_types = ["home.StandardPage"]
 
     def get_product_count(self):
         return f"{self.live_products.count()} live ({self.page_products.count()} total)"
@@ -244,11 +247,96 @@ class CategoryPage(Page):
         verbose_name_plural = "Categories"
 
 
+def _items_for_variants(item_model, variant_ids):
+    # Basket and order items refer to their variant with a generic foreign key
+    return item_model.objects.filter(
+        product_content_type=ContentType.objects.get_for_model(ProductVariant),
+        product_id__in=list(variant_ids),
+    )
+
+
+def basket_items_for_variants(variant_ids):
+    return _items_for_variants(BasketItem, variant_ids)
+
+
+def order_items_for_variants(variant_ids):
+    return _items_for_variants(OrderItem, variant_ids)
+
+
+def _they(count, singular, plural):
+    return singular if count == 1 else plural
+
+
+def protected_variants_message(variants):
+    """
+    Error message if any of these variants can't be deleted, because they've been
+    ordered or are in customers' baskets; otherwise None.
+
+    Salesman prevents deleting products that are in baskets, and a signal prevents
+    deleting ordered variants (both raising ProtectedError, which is a server
+    error in the admin); the admin checks this first and shows this message.
+    """
+    variants = list(variants)
+    variant_ids = [variant.id for variant in variants]
+    ordered_ids = set(
+        order_items_for_variants(variant_ids).values_list("product_id", flat=True)
+    )
+    in_basket_ids = set(
+        basket_items_for_variants(variant_ids).values_list("product_id", flat=True)
+    )
+    ordered = [str(variant) for variant in variants if variant.id in ordered_ids]
+    # Ordered variants are only listed once
+    in_baskets = [
+        str(variant)
+        for variant in variants
+        if variant.id in in_basket_ids and variant.id not in ordered_ids
+    ]
+    count = len(ordered) + len(in_baskets)
+    if not count:
+        return None
+    sentences = []
+    if ordered:
+        sentences.append(
+            f"{', '.join(ordered)} can't be deleted because "
+            f"{_they(len(ordered), 'it has', 'they have')} been ordered."
+        )
+    if in_baskets:
+        sentences.append(
+            f"{', '.join(in_baskets)} can't be deleted because "
+            f"{_they(len(in_baskets), 'it is', 'they are')} in customers' baskets."
+        )
+    sentences.append(
+        f"Make {_they(count, 'it', 'them')} not live instead, so "
+        f"{_they(count, 'it', 'they')} can't be added to any more baskets."
+    )
+    return " ".join(sentences)
+
+
+class ProductAdminForm(WagtailAdminModelForm):
+    def clean(self):
+        cleaned_data = super().clean()
+        # Variants removed from the product in the form can't be deleted if
+        # they've been ordered or are in customers' baskets
+        variants_formset = self.formsets.get("variants")
+        if variants_formset is not None and variants_formset.is_valid():
+            deleted_variants = [
+                form.instance
+                for form in variants_formset.deleted_forms
+                if form.instance.pk is not None
+            ]
+            message = protected_variants_message(deleted_variants)
+            if message:
+                self.add_error(None, message)
+        return cleaned_data
+
+
 class Product(ClusterableModel):
     """
     Product, used to subgroup products in display.
     ProductVariant is the actual product that gets added to basket.
     """
+
+    base_form_class = ProductAdminForm
 
     category_page = ParentalKey(CategoryPage, related_name="page_products")
 
@@ -327,17 +415,21 @@ class Product(ClusterableModel):
         return self.variants.filter(live=True)
 
     def out_of_stock(self):
-        if self.variants.exists():
-            return self.variants.aggregate(models.Sum("stock"))["stock__sum"] <= 0
-        return True
+        """
+        Nothing from this product can be added to the basket: no live variant has
+        any stock. (Variants that aren't live don't count, even if they have stock.)
+        """
+        return not self.live_variants.filter(stock__gt=0).exists()
 
     @property
     def identifier(self):
         return slugify(f"{self.category_page.title}-{self.name}")
 
     def category_link(self):
-        return mark_safe(
-            f"<a href={reverse('wagtailadmin_pages:edit', args=(self.category_page.id,))}>{self.category_page.title}</a>"
+        return format_html(
+            '<a href="{}">{}</a>',
+            reverse("wagtailadmin_pages:edit", args=(self.category_page.id,)),
+            self.category_page.title,
         )
 
     category_link.short_description = "Category"
@@ -359,11 +451,14 @@ class Product(ClusterableModel):
 class ProductVariant(Orderable):
     product = ParentalKey(Product, on_delete=models.CASCADE, related_name="variants")
     variant_name = models.CharField(
-        null=True,
         blank=True,
+        default="",
         max_length=255,
         verbose_name="Variant name",
-        help_text="Can be left blank if there is only one variant for this product.",
+        help_text=(
+            "Can be left blank if there is only one variant for this product, or if "
+            "it only varies by colour and/or size."
+        ),
     )
     image = models.ForeignKey(
         "wagtailimages.Image",
@@ -377,7 +472,10 @@ class ProductVariant(Orderable):
         blank=True,
         max_digits=18,
         decimal_places=2,
-        help_text="Leave blank to use default product price.",
+        help_text=(
+            "Leave blank to use the product's price (which then also applies if the "
+            "product's price is changed)."
+        ),
     )
     stock = models.IntegerField(
         default=1, help_text="Quantity of this item currently in stock"
@@ -386,11 +484,21 @@ class ProductVariant(Orderable):
         default=True, help_text="Display this product variant in the shop"
     )
 
-    colour = models.CharField(null=True, blank=True)
-    size = models.CharField(null=True, blank=True)
+    colour = models.CharField(blank=True, default="")
+    size = models.CharField(blank=True, default="")
 
-    class Meta:
-        unique_together = ("variant_name", "colour", "size")
+    # Inherit Orderable's Meta, so variants are ordered by sort_order
+    class Meta(Orderable.Meta):
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product", "variant_name", "colour", "size"],
+                name="unique_product_variant",
+                violation_error_message=(
+                    "This product already has a variant with this name, colour "
+                    "and size."
+                ),
+            )
+        ]
 
     def __str__(self):
         product_name = self.product.name
@@ -416,27 +524,34 @@ class ProductVariant(Orderable):
 
     variant_full_name.short_description = "Variant name"
 
+    @property
+    def base_price(self):
+        """
+        The variant's price before any sale discount: its own price, or the
+        product's price if the variant doesn't have one
+        """
+        return self.price if self.price is not None else self.product.price
+
+    base_price.fget.short_description = "Price"
+
     def get_price(self, request):
-        return self.price
+        return self.base_price
 
     def name_and_price(self):
         discounted_price = self.get_discounted_price()
         if discounted_price:
-            price_str = f"£{discounted_price} (was £{self.price})" 
+            price_str = f"£{discounted_price} (was £{self.base_price})"
         else:
-            price_str = f"£{self.price}"
+            price_str = f"£{self.base_price}"
         if self.variant_full_name():
             return f"{self.variant_full_name()} - {price_str}"
         return (f"{price_str}")
 
     def category_link(self):
-        return mark_safe(
-            f"<a href={reverse('wagtailadmin_pages:edit', args=(self.product.category_page.id,))}>{self.product.category_page.title}</a>"
-        )
+        return self.product.category_link()
 
     category_link.short_description = "Category"
     category_link.admin_order_field = "product__category_page__title"
-    category_link.short_description = "Category"
 
     def get_sale_item(self):
         """
@@ -465,14 +580,14 @@ class ProductVariant(Orderable):
         nearest penny. Used for both the displayed sale price and the basket discount,
         so the basket always charges quantity x the displayed price.
         """
-        return (self.price * Decimal(sale_item.discount) / 100).quantize(
+        return (self.base_price * Decimal(sale_item.discount) / 100).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
 
     def get_discounted_price(self):
         sale_item = self.get_sale_item()
         if sale_item:
-            return self.price - self.get_discount_amount(sale_item)
+            return self.base_price - self.get_discount_amount(sale_item)
 
     @property
     def code(self):
@@ -501,7 +616,7 @@ class ShopPage(Page):
     subpage_types = ["home.FormPage", "home.StandardPage", "CategoryPage"]
 
     def categories(self):
-        return CategoryPage.objects.live().order_by("index")
+        return CategoryPage.objects.child_of(self).live().order_by("index")
 
     def children(self):
         return self.categories()
@@ -640,16 +755,15 @@ class Sale(ClusterableModel):
         return f"{self.name} ({self.start_date.strftime('%d%b%y')} - {self.end_date.strftime('%d%b%y')})"
 
     def clean(self):
-        if not self.id:
-            within_these_dates = Sale.objects.exclude(
-                end_date__lt=self.start_date
-            ).exclude(start_date__gt=self.end_date)
-            if within_these_dates.exists():
-                existing = within_these_dates.first()
-                raise (
-                    ValidationError(
-                        f"A sale already exists for some of these dates ({existing})"
-                    )
+        if self.start_date and self.end_date:
+            # A sale is current from its start date up to (but not including) its
+            # end date, so one sale can start when another ends
+            overlapping = Sale.objects.filter(
+                start_date__lt=self.end_date, end_date__gt=self.start_date
+            ).exclude(pk=self.pk)
+            if overlapping.exists():
+                raise ValidationError(
+                    f"A sale already exists for some of these dates ({overlapping.first()})"
                 )
         return super().clean()
 

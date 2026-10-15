@@ -94,7 +94,7 @@ def _item_unavailable_html(request, product_id):
         f"{ITEM_UNAVAILABLE_MESSAGE}</div>"
     )
     product = Product.objects.filter(id=product_id, live=True).first()
-    if product is not None and product.live_variants.filter(stock__gt=0).exists():
+    if product is not None and not product.out_of_stock():
         variant_html = render_to_string(
             "shop/includes/select_variant_field.html", {"product": product}, request
         )

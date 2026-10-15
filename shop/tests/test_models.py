@@ -1,16 +1,22 @@
+import json
 from datetime import datetime, timedelta
 from datetime import timezone as datetime_tz
+from decimal import Decimal
+
 import pytest
 from model_bakery import baker
 
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
+from django.template.loader import render_to_string
 from django.utils import timezone
 from django.urls import reverse
+from wagtail.admin.panels import get_edit_handler
 
 from salesman.core.utils import get_salesman_model
 
-from .factories import CategoryPageFactory
-from ..models import Sale, SaleCategory, SaleProduct
+from .factories import CategoryPageFactory, ShopPageFactory
+from ..models import CategoryPage, Product, Sale, SaleCategory, SaleProduct
 
 pytestmark = pytest.mark.django_db
 
@@ -83,7 +89,7 @@ def test_product_variant_str(
     product, variant_name, colour, size, expected_str, expected_name_and_price
 ):
     variant = baker.make(
-        "shop.ProductVariant", product=product, variant_name=variant_name, price=10
+        "shop.ProductVariant", product=product, variant_name=variant_name or "", price=10
     )
     if colour:
         variant.colour = colour
@@ -112,7 +118,7 @@ def test_product_variant_str_with_sale(
 ):  
     freezer.move_to("2022-01-01 09:00")
     variant = baker.make(
-        "shop.ProductVariant", product=product, variant_name=variant_name, price=10
+        "shop.ProductVariant", product=product, variant_name=variant_name or "", price=10
     )
     if colour:
         variant.colour = colour
@@ -426,3 +432,213 @@ def test_basket_merge_empty_basket_does_not_set_timeout(basket):
     user_basket.refresh_from_db()
     assert user_basket.timeout is None
 
+
+# Out of stock
+
+
+def test_product_out_of_stock_ignores_variants_not_live(product):
+    # Live variants have no stock; a variant that isn't live has stock but
+    # can't be added to the basket
+    baker.make("shop.ProductVariant", product=product, variant_name="S", stock=0)
+    baker.make("shop.ProductVariant", product=product, variant_name="M", stock=0)
+    hidden = baker.make(
+        "shop.ProductVariant", product=product, variant_name="L", stock=5, live=False
+    )
+    assert product.out_of_stock()
+    hidden.live = True
+    hidden.save()
+    assert not product.out_of_stock()
+
+
+def test_product_out_of_stock_negative_stock(product):
+    # Negative stock on one variant doesn't cancel out another's stock
+    baker.make("shop.ProductVariant", product=product, variant_name="S", stock=-2)
+    baker.make("shop.ProductVariant", product=product, variant_name="M", stock=1)
+    assert not product.out_of_stock()
+
+
+def test_product_card_out_of_stock_ignores_variants_not_live(rf, product):
+    baker.make("shop.ProductVariant", product=product, variant_name="S", stock=0)
+    baker.make(
+        "shop.ProductVariant", product=product, variant_name="L", stock=5, live=False
+    )
+    html = render_to_string(
+        "shop/includes/product-listing-card.html", {"product": product}, rf.get("/")
+    )
+    assert "Out of stock" in html
+    assert f"change_quantity_wrapper_{product.id}" not in html
+    assert "Add to basket" not in html
+
+
+# Variant uniqueness
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"variant_name": "Mug"},
+        {"colour": "Green", "size": "M"},
+        # all blank
+        {},
+    ],
+)
+def test_product_variant_unique_per_product(product, fields):
+    baker.make("shop.ProductVariant", product=product, **fields)
+    duplicate = baker.prepare("shop.ProductVariant", product=product, **fields)
+    with pytest.raises(ValidationError, match="already has a variant"):
+        duplicate.full_clean()
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            duplicate.save()
+
+
+def test_product_variant_same_options_on_other_products(product, category_page):
+    other_product = baker.make("shop.Product", category_page=category_page)
+    fields = {"variant_name": "Men's", "colour": "Black", "size": "M"}
+    baker.make("shop.ProductVariant", product=product, **fields)
+    variant = baker.prepare("shop.ProductVariant", product=other_product, **fields)
+    variant.full_clean()
+    variant.save()
+
+
+def test_product_admin_form_rejects_duplicate_variants(product):
+    # Duplicate variants added in the product's admin form (InlinePanel)
+    form_class = get_edit_handler(Product).get_form_class()
+    data = {
+        "category_page": product.category_page.id,
+        "name": "Mug",
+        "price": "10",
+        "description": json.dumps({"blocks": [], "entityMap": {}}),
+        "index": "1",
+        "live": "on",
+        "variants-TOTAL_FORMS": "2",
+        "variants-INITIAL_FORMS": "0",
+        "variants-MIN_NUM_FORMS": "0",
+        "variants-MAX_NUM_FORMS": "1000",
+    }
+    for i in range(2):
+        data.update(
+            {
+                f"variants-{i}-variant_name": "Large",
+                f"variants-{i}-colour": "",
+                f"variants-{i}-size": "",
+                f"variants-{i}-stock": "1",
+                f"variants-{i}-live": "on",
+                f"variants-{i}-ORDER": str(i + 1),
+            }
+        )
+    form = form_class(data, instance=Product(category_page=product.category_page))
+    assert not form.is_valid()
+    errors = form.formsets["variants"].non_form_errors()
+    assert errors == [
+        "Please correct the duplicate data for product, variant_name, colour and size, "
+        "which must be unique."
+    ]
+
+    # the same form with different variants is valid
+    data["variants-1-variant_name"] = "Small"
+    form = form_class(data, instance=Product(category_page=product.category_page))
+    assert form.is_valid(), form.errors
+
+
+def test_product_variants_ordered_by_sort_order(product):
+    second = baker.make("shop.ProductVariant", product=product, variant_name="B", sort_order=2)
+    first = baker.make("shop.ProductVariant", product=product, variant_name="A", sort_order=1)
+    assert list(product.variants.all()) == [first, second]
+
+
+# Default price
+
+
+def test_product_variant_base_price(product):
+    # product price is 12
+    variant = baker.make("shop.ProductVariant", product=product, price=None)
+    assert variant.price is None
+    assert variant.base_price == 12
+    assert variant.get_price(None) == 12
+    assert variant.name_and_price() == "£12"
+
+    # a variant with no price follows changes to the product price
+    product.price = 15
+    product.save()
+    variant.refresh_from_db()
+    assert variant.base_price == 15
+
+    variant.price = 9
+    assert variant.base_price == 9
+
+
+def test_product_variant_base_price_in_basket(product):
+    variant = baker.make("shop.ProductVariant", product=product, price=None, stock=5)
+    basket = baker.make("shop.Basket")
+    basket.add(variant, quantity=2)
+    basket.update(request=None)
+    assert basket.total == 24
+
+
+def test_product_variant_base_price_with_sale(freezer, sale_with_items, product):
+    # product discount is 20%
+    freezer.move_to("2022-01-01 09:00")
+    variant = baker.make("shop.ProductVariant", product=product, price=None)
+    assert variant.get_discounted_price() == Decimal("9.60")
+    assert variant.name_and_price() == "£9.60 (was £12)"
+
+
+# Sale dates
+
+
+def test_edit_sale_without_changing_dates(sale_with_items):
+    # previously, editing a sale found itself as an overlapping sale
+    sale_with_items.name = "New name"
+    sale_with_items.full_clean()
+    sale_with_items.save()
+
+
+def test_edit_sale_to_overlap_another(sale_with_items):
+    other_sale = baker.make(
+        Sale,
+        start_date=datetime(2022, 2, 1, tzinfo=datetime_tz.utc),
+        end_date=datetime(2022, 2, 5, tzinfo=datetime_tz.utc),
+    )
+    other_sale.start_date = datetime(2022, 1, 1, 12, tzinfo=datetime_tz.utc)
+    with pytest.raises(ValidationError, match="A sale already exists"):
+        other_sale.full_clean()
+
+
+def test_sale_can_start_when_another_ends(sale_with_items):
+    # sale_with_items ends at 2022-01-02 00:00
+    sale = baker.make(
+        Sale,
+        start_date=sale_with_items.end_date,
+        end_date=datetime(2022, 1, 5, tzinfo=datetime_tz.utc),
+    )
+    assert sale.id
+
+
+def test_sale_clean_missing_dates():
+    # e.g. invalid dates in the admin form, which reports those errors itself
+    Sale(name="Sale").clean()
+
+
+# Shop and category pages
+
+
+def test_shop_page_categories_only_its_own(shop_page, category_page, home_page):
+    other_shop = ShopPageFactory(parent=home_page, title="Other shop", slug="other")
+    CategoryPageFactory(parent=other_shop, title="Other category")
+    assert list(shop_page.categories()) == [category_page]
+
+
+def test_category_page_cannot_have_category_children(category_page):
+    assert not CategoryPage.can_create_at(category_page)
+
+
+def test_category_link_escapes_title(product):
+    product.category_page.title = "Mugs & <cups>"
+    product.category_page.save()
+    link = product.category_link()
+    edit_url = reverse("wagtailadmin_pages:edit", args=(product.category_page.id,))
+    assert f'href="{edit_url}"' in link
+    assert "Mugs &amp; &lt;cups&gt;" in link
+    variant = baker.make("shop.ProductVariant", product=product)
+    assert variant.category_link() == link
