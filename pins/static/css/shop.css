@@ -234,3 +234,25 @@
 .text-strikethrough {
   text-decoration: line-through;
 }
+
+
+/* #payment in progress ---- Buttons ---- */
+/* The site's a.btn styles make link buttons larger than form buttons;
+   give the link and form buttons the same (bootstrap) size */
+.shop-payment-actions .btn {
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.5;
+  padding: 0.375rem 0.75rem;
+}
+
+.shop-payment-actions a.btn {
+  background-color: var(--bs-btn-bg);
+  color: var(--bs-btn-color);
+}
+
+.shop-payment-actions a.btn:hover {
+  background-color: var(--bs-btn-hover-bg);
+  color: var(--bs-btn-hover-color);
+}
