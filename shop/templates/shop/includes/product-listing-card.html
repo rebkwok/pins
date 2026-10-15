@@ -56,7 +56,7 @@
                 hx-trigger="click"
                 hx-target="#id_quantity_wrapper_{{ product.id }}"
                 hx-get="{% url 'shop:decrease_quantity' product.id %}"
-                hx-include="[id='id_quantity_{{ product.id }}'],[name='product_id']" 
+                hx-include="[id='id_quantity_{{ product.id }}'],[id='id_product_{{ product.id }}']" 
             >-</span>
         </div>
         <span id="id_quantity_wrapper_{{ product.id }}">
@@ -68,7 +68,7 @@
                 hx-trigger="click"
                 hx-target="#id_quantity_wrapper_{{ product.id }}"
                 hx-get="{% url 'shop:increase_quantity' product.id %}"
-                hx-include="[id='id_quantity_{{ product.id }}'],[name='product_id']"  
+                hx-include="[id='id_quantity_{{ product.id }}'],[id='id_product_{{ product.id }}']"  
             >+</span>
         </div>
         <div class="input-group">

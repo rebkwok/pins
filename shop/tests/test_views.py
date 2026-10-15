@@ -501,9 +501,13 @@ def test_update_quantity_with_error(rf, basket):
     request.session = {"BASKET_ID": basket.id}
 
     with mock.patch("shop.views.BasketViewSet.as_view") as mock_basket_as_view:
-        mock_basket_as_view.return_value = mock_as_view_resp(
-            status_code=400, data={"quantity": 4, "product_id": variant_id}
-        )
+        # the basket item is found, but updating it fails
+        mock_basket_as_view.side_effect = [
+            mock_as_view_resp(
+                status_code=200, data={"quantity": 4, "product_id": variant_id}
+            ),
+            mock_as_view_resp(status_code=400, data={}),
+        ]
         resp = update_quantity(request, basket_item.ref)
 
     # refresh_from_db isn't enough to get the update basket here
@@ -698,7 +702,15 @@ def test_post_checkout_view_invalid_form(rf, basket):
 
 
 @mock.patch("shop.views.CheckoutViewSet.as_view")
-def test_post_checkout_view_non_stripe_payment_method(mock_checkout, rf, basket):
+@mock.patch("shop.views.payment_methods_pool.get_payments")
+def test_post_checkout_view_non_stripe_payment_method(
+    mock_get_payments, mock_checkout, rf, basket
+):
+    # pay-in-advance isn't currently enabled in settings
+    mock_get_payments.return_value = [
+        mock.Mock(identifier="stripe"),
+        mock.Mock(identifier="pay-in-advance"),
+    ]
     mock_checkout.return_value = mock_as_view_resp(
         status_code=201, data={"url": "https://test-checkout?token=foo"}
     )
@@ -788,7 +800,14 @@ def test_new_order_status_view(rf, order):
     assert "Thank you for your order!" in resp.rendered_content
 
 
+def set_session_basket(client, basket):
+    session = client.session
+    session["BASKET_ID"] = basket.id
+    session.save()
+
+
 def test_basket_timeout_view(client, basket, freezer):
+    set_session_basket(client, basket)
     url = reverse("shop:basket_timeout", args=(basket.id,))
     headers = {"hx-request": True}
     # Set current time
@@ -831,6 +850,7 @@ def test_basket_timeout_view_no_timeout(client, basket, freezer, settings):
     settings.BASKET_TIMEOUT_MINUTES = 30
     freezer.move_to(datetime(2023, 10, 1, 12, 0, tzinfo=timezone.utc))
     Basket.objects.filter(id=basket.id).update(timeout=None)
+    set_session_basket(client, basket)
     url = reverse("shop:basket_timeout", args=(basket.id,))
     resp = client.get(url, headers={"hx-request": True})
     assert resp.content.decode() == "30m 0s"

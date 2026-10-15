@@ -2,17 +2,19 @@ from urllib.parse import parse_qsl, urlparse
 import logging
 
 from django.contrib import messages
+from django.core.exceptions import BadRequest
 from django.db import transaction
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import render, get_object_or_404
 from django.template.response import TemplateResponse
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 from django.views.generic import DetailView
 import stripe
 from salesman.basket.views import BasketViewSet
+from salesman.checkout.payment import payment_methods_pool
 from salesman.checkout.views import CheckoutViewSet
 from salesman.core.utils import get_salesman_model
 
@@ -30,6 +32,21 @@ Order = get_salesman_model("Order")
 # HELPER FUNCTIONS
 
 
+def _get_int(data, key, default=None, min_value=None):
+    """
+    Get an integer from request data (GET or POST). Raises BadRequest (400) if
+    it's missing (with no default), not an integer, or less than min_value.
+    """
+    value = data.get(key, default)
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        raise BadRequest(f"Invalid {key}")
+    if min_value is not None and value < min_value:
+        raise BadRequest(f"Invalid {key}")
+    return value
+
+
 def get_basket(request):
     request.method = "GET"
     resp = BasketViewSet.as_view({"get": "list"})(request)
@@ -40,6 +57,52 @@ def get_basket(request):
 
 def get_existing_basket(request):
     return Basket.get_existing(request)
+
+
+ITEM_UNAVAILABLE_MESSAGE = "Sorry, that item is no longer available."
+
+
+def _is_available(variant):
+    """Can this variant be added to the basket from the shop page?"""
+    return variant is not None and variant.live and variant.product.live
+
+
+def _item_unavailable_html(request, product_id):
+    """
+    Out-of-band htmx updates for a product card on the shop page when the selected
+    variant is no longer available (e.g. it was made not live after the page was
+    loaded): show a message below the product, and update the variant options,
+    hiding the quantity and add to basket controls if none are available.
+    """
+    html = (
+        f"<div id='added_{product_id}' class='alert-danger mt-2' hx-swap-oob='true'>"
+        f"{ITEM_UNAVAILABLE_MESSAGE}</div>"
+    )
+    product = Product.objects.filter(id=product_id, live=True).first()
+    if product is not None and product.live_variants.filter(stock__gt=0).exists():
+        variant_html = render_to_string(
+            "shop/includes/select_variant_field.html", {"product": product}, request
+        )
+        html += (
+            f"<div id='id_select_variant_wrapper_{product_id}' hx-swap-oob='true'>"
+            f"{variant_html}</div>"
+        )
+    else:
+        html += (
+            f"<div id='id_select_variant_wrapper_{product_id}' hx-swap-oob='true'></div>"
+            f"<div id='change_quantity_wrapper_{product_id}' hx-swap-oob='true'></div>"
+        )
+    return html
+
+
+def _quantity_unavailable_response(request, product_id):
+    """Response to the shop page +/- buttons when the item is no longer available"""
+    quantity_html = render_to_string(
+        "shop/includes/quantity_field.html",
+        {"product_id": product_id, "value": 1},
+        request,
+    )
+    return HttpResponse(quantity_html + _item_unavailable_html(request, product_id))
 
 
 def _payment_in_progress(request):
@@ -126,7 +189,7 @@ def _can_increase_quantity(request, variant, value, in_basket=False):
 
 
 class ProductDetailView(DetailView):
-    model = Product
+    queryset = Product.objects.filter(live=True)
     template_name = "shop/shop_product_page.html"
     context_object_name = "product"
 
@@ -136,22 +199,40 @@ class ProductDetailView(DetailView):
         return context_data
 
 
+@require_GET
 def decrease_quantity(request, product_id):
-    value = int(request.GET.get("quantity", 1))
+    # product_id in the URL is the PRODUCT
+    # product_id in GET is the variant
+    variant_id = _get_int(request.GET, "product_id")
+    value = _get_int(request.GET, "quantity", default=1, min_value=1)
+    in_basket = request.GET.get("ref") == "basket"
+    # Items that are already in the basket can still be changed if they're no
+    # longer live, but they can't be added from the shop page
+    if not in_basket and not _is_available(
+        ProductVariant.objects.filter(id=variant_id).first()
+    ):
+        return _quantity_unavailable_response(request, product_id)
     if value > 1:
         value -= 1
     return _change_quantity(request, product_id, value)
 
 
+@require_GET
 def increase_quantity(request, product_id):
     # product_id in the URL is the PRODUCT
     # product_id in GET is the variant
     # We need to increase the variant; the +/- buttons on the shop page refer to product
-    variant_id = int(request.GET.get("product_id"))
-    variant = ProductVariant.objects.get(id=int(variant_id))
+    variant_id = _get_int(request.GET, "product_id")
+    variant = ProductVariant.objects.filter(id=variant_id).first()
     # value represents the CURRENT value of the quantity field (pre-increase)
-    value = int(request.GET.get("quantity", 1))
+    value = _get_int(request.GET, "quantity", default=1, min_value=1)
     in_basket = request.GET.get("ref") == "basket"
+    # Items that are already in the basket can still be changed if they're no
+    # longer live, but they can't be added from the shop page
+    if not in_basket and not _is_available(variant):
+        return _quantity_unavailable_response(request, product_id)
+    if variant is None:
+        raise Http404
     # We click on this button to increase the quantity from its current value
     # check that we can increase to this value plus 1
     can_increase = _can_increase_quantity(request, variant, value + 1, in_basket)
@@ -179,9 +260,12 @@ def _change_quantity(request, product_id, new_value, can_increase=True):
     return resp
 
 
+@require_POST
 def add_to_basket(request, product_id):
     # product_id in the URL is the PRODUCT
     # product_id in POST is the variant
+    variant_id = _get_int(request.POST, "product_id")
+    quantity = _get_int(request.POST, "quantity", min_value=1)
     if _payment_in_progress(request):
         resp_str = f"<div>{_basket_icon_html(request, get_existing_basket_quantity(request))}</div>"
         resp_str += (
@@ -193,14 +277,19 @@ def add_to_basket(request, product_id):
     with transaction.atomic():
         # Lock the variant until the item has been added, so that concurrent
         # requests can't both reserve the last items in stock
-        variant = ProductVariant.objects.select_for_update().get(
-            id=request.POST.get("product_id")
+        variant = (
+            ProductVariant.objects.select_for_update()
+            .filter(id=variant_id, live=True, product__live=True)
+            .first()
         )
+        if variant is None:
+            resp_str = f"<div>{_basket_icon_html(request, get_existing_basket_quantity(request))}</div>"
+            return HttpResponse(resp_str + _item_unavailable_html(request, product_id))
         # add_to_basket is called from the shop page, not the basket page; we're
         # adding this entire quantity to the basket, but we're not incrementing
         # it, so just check we can add the current quantity
         can_increase = _can_increase_quantity(
-            request, variant, int(request.POST.get("quantity")), in_basket=False
+            request, variant, quantity, in_basket=False
         )
         if can_increase:
             resp = BasketViewSet.as_view({"post": "create"})(request)
@@ -257,15 +346,19 @@ def add_to_basket(request, product_id):
     return HttpResponse(resp_str)
 
 
+@require_POST
 def update_quantity(request, ref):
     # Called from basket
     # Here product ID is the variant ID
-    product_id = int(request.POST.get("product_id"))
+    product_id = _get_int(request.POST, "product_id")
+    new_quantity = _get_int(request.POST, "quantity", min_value=1)
     if _payment_in_progress(request):
         return _payment_in_progress_item_response(product_id)
-    new_quantity = int(request.POST.get("quantity"))
     request.method = "GET"
     current_item_resp = BasketViewSet.as_view({"get": "retrieve"})(request, ref=ref)
+    if current_item_resp.status_code != 200:
+        # no item with this ref in the basket
+        raise Http404
     current_quantity = current_item_resp.data["quantity"]
 
     if current_quantity == new_quantity:
@@ -317,16 +410,17 @@ def update_quantity(request, ref):
     return HttpResponse(result_html)
 
 
+@require_POST
 def delete_basket_item(request, ref):
     # This is the product variant ID
-    product_id = int(request.POST.get("product_id"))
+    product_id = _get_int(request.POST, "product_id")
     if _payment_in_progress(request):
         return _payment_in_progress_item_response(product_id)
 
     request.method = "DELETE"
     # The serialised basket identifies products (NOT variants) with their idenitifier, not id
     # Find the relevant product idenitifier
-    product_identifier = ProductVariant.objects.get(id=product_id).product.identifier
+    product_identifier = get_object_or_404(ProductVariant, id=product_id).product.identifier
     # Delete the item
     resp = BasketViewSet.as_view({"delete": "destroy"})(request, ref=ref)
 
@@ -384,6 +478,7 @@ def _payment_in_progress_item_response(product_id):
     )
 
 
+@require_GET
 def basket_view(request):
     existing_basket = get_existing_basket(request)
     if existing_basket is not None and existing_basket.payment_in_progress:
@@ -443,11 +538,22 @@ def cancel_payment(request):
     return HttpResponseRedirect(reverse("shop:basket"))
 
 
+@require_http_methods(["GET", "POST"])
 def checkout_view(request):
     if _payment_in_progress(request):
         return HttpResponseRedirect(reverse("shop:basket"))
-    payment_method = request.GET["payment-method"]
-    shipping_method = request.GET["shipping-method"]
+    payment_method = request.GET.get("payment-method")
+    shipping_method = request.GET.get("shipping-method")
+    valid_payment_methods = {
+        method.identifier
+        for method in payment_methods_pool.get_payments("basket", request)
+    }
+    if (
+        payment_method not in valid_payment_methods
+        or shipping_method not in SHIPPING_METHODS
+    ):
+        messages.error(request, "Please select a shipping and payment method.")
+        return HttpResponseRedirect(reverse("shop:basket"))
     context = {"payment_method": payment_method, "shipping_method": shipping_method}
 
     if request.method == "POST":
@@ -485,10 +591,12 @@ def checkout_view(request):
     return TemplateResponse(request, "shop/checkout.html", context)
 
 
+@require_GET
 def new_order_view(request, token):
     return _order_status(request, token, new=True)
 
 
+@require_GET
 def order_status_view(request, token):
     return _order_status(request, token)
 
@@ -506,8 +614,12 @@ def _order_status(request, token, new=False):
     return TemplateResponse(request, "shop/order_status.html", context)
 
 
+@require_GET
 def basket_timeout(request, basket_id):
-    basket = get_object_or_404(Basket, id=basket_id)
+    # Only the visitor's own basket
+    basket = get_existing_basket(request)
+    if basket is None or basket.id != basket_id:
+        raise Http404
     if basket.items.exists():
         if basket.timeout is None:
             # Shouldn't happen, as the timeout is set whenever items are added,
