@@ -99,37 +99,56 @@ class PayByStripe(StripePayment):
     @classmethod
     def handle_webhook_session_completed(cls, request, session):
         """
-        Fulfil the order after a successful checkout session.
+        Replaces salesman_stripe's handler with fulfil_session, which is also
+        called from the success view.
+        Unrecoverable problems (missing basket or order) are logged and return
+        200, so Stripe doesn't keep retrying.
+        """
+        _, message = cls.fulfil_session(request, session)
+        return HttpResponse(message)
 
-        Replaces salesman_stripe's handler so that:
-        - duplicate events (Stripe can send an event more than once) don't
-          create a second payment
-        - unrecoverable problems (missing basket or order) are logged and return
-          200, so Stripe doesn't keep retrying
-        - a payment for an empty basket (e.g. items expired) or a payment amount
-          that doesn't match the order total is recorded on the order, so the
-          shop can resolve it
+    @classmethod
+    def fulfil_session(cls, request, session):
+        """
+        Create and pay the order for a completed checkout session.
+
+        Called from both the webhook and the success view, so it's safe to call
+        more than once, including concurrently: the order records the Stripe
+        session id, and whichever call comes first creates the order and
+        payment; later calls return the existing order.
+
+        A payment for an empty basket (e.g. items expired) or a payment amount
+        that doesn't match the order total is recorded on the order, so the
+        shop can resolve it.
+
+        Returns (order, message); order is None if it couldn't be fulfilled.
         """
         kind, id = cls.parse_reference(session.client_reference_id)
         if kind is None:
             logger.error("Invalid Stripe session reference: %s", session.id)
-            return HttpResponse("Invalid session reference")
+            return None, "Invalid session reference"
 
         with transaction.atomic():
-            # Lock the basket so that concurrent deliveries of the same event
-            # are processed one at a time
-            basket = (
-                Basket.objects.select_for_update().filter(id=id).first()
-                if kind == "basket"
-                else None
-            )
-            if OrderPayment.objects.filter(
-                transaction_id=session.payment_intent
-            ).exists():
-                logger.info(
-                    "Stripe payment %s already processed", session.payment_intent
+            # Lock the basket or order so that concurrent calls for the same
+            # session are processed one at a time
+            if kind == "basket":
+                basket = Basket.objects.select_for_update().filter(id=id).first()
+            else:
+                order = Order.objects.select_for_update().filter(id=id).first()
+
+            existing_order = Order.objects.filter(
+                _extra__stripe_session_id=session.id
+            ).first()
+            if existing_order is None:
+                payment = (
+                    OrderPayment.objects.filter(transaction_id=session.payment_intent)
+                    .select_related("order")
+                    .first()
                 )
-                return HttpResponse("Order already fulfilled")
+                existing_order = payment.order if payment else None
+            if existing_order is not None:
+                logger.info("Stripe session %s already fulfilled", session.id)
+                return existing_order, "Order already fulfilled"
 
             if kind == "basket":
                 if basket is None:
@@ -138,8 +157,10 @@ class PayByStripe(StripePayment):
                         session.payment_intent,
                         id,
                     )
-                    return HttpResponse("Missing basket")
+                    return None, "Missing basket"
                 basket_was_empty = not basket.items.exists()
+                # basket.extra is copied to order.extra
+                basket.extra["stripe_session_id"] = session.id
                 order = Order.objects.create_from_basket(
                     basket, request, status=stripe_settings.SALESMAN_STRIPE_PAID_STATUS
                 )
@@ -152,14 +173,15 @@ class PayByStripe(StripePayment):
                         "if necessary.",
                     )
             else:
-                order = Order.objects.filter(id=id).first()
                 if order is None:
                     logger.error(
                         "Stripe payment %s received for missing order %s",
                         session.payment_intent,
                         id,
                     )
-                    return HttpResponse("Missing order")
+                    return None, "Missing order"
+                order.extra["stripe_session_id"] = session.id
+                order.save()
 
             amount = Decimal(session.amount_total) / 100
             if amount != order.total:
@@ -175,7 +197,7 @@ class PayByStripe(StripePayment):
             )
 
         logger.info("Order fulfilled: %s", order.ref)
-        return HttpResponse("Order fulfilled")
+        return order, "Order fulfilled"
 
     @classmethod
     def _flag_order(cls, order, message):
@@ -193,12 +215,34 @@ class PayByStripe(StripePayment):
     @classmethod
     def success_view(cls, request):
         """
-        Handle successfull payment on Stripe.
+        Handle successful payment on Stripe.
+        Fulfil the order here as well as in the webhook, so the customer sees
+        their order (and an empty basket) without waiting for the webhook.
+        If anything goes wrong, the webhook will still fulfil the order.
         """
+        context = {"hide_basket": True}
         checkout_session_id = request.GET.get("session_id")
-        session = stripe.checkout.Session.retrieve(checkout_session_id)
-        customer = stripe.Customer.retrieve(session.customer)
-        context = {"email": customer.email, "total": session.amount_total / 100}
+        try:
+            session = (
+                stripe.checkout.Session.retrieve(checkout_session_id)
+                if checkout_session_id
+                else None
+            )
+        except stripe.StripeError:
+            logger.exception("Error retrieving Stripe session %s", checkout_session_id)
+            session = None
+
+        if session is not None:
+            context["email"] = session.customer_details.email
+            context["total"] = Decimal(session.amount_total) / 100
+            if session.payment_status == "paid":
+                try:
+                    context["order"], _ = cls.fulfil_session(request, session)
+                except Exception:
+                    logger.exception(
+                        "Error fulfilling Stripe session %s from success view",
+                        session.id,
+                    )
         return render(request, "shop/stripe_success.html", context)
 
 
