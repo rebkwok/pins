@@ -1,4 +1,5 @@
 from salesman.admin.wagtail.panels import ReadOnlyPanel
+from wagtail.admin.panels import FieldPanel
 from salesman.admin.wagtail_hooks import OrderAdmin as SalesmanOrderAdmin
 from salesman.core.utils import get_salesman_model
 from wagtail.admin.ui.tables import BooleanColumn
@@ -11,6 +12,7 @@ from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
 from .models import (
+    PRODUCT_VARIANT_PANELS,
     CategoryPage,
     Product,
     ProductVariant,
@@ -38,6 +40,7 @@ class ProductViewSet(SnippetViewSet):
 
 class ProductVariantViewSet(SnippetViewSet):
     model = ProductVariant
+    panels = [FieldPanel("product"), *PRODUCT_VARIANT_PANELS]
     list_display = (
         "product",
         "variant_full_name",

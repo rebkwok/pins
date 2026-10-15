@@ -1,0 +1,289 @@
+"""
+Stock edited in the admin is applied as a change from the stock shown when the
+form was loaded, so stock taken or returned by customers' baskets meanwhile
+isn't overwritten.
+"""
+import json
+import re
+
+import pytest
+from model_bakery import baker
+
+from django.urls import reverse
+
+from ..models import ProductVariant
+
+pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture
+def admin_client(client):
+    user = baker.make("auth.User", is_superuser=True, is_staff=True)
+    client.force_login(user)
+    yield client
+
+
+@pytest.fixture
+def variant(product):
+    yield baker.make(
+        "shop.ProductVariant", product=product, variant_name="Small", price=10, stock=10
+    )
+
+
+def stock_shown_in(html, prefix=""):
+    match = re.search(
+        rf'<input type="hidden" name="{prefix}stock_shown" value="(-?\d+)"', html
+    )
+    return int(match.group(1)) if match else None
+
+
+def variant_form_data(variant, stock, stock_shown, **extra):
+    data = {
+        "product": variant.product.id,
+        "variant_name": variant.variant_name,
+        "price": "10.00",
+        "stock": str(stock),
+        "live": "on",
+        "colour": "",
+        "size": "",
+        **extra,
+    }
+    if stock_shown is not None:
+        data["stock_shown"] = str(stock_shown)
+    return data
+
+
+def edit_variant_url(variant):
+    return reverse("wagtailsnippets_shop_productvariant:edit", args=(variant.id,))
+
+
+def take_stock(variant, quantity):
+    # e.g. a customer adds items to their basket
+    basket = baker.make("shop.Basket")
+    basket.add(ProductVariant.objects.get(id=variant.id), quantity=quantity)
+
+
+# Variant snippet form
+
+
+def test_variant_edit_form_shows_stock(admin_client, variant):
+    resp = admin_client.get(edit_variant_url(variant))
+    assert resp.status_code == 200
+    assert stock_shown_in(resp.content.decode()) == 10
+
+
+@pytest.mark.parametrize(
+    "new_stock,expected",
+    [
+        # the admin adds 5 while 2 are added to baskets
+        (15, 13),
+        # the admin removes 4
+        (6, 4),
+        # the admin doesn't change stock: the basket change is kept
+        (10, 8),
+    ],
+)
+def test_variant_edit_applies_stock_change(admin_client, variant, new_stock, expected):
+    take_stock(variant, 2)
+    resp = admin_client.post(
+        edit_variant_url(variant), variant_form_data(variant, new_stock, stock_shown=10)
+    )
+    assert resp.status_code == 302
+    variant.refresh_from_db()
+    assert variant.stock == expected
+
+
+def test_variant_edit_without_stock_shown(admin_client, variant):
+    # If the form didn't send the stock shown, the entered stock is used
+    take_stock(variant, 2)
+    admin_client.post(
+        edit_variant_url(variant), variant_form_data(variant, 15, stock_shown=None)
+    )
+    variant.refresh_from_db()
+    assert variant.stock == 15
+
+
+def test_variant_edit_form_errors_keep_stock_shown(admin_client, variant):
+    # The form is redisplayed with the original stock shown, so saving it again
+    # still applies the admin's change
+    take_stock(variant, 2)
+    resp = admin_client.post(
+        edit_variant_url(variant),
+        variant_form_data(variant, 15, stock_shown=10, price="not a price"),
+    )
+    assert resp.status_code == 200
+    assert stock_shown_in(resp.content.decode()) == 10
+    variant.refresh_from_db()
+    assert variant.stock == 8
+
+
+def test_variant_create(admin_client, product):
+    resp = admin_client.post(
+        reverse("wagtailsnippets_shop_productvariant:add"),
+        {
+            "product": product.id,
+            "variant_name": "Large",
+            "price": "",
+            "stock": "7",
+            "live": "on",
+            "colour": "",
+            "size": "",
+        },
+    )
+    assert resp.status_code == 302
+    assert ProductVariant.objects.get(variant_name="Large").stock == 7
+
+
+# Product form (variants inline)
+
+
+def edit_product_url(product):
+    return reverse("wagtailsnippets_shop_product:edit", args=(product.id,))
+
+
+def product_form_data(product, stock, stock_shown):
+    variant = product.variants.get()
+    return {
+        "category_page": product.category_page.id,
+        "name": product.name,
+        "price": str(product.price),
+        "description": json.dumps({"blocks": [], "entityMap": {}}),
+        "index": str(product.index),
+        "live": "on",
+        "variants-TOTAL_FORMS": "1",
+        "variants-INITIAL_FORMS": "1",
+        "variants-MIN_NUM_FORMS": "0",
+        "variants-MAX_NUM_FORMS": "1000",
+        "variants-0-id": str(variant.id),
+        "variants-0-variant_name": variant.variant_name,
+        "variants-0-price": "10.00",
+        "variants-0-stock": str(stock),
+        "variants-0-stock_shown": str(stock_shown),
+        "variants-0-live": "on",
+        "variants-0-colour": "",
+        "variants-0-size": "",
+        "variants-0-ORDER": "1",
+    }
+
+
+def test_product_edit_form_shows_variant_stock(admin_client, variant):
+    resp = admin_client.get(edit_product_url(variant.product))
+    assert resp.status_code == 200
+    assert stock_shown_in(resp.content.decode(), prefix="variants-0-") == 10
+
+
+@pytest.mark.parametrize("new_stock,expected", [(15, 13), (10, 8)])
+def test_product_edit_applies_variant_stock_change(
+    admin_client, variant, new_stock, expected
+):
+    take_stock(variant, 2)
+    resp = admin_client.post(
+        edit_product_url(variant.product),
+        product_form_data(variant.product, new_stock, stock_shown=10),
+    )
+    assert resp.status_code == 302
+    variant.refresh_from_db()
+    assert variant.stock == expected
+
+
+# Negative stock
+
+
+def test_variant_edit_negative_stock(admin_client, variant):
+    resp = admin_client.post(
+        edit_variant_url(variant), variant_form_data(variant, -3, stock_shown=10)
+    )
+    assert resp.status_code == 200
+    assert "Stock can&#x27;t be negative." in resp.content.decode()
+    variant.refresh_from_db()
+    assert variant.stock == 10
+
+
+def test_variant_edit_reduce_to_zero(admin_client, variant):
+    resp = admin_client.post(
+        edit_variant_url(variant), variant_form_data(variant, 0, stock_shown=10)
+    )
+    assert resp.status_code == 302
+    variant.refresh_from_db()
+    assert variant.stock == 0
+
+
+def test_variant_edit_reduction_would_be_negative_after_basket_changes(
+    admin_client, variant
+):
+    # The admin enters 0, but 2 have been added to baskets since the page was
+    # loaded, so the change (-10) would take stock to -2
+    take_stock(variant, 2)
+    resp = admin_client.post(
+        edit_variant_url(variant), variant_form_data(variant, 0, stock_shown=10)
+    )
+    assert resp.status_code == 200
+    assert (
+        "Stock can&#x27;t be negative. It has changed from 10 to 8 since this page "
+        "was loaded, because of items added to or removed from customers&#x27; "
+        "baskets, so the lowest you can enter is 2."
+    ) in resp.content.decode()
+    variant.refresh_from_db()
+    assert variant.stock == 8
+
+    # entering the lowest allowed value sets stock to 0
+    resp = admin_client.post(
+        edit_variant_url(variant), variant_form_data(variant, 2, stock_shown=10)
+    )
+    assert resp.status_code == 302
+    variant.refresh_from_db()
+    assert variant.stock == 0
+
+
+def test_variant_edit_unchanged_negative_stock(admin_client, variant):
+    # Stock that's already negative doesn't stop other fields being changed
+    ProductVariant.objects.filter(id=variant.id).update(stock=-1)
+    resp = admin_client.post(
+        edit_variant_url(variant),
+        variant_form_data(variant, -1, stock_shown=-1, variant_name="Medium"),
+    )
+    assert resp.status_code == 302
+    variant.refresh_from_db()
+    assert variant.variant_name == "Medium"
+    assert variant.stock == -1
+
+
+@pytest.mark.parametrize("stock_shown", [None, ""])
+def test_variant_negative_stock_without_stock_shown(admin_client, variant, stock_shown):
+    data = variant_form_data(variant, -1, stock_shown=None)
+    if stock_shown is not None:
+        data["stock_shown"] = stock_shown
+    resp = admin_client.post(edit_variant_url(variant), data)
+    assert resp.status_code == 200
+    variant.refresh_from_db()
+    assert variant.stock == 10
+
+
+def test_variant_create_negative_stock(admin_client, product):
+    resp = admin_client.post(
+        reverse("wagtailsnippets_shop_productvariant:add"),
+        {
+            "product": product.id,
+            "variant_name": "Large",
+            "price": "",
+            "stock": "-1",
+            "live": "on",
+            "colour": "",
+            "size": "",
+        },
+    )
+    assert resp.status_code == 200
+    assert not ProductVariant.objects.filter(variant_name="Large").exists()
+
+
+def test_product_edit_variant_negative_stock(admin_client, variant):
+    take_stock(variant, 2)
+    resp = admin_client.post(
+        edit_product_url(variant.product),
+        product_form_data(variant.product, 0, stock_shown=10),
+    )
+    assert resp.status_code == 200
+    assert "the lowest you can enter is 2" in resp.content.decode()
+    variant.refresh_from_db()
+    assert variant.stock == 8
+

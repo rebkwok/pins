@@ -2,6 +2,7 @@ from datetime import timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 import logging
+from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator
@@ -22,6 +23,7 @@ from salesman.orders.models import (
 from modelcluster.models import ClusterableModel, ParentalKey
 from wagtail.admin.forms import WagtailAdminModelForm
 from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, MultiFieldPanel
+from wagtail.admin.panels.base import get_form_for_model
 from wagtail.contrib.forms.models import validate_to_address
 from wagtail.contrib.settings.models import (
     BaseGenericSetting,
@@ -312,6 +314,120 @@ def protected_variants_message(variants):
     return " ".join(sentences)
 
 
+class ProductVariantAdminForm(WagtailAdminModelForm):
+    """
+    Admin form for product variants, on their own and in the product form.
+
+    Stock is changed relative to the stock shown when the form was loaded, so
+    that stock taken or returned by customers' baskets while the form is being
+    edited isn't overwritten. E.g. if the form showed 10 and is saved with 15,
+    but 2 have been added to baskets meanwhile (so stock is 8), stock becomes 13.
+    """
+
+    # The stock when the form was loaded (a submitted field, so it's kept if the
+    # form is redisplayed with errors)
+    stock_shown = forms.IntegerField(required=False, widget=forms.HiddenInput)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk is not None:
+            self.fields["stock_shown"].initial = self.instance.stock
+
+    def clean(self):
+        cleaned_data = super().clean()
+        stock = cleaned_data.get("stock")
+        stock_shown = cleaned_data.get("stock_shown")
+        if stock is None:
+            return cleaned_data
+        if self.instance.pk is None or stock_shown is None:
+            if stock < 0:
+                self.add_error("stock", "Stock can't be negative.")
+            return cleaned_data
+
+        change = stock - stock_shown
+        if change == 0:
+            # Stock isn't changed (even if it's already negative)
+            return cleaned_data
+        current_stock = (
+            ProductVariant.objects.filter(pk=self.instance.pk)
+            .values_list("stock", flat=True)
+            .first()
+        )
+        if current_stock is not None and current_stock + change < 0:
+            message = "Stock can't be negative."
+            if current_stock != stock_shown:
+                message += (
+                    f" It has changed from {stock_shown} to {current_stock} since this "
+                    "page was loaded, because of items added to or removed from "
+                    f"customers' baskets, so the lowest you can enter is "
+                    f"{stock_shown - current_stock}."
+                )
+            self.add_error("stock", message)
+        return cleaned_data
+
+    def save(self, commit=True):
+        stock_shown = self.cleaned_data.get("stock_shown")
+        if self.instance.pk is not None and stock_shown is not None:
+            change = self.cleaned_data["stock"] - stock_shown
+            # Saving with an F expression adds the change to the stock in the
+            # database (UPDATE ... SET stock = stock + change)
+            self.instance.stock = models.F("stock") + change
+        instance = super().save(commit=commit)
+        if commit and isinstance(instance.stock, models.expressions.Combinable):
+            instance.refresh_from_db(fields=["stock"])
+        return instance
+
+
+class StockFieldPanel(FieldPanel):
+    """
+    Panel for a variant's stock, which includes ProductVariantAdminForm's hidden
+    stock_shown field (rendered with the stock field, rather than as its own
+    empty panel)
+    """
+
+    def get_form_options(self):
+        options = super().get_form_options()
+        options["fields"] = [*options.get("fields", []), "stock_shown"]
+        return options
+
+    class BoundPanel(FieldPanel.BoundPanel):
+        def render_html(self, parent_context=None):
+            return format_html(
+                "{}{}", super().render_html(parent_context), self.form["stock_shown"]
+            )
+
+
+PRODUCT_VARIANT_PANELS = [
+    FieldPanel("variant_name"),
+    FieldPanel("image"),
+    FieldPanel("price"),
+    StockFieldPanel("stock"),
+    FieldPanel("live"),
+    FieldPanel("colour"),
+    FieldPanel("size"),
+]
+
+
+class ProductVariantsInlinePanel(InlinePanel):
+    """
+    InlinePanel for a product's variants, using ProductVariantAdminForm for each
+    variant. (InlinePanel builds the child forms from WagtailAdminModelForm,
+    ignoring the child model's base_form_class.)
+    """
+
+    def get_form_options(self):
+        options = super().get_form_options()
+        child_form_options = self.child_edit_handler.get_form_options()
+        options["formsets"][self.relation_name]["form"] = get_form_for_model(
+            self.db_field.related_model,
+            form_class=ProductVariantAdminForm,
+            defer_required_on_fields=child_form_options.get(
+                "defer_required_on_fields", []
+            ),
+        )
+        return options
+
+
 class ProductAdminForm(WagtailAdminModelForm):
     def clean(self):
         cleaned_data = super().clean()
@@ -380,8 +496,9 @@ class Product(ClusterableModel):
         FieldPanel("description"),
         FieldPanel("index"),
         FieldPanel("live"),
-        InlinePanel(
+        ProductVariantsInlinePanel(
             "variants",
+            panels=PRODUCT_VARIANT_PANELS,
             heading="Product variants",
             label="Variant",
             help_text=mark_safe(
@@ -449,6 +566,8 @@ class Product(ClusterableModel):
 
 
 class ProductVariant(Orderable):
+    base_form_class = ProductVariantAdminForm
+
     product = ParentalKey(Product, on_delete=models.CASCADE, related_name="variants")
     variant_name = models.CharField(
         blank=True,
@@ -478,7 +597,12 @@ class ProductVariant(Orderable):
         ),
     )
     stock = models.IntegerField(
-        default=1, help_text="Quantity of this item currently in stock"
+        default=1,
+        help_text=(
+            "Quantity of this item currently in stock, not including items in "
+            "customers' baskets. Your change is added to the current stock when you "
+            "save, so items added to or removed from baskets meanwhile aren't lost."
+        ),
     )
     live = models.BooleanField(
         default=True, help_text="Display this product variant in the shop"
