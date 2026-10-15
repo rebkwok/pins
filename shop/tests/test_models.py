@@ -233,8 +233,8 @@ def test_basket_timeout(basket, freezer):
     Basket.clear_expired()
     assert basket.items.exists()
 
-    # move time to more than 15 mins in future
-    freezer.move_to(timezone.now() + timedelta(minutes=20))
+    # move time to more than 30 mins in future
+    freezer.move_to(timezone.now() + timedelta(minutes=35))
     Basket.clear_expired()
     assert not basket.items.exists()
 
@@ -398,7 +398,7 @@ def test_basket_merge_sets_timeout(freezer, settings, basket, user_basket_timeou
     # A user basket that is new (no timeout) or has been cleared by
     # clear_expired (timeout reset to None) has items merged in
     freezer.move_to("2024-01-01 10:00")
-    settings.BASKET_TIMEOUT_MINUTES = 15
+    settings.BASKET_TIMEOUT_MINUTES = 30
     user_basket = baker.make("shop.Basket", user=baker.make("auth.User"))
     if user_basket_timeout == "cleared":
         user_basket.add(basket.items.first().product, quantity=1)
@@ -411,10 +411,10 @@ def test_basket_merge_sets_timeout(freezer, settings, basket, user_basket_timeou
     user_basket.merge(basket)
     user_basket.refresh_from_db()
     assert user_basket.quantity == 2
-    assert user_basket.timeout == datetime(2024, 1, 1, 10, 15, tzinfo=datetime_tz.utc)
+    assert user_basket.timeout == datetime(2024, 1, 1, 10, 30, tzinfo=datetime_tz.utc)
 
     # merged items expire
-    freezer.move_to("2024-01-01 10:16")
+    freezer.move_to("2024-01-01 10:31")
     assert Basket.clear_expired() == 1
     assert not user_basket.items.exists()
 

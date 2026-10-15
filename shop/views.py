@@ -9,15 +9,16 @@ from django.template.response import TemplateResponse
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 from django.views.generic import DetailView
-from salesman.basket.models import BASKET_ID_SESSION_KEY
+import stripe
 from salesman.basket.views import BasketViewSet
 from salesman.checkout.views import CheckoutViewSet
 from salesman.core.utils import get_salesman_model
 
 from .forms import CheckoutForm
 from .models import ProductVariant, Product, SHIPPING_METHODS
-from .payment import PAYMENT_METHOD_DESCRIPTIONS
+from .payment import PAYMENT_METHOD_DESCRIPTIONS, PayByStripe
 
 
 logger = logging.getLogger(__name__)
@@ -38,25 +39,17 @@ def get_basket(request):
 
 
 def get_existing_basket(request):
-    """
-    Return the basket for this request, or None if there isn't one yet.
-    Unlike salesman's Basket.objects.get_or_create_from_request, this doesn't
-    create a basket (or a session) for visitors who haven't added anything to
-    their basket.
-    """
-    user = getattr(request, "user", None)
-    session = getattr(request, "session", None)
-    basket_id = session.get(BASKET_ID_SESSION_KEY) if session is not None else None
-    if user is not None and user.is_authenticated:
-        if basket_id is not None:
-            # The user has a basket from before they logged in; let salesman
-            # merge it into their user basket
-            basket, _ = Basket.objects.get_or_create_from_request(request)
-            return basket
-        return Basket.objects.filter(user=user).first()
-    if basket_id is not None:
-        return Basket.objects.filter(id=basket_id, user=None).first()
-    return None
+    return Basket.get_existing(request)
+
+
+def _payment_in_progress(request):
+    basket = get_existing_basket(request)
+    return basket is not None and basket.payment_in_progress
+
+
+PAYMENT_IN_PROGRESS_MESSAGE = (
+    "Your basket can't be changed while a payment is in progress."
+)
 
 
 def get_existing_basket_quantity(request):
@@ -189,6 +182,14 @@ def _change_quantity(request, product_id, new_value, can_increase=True):
 def add_to_basket(request, product_id):
     # product_id in the URL is the PRODUCT
     # product_id in POST is the variant
+    if _payment_in_progress(request):
+        resp_str = f"<div>{_basket_icon_html(request, get_existing_basket_quantity(request))}</div>"
+        resp_str += (
+            f"<div id='added_{product_id}' class='alert-danger mt-2' hx-swap-oob='true'>"
+            f"{PAYMENT_IN_PROGRESS_MESSAGE} <a href='{reverse('shop:basket')}'>View basket</a></div>"
+        )
+        return HttpResponse(resp_str)
+
     with transaction.atomic():
         # Lock the variant until the item has been added, so that concurrent
         # requests can't both reserve the last items in stock
@@ -260,6 +261,8 @@ def update_quantity(request, ref):
     # Called from basket
     # Here product ID is the variant ID
     product_id = int(request.POST.get("product_id"))
+    if _payment_in_progress(request):
+        return _payment_in_progress_item_response(product_id)
     new_quantity = int(request.POST.get("quantity"))
     request.method = "GET"
     current_item_resp = BasketViewSet.as_view({"get": "retrieve"})(request, ref=ref)
@@ -317,6 +320,8 @@ def update_quantity(request, ref):
 def delete_basket_item(request, ref):
     # This is the product variant ID
     product_id = int(request.POST.get("product_id"))
+    if _payment_in_progress(request):
+        return _payment_in_progress_item_response(product_id)
 
     request.method = "DELETE"
     # The serialised basket identifies products (NOT variants) with their idenitifier, not id
@@ -372,7 +377,34 @@ def _basket_icon_html(request, quantity):
     )
 
 
+def _payment_in_progress_item_response(product_id):
+    return HttpResponse(
+        f"<div id='updated_{product_id}' class='alert-danger' hx-swap-oob='true'>"
+        f"{PAYMENT_IN_PROGRESS_MESSAGE}</div>"
+    )
+
+
 def basket_view(request):
+    existing_basket = get_existing_basket(request)
+    if existing_basket is not None and existing_basket.payment_in_progress:
+        # The customer has come back to their basket during checkout; check
+        # whether the payment has completed or expired
+        order = PayByStripe.check_basket_payment(request, existing_basket)
+        if order is not None:
+            return HttpResponseRedirect(
+                reverse("shop:new_order_status", args=(order.token,))
+            )
+        existing_basket.refresh_from_db()
+        if existing_basket.payment_in_progress:
+            return TemplateResponse(
+                request,
+                "shop/basket_payment_in_progress.html",
+                {
+                    "stripe_session_url": existing_basket.stripe_session_url,
+                    "hide_basket": True,
+                },
+            )
+
     basket = get_basket(request)
     basket_context = get_basket_context(basket)
     checkout_methods = CheckoutViewSet.as_view({"get": "list"})(request)
@@ -392,7 +424,28 @@ def basket_view(request):
     )
 
 
+@require_POST
+def cancel_payment(request):
+    """Cancel the basket's in-progress payment, so the basket can be changed"""
+    basket = get_existing_basket(request)
+    if basket is not None and basket.payment_in_progress:
+        try:
+            if PayByStripe.cancel_basket_payment(basket):
+                messages.info(request, "Payment cancelled.")
+            # Otherwise the payment has completed; the basket view will fulfil it
+        except stripe.StripeError:
+            logger.exception(
+                "Error cancelling Stripe session %s", basket.stripe_session_id
+            )
+            messages.error(
+                request, "Sorry, your payment couldn't be cancelled. Please try again."
+            )
+    return HttpResponseRedirect(reverse("shop:basket"))
+
+
 def checkout_view(request):
+    if _payment_in_progress(request):
+        return HttpResponseRedirect(reverse("shop:basket"))
     payment_method = request.GET["payment-method"]
     shipping_method = request.GET["shipping-method"]
     context = {"payment_method": payment_method, "shipping_method": shipping_method}

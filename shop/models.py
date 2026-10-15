@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils.text import slugify
 from django.utils.safestring import mark_safe
 from django.utils import timezone
-from salesman.basket.models import BaseBasket, BaseBasketItem
+from salesman.basket.models import BASKET_ID_SESSION_KEY, BaseBasket, BaseBasketItem
 from salesman.orders.models import (
     BaseOrder,
     BaseOrderItem,
@@ -76,6 +76,61 @@ class Basket(BaseBasket):
     )
     timeout = models.DateTimeField(null=True)
 
+    # Key in extra for the Stripe checkout session while a payment is in progress
+    STRIPE_SESSION_KEY = "stripe_session"
+
+    @classmethod
+    def get_existing(cls, request):
+        """
+        Return the basket for this request, or None if there isn't one yet.
+        Unlike salesman's Basket.objects.get_or_create_from_request, this doesn't
+        create a basket (or a session) for visitors who haven't added anything to
+        their basket.
+        """
+        user = getattr(request, "user", None)
+        session = getattr(request, "session", None)
+        basket_id = session.get(BASKET_ID_SESSION_KEY) if session is not None else None
+        if user is not None and user.is_authenticated:
+            if basket_id is not None:
+                # The user has a basket from before they logged in; let salesman
+                # merge it into their user basket
+                basket, _ = cls.objects.get_or_create_from_request(request)
+                return basket
+            return cls.objects.filter(user=user).first()
+        if basket_id is not None:
+            return cls.objects.filter(id=basket_id, user=None).first()
+        return None
+
+    @property
+    def payment_in_progress(self):
+        """
+        A Stripe checkout session has been started for this basket and hasn't
+        completed or expired; the basket can't be changed until it does.
+        """
+        return self.STRIPE_SESSION_KEY in self.extra
+
+    @property
+    def stripe_session_id(self):
+        return self.extra.get(self.STRIPE_SESSION_KEY, {}).get("id")
+
+    @property
+    def stripe_session_url(self):
+        return self.extra.get(self.STRIPE_SESSION_KEY, {}).get("url")
+
+    def start_payment(self, session_id, session_url, hold_until):
+        """
+        Record the Stripe checkout session for this basket, and hold the
+        basket's items until hold_until
+        """
+        self.extra[self.STRIPE_SESSION_KEY] = {"id": session_id, "url": session_url}
+        self.timeout = hold_until
+        self.save()
+
+    def end_payment(self):
+        """The basket's Stripe checkout session has expired or been cancelled"""
+        self.extra.pop(self.STRIPE_SESSION_KEY, None)
+        self.save()
+
     def update(self, request):
         super().update(request)
         self.reset_timeout()
@@ -89,10 +144,13 @@ class Basket(BaseBasket):
             self.reset_timeout()
 
     def reset_timeout(self):
+        timeout = timezone.now() + timedelta(minutes=settings.BASKET_TIMEOUT_MINUTES)
+        if self.payment_in_progress and self.timeout and self.timeout > timeout:
+            # Don't release items before the checkout session expires
+            # (update() is called whenever the basket is displayed)
+            return
         logger.info("Resetting basket timeout")
-        self.timeout = timezone.now() + timedelta(
-            minutes=settings.BASKET_TIMEOUT_MINUTES
-        )
+        self.timeout = timeout
         self.save()
 
     @classmethod
@@ -110,7 +168,9 @@ class Basket(BaseBasket):
         for basket in expired:
             basket.clear()
             basket.timeout = None
-            basket.save(update_fields=["timeout"])
+            # Any checkout session has expired by now
+            basket.extra.pop(cls.STRIPE_SESSION_KEY, None)
+            basket.save(update_fields=["timeout", "extra"])
             count += 1
         if count:
             logger.info("Cleared %s expired basket(s)", count)
