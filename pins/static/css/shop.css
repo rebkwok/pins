@@ -206,8 +206,16 @@
   }
 
 
+/* The carousel shrinks with its grid column (like the "no photo" image), rather
+   than having a fixed width, so cards with and without images line up */
 .carousel.shop-carousel {
-  width: 180px;
+  width: 100%;
+  max-width: 180px;
+}
+
+/* the product page shows larger images */
+.carousel.shop-carousel--detail {
+  max-width: 300px;
 }
 
 .carousel-control-next,
