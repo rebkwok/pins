@@ -287,3 +287,31 @@ def test_product_edit_variant_negative_stock(admin_client, variant):
     variant.refresh_from_db()
     assert variant.stock == 8
 
+
+
+def test_product_edit_duplicate_variants_message(admin_client, variant):
+    product = variant.product
+    data = product_form_data(product, 10, stock_shown=10)
+    # add a second variant the same as the first
+    data.update(
+        {
+            "variants-TOTAL_FORMS": "2",
+            "variants-1-variant_name": variant.variant_name,
+            "variants-1-price": "",
+            "variants-1-stock": "1",
+            "variants-1-live": "on",
+            "variants-1-colour": "",
+            "variants-1-size": "",
+            "variants-1-ORDER": "2",
+        }
+    )
+    resp = admin_client.post(edit_product_url(product), data)
+    assert resp.status_code == 200
+    content = resp.content.decode()
+    assert (
+        "Two or more variants have the same name, colour and size. Each variant "
+        "needs a different name, colour or size."
+    ) in content
+    assert "This variant has the same name, colour and size as another variant." in content
+    assert "Please correct the duplicate" not in content
+    assert product.variants.count() == 1

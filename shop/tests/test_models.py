@@ -529,10 +529,14 @@ def test_product_admin_form_rejects_duplicate_variants(product):
         )
     form = form_class(data, instance=Product(category_page=product.category_page))
     assert not form.is_valid()
-    errors = form.formsets["variants"].non_form_errors()
-    assert errors == [
-        "Please correct the duplicate data for product, variant_name, colour and size, "
-        "which must be unique."
+    variants_formset = form.formsets["variants"]
+    assert variants_formset.non_form_errors() == [
+        "Two or more variants have the same name, colour and size. Each variant "
+        "needs a different name, colour or size."
+    ]
+    # the duplicate variant is marked
+    assert variants_formset.forms[1].non_field_errors() == [
+        "This variant has the same name, colour and size as another variant."
     ]
 
     # the same form with different variants is valid

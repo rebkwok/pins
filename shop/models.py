@@ -20,6 +20,7 @@ from salesman.orders.models import (
     BaseOrderNote,
     BaseOrderPayment,
 )
+from modelcluster.forms import BaseChildFormSet
 from modelcluster.models import ClusterableModel, ParentalKey
 from wagtail.admin.forms import WagtailAdminModelForm
 from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, MultiFieldPanel
@@ -418,16 +419,40 @@ PRODUCT_VARIANT_PANELS = [
 ]
 
 
+VARIANT_UNIQUE_FIELDS = ("variant_name", "colour", "size")
+
+
+class ProductVariantFormSet(BaseChildFormSet):
+    """
+    The product form's variants, with clearer errors than Django's defaults
+    ("Please correct the duplicate data for product, variant_name, colour and
+    size, which must be unique.") for duplicate variants
+    """
+
+    def get_unique_error_message(self, unique_check):
+        if set(unique_check) - {self.fk.name} == set(VARIANT_UNIQUE_FIELDS):
+            return (
+                "Two or more variants have the same name, colour and size. Each "
+                "variant needs a different name, colour or size."
+            )
+        return super().get_unique_error_message(unique_check)
+
+    def get_form_error(self):
+        # Shown on each duplicate variant
+        return "This variant has the same name, colour and size as another variant."
+
+
 class ProductVariantsInlinePanel(InlinePanel):
     """
     InlinePanel for a product's variants, using ProductVariantAdminForm for each
-    variant. (InlinePanel builds the child forms from WagtailAdminModelForm,
-    ignoring the child model's base_form_class.)
+    variant (InlinePanel builds the child forms from WagtailAdminModelForm,
+    ignoring the child model's base_form_class), and ProductVariantFormSet.
     """
 
     def get_form_options(self):
         options = super().get_form_options()
         child_form_options = self.child_edit_handler.get_form_options()
+        options["formsets"][self.relation_name]["formset"] = ProductVariantFormSet
         options["formsets"][self.relation_name]["form"] = get_form_for_model(
             self.db_field.related_model,
             form_class=ProductVariantAdminForm,
