@@ -3,6 +3,7 @@ from crispy_forms.layout import Button, Field, Hidden, Layout, Submit
 from django import forms
 from django.urls import reverse
 
+from .models import SHIPPING_COLLECT
 from .payment import PAYMENT_METHOD_BUTTON_TEXT
 
 
@@ -29,7 +30,7 @@ class CheckoutForm(forms.Form):
         # checkout serializer (but can be blank)
         # We currently never need to collect billing address as it will be
         # handled by Stripe
-        if shipping_method != "collect":
+        if shipping_method != SHIPPING_COLLECT:
             shipping_address_layout = "shipping_address"
         else:
             shipping_address_layout = Hidden("shipping_address", "-")

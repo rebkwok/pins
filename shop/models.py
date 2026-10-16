@@ -36,7 +36,9 @@ from wagtail.models import Page, Orderable
 # ORDERS
 
 
-SHIPPING_METHODS = {"collect": "Collect in store", "deliver": "Delivery"}
+SHIPPING_COLLECT = "collect"
+SHIPPING_DELIVER = "deliver"
+SHIPPING_METHODS = {SHIPPING_COLLECT: "Collect in store", SHIPPING_DELIVER: "Delivery"}
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +46,12 @@ logger = logging.getLogger(__name__)
 class Order(BaseOrder):
     name = models.CharField(max_length=255, verbose_name="Name")
     shipping_method = models.CharField(
-        choices=tuple(SHIPPING_METHODS.items()), default="collect"
+        choices=tuple(SHIPPING_METHODS.items()), default=SHIPPING_COLLECT
     )
+
+    @property
+    def needs_delivery(self):
+        return self.shipping_method != SHIPPING_COLLECT
 
     @transaction.atomic
     def populate_from_basket(
@@ -77,9 +83,13 @@ class OrderNote(BaseOrderNote):
 
 class Basket(BaseBasket):
     shipping_method = models.CharField(
-        choices=tuple(SHIPPING_METHODS.items()), default="collect"
+        choices=tuple(SHIPPING_METHODS.items()), default=SHIPPING_COLLECT
     )
     timeout = models.DateTimeField(null=True)
+
+    @property
+    def needs_delivery(self):
+        return self.shipping_method != SHIPPING_COLLECT
 
     # Key in extra for the Stripe checkout session while a payment is in progress
     STRIPE_SESSION_KEY = "stripe_session"

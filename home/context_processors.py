@@ -1,8 +1,8 @@
-import os
+from django.conf import settings
 
 
 def home(request):
     return {
-        "hide_search": os.environ.get("HIDE_SEARCH", False),
-        "hide_breadcrumbs": os.environ.get("HIDE_BREADCRUMBS", False),
+        "hide_search": settings.HIDE_SEARCH,
+        "hide_breadcrumbs": settings.HIDE_BREADCRUMBS,
     }

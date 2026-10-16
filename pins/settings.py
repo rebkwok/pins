@@ -16,6 +16,7 @@ import logging
 import os
 import sys
 
+from decimal import Decimal
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -582,6 +583,10 @@ PDF_ENCRYPTION_KEY=env.str("PDF_ENCRYPTION_KEY")
 
 RECIPE_SUBMISSIONS_OPEN=env.bool("RECIPE_SUBMISSIONS_OPEN", default=False)
 
+# Hide the site search box and breadcrumbs
+HIDE_SEARCH = env.bool("HIDE_SEARCH", default=False)
+HIDE_BREADCRUMBS = env.bool("HIDE_BREADCRUMBS", default=False)
+
 
 # Image uploads
 WAGTAILIMAGES_EXTENSIONS =  ["jpg", "jpeg", "png"]
@@ -627,6 +632,9 @@ SALESMAN_STRIPE_PAID_STATUS = "PROCESSING"
 # How long items are held in a basket. The Stripe checkout session expires 1 minute
 # after the basket timeout, and Stripe requires sessions to expire between 30
 # minutes and 24 hours after they're created.
+# Flat shipping cost for shop orders that are delivered (not collected)
+SHOP_SHIPPING_COST = Decimal(env.str("SHOP_SHIPPING_COST", default="4.99"))
+
 BASKET_TIMEOUT_MINUTES = env.int("BASKET_TIMEOUT_MINUTES", 30)
 if not 30 <= BASKET_TIMEOUT_MINUTES < 24 * 60:
     raise ImproperlyConfigured(

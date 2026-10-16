@@ -1,5 +1,4 @@
-from django.http import HttpRequest
-from salesman.basket.models import BaseBasket
+from django.conf import settings
 from salesman.basket.modifiers import BasketModifier
 
 from .models import Sale
@@ -7,14 +6,17 @@ from .models import Sale
 
 class ShippingCostModifier(BasketModifier):
     """
-    Add flat shipping cost to the basket.
+    Add flat shipping cost (settings.SHOP_SHIPPING_COST) to baskets that are
+    delivered.
     """
 
     identifier = "shipping-cost"
 
     def process_basket(self, basket, request):
-        if basket.shipping_method != "collect" and basket.count:
-            self.add_extra_row(basket, request, label="Shipping", amount=3.99)
+        if basket.needs_delivery and basket.count:
+            self.add_extra_row(
+                basket, request, label="Shipping", amount=settings.SHOP_SHIPPING_COST
+            )
 
 
 class SaleModifier(BasketModifier):

@@ -28,7 +28,7 @@
                         </ul>
                     <li>Order date: {{ order.date_created|date:"d M Y" }}</li>
                     <li>Shipping method: {{ order.get_shipping_method_display }}</li>
-                    {% if order.shipping_method != "collect" %}
+                    {% if order.needs_delivery %}
                         <li>Shipping address: {{ order.shipping_address }}</li>
                     {% endif %}
                     <li>Order total: £{{ order.total|floatformat:2 }}</li>
