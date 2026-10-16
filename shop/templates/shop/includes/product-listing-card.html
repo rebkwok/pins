@@ -2,42 +2,46 @@
 
 <div>
     <div class="mb-4">
-    <a href="{% url 'shop:product_detail' product.id %}">
-    {% if product.images %}
-        <div id="shopCarousel" class="carousel shop-carousel slide" data-ride="carousel">
-            {% if product.images|length > 1 %}
-                <ol class="carousel-indicators">
-                    {% for im in product.images %}
-                        <li data-target="#shopCarousel" data-slide-to="{{ forloop.counter0 }}" {% if forloop.first %}class="active"{% endif %}></li>
+    {% with images=product.images %}
+    {% if images %}
+        <div id="shop-carousel-{{ product.id }}" class="carousel slide shop-carousel{% if detail_page %} shop-carousel--detail{% endif %}"{% if images|length > 1 %} data-bs-ride="carousel"{% endif %}>
+            {% if images|length > 1 %}
+                <div class="carousel-indicators">
+                    {% for im in images %}
+                        <button type="button" data-bs-target="#shop-carousel-{{ product.id }}" data-bs-slide-to="{{ forloop.counter0 }}" aria-label="Image {{ forloop.counter }}"{% if forloop.first %} class="active" aria-current="true"{% endif %}></button>
                     {% endfor %}
-                </ol>
+                </div>
             {% endif %}
             <div class="carousel-inner">
-                {% for pimage in product.images %}
-                <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                {% for pimage in images %}
+                <div class="carousel-item{% if forloop.first %} active{% endif %}">
                     {% if detail_page %}
                         <a href="{{ pimage.file.url }}">
                             <figure class="product-listing-card__image">
-                                {% image pimage fill-300x300-c100 loading="lazy" %}
+                                {% image pimage fill-300x300-c100 loading="lazy" class="d-block" %}
                             </figure>
                         </a>
                     {% else %}
-                        <figure class="product-listing-card__image">
-                            {% image pimage fill-180x180-c100 loading="lazy" class="d-block w-180" %}
-                        </figure>
+                        <a href="{% url 'shop:product_detail' product.id %}">
+                            <figure class="product-listing-card__image">
+                                {% image pimage fill-180x180-c100 loading="lazy" class="d-block w-180" %}
+                            </figure>
+                        </a>
                     {% endif %}
                 </div>
                 {% endfor %}
             </div>
         </div>
-        {% else %}
+    {% else %}
+        {% if not detail_page %}<a href="{% url 'shop:product_detail' product.id %}">{% endif %}
         <figure class="product-listing-card__image">
             <img src={% static 'images/logo.png' %} height="180" width="180" loading="lazy">
             <div class="layer"></div>
             <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">No photo available</div>
         </figure>
+        {% if not detail_page %}</a>{% endif %}
     {% endif %}
-    </a>
+    {% endwith %}
 </div>
 
 <form class="shop-form" action="" method="POST">
