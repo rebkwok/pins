@@ -19,11 +19,28 @@ def test_basket_shipping_modifier(basket):
     assert list(basket.extra_rows.keys()) == ["shipping-cost"]
     assert basket.extra_rows["shipping-cost"].data == {
         "label": "Shipping",
-        "amount": "3.99",
+        "amount": "4.99",
         "extra": {},
     }
     assert basket.subtotal == 20
-    assert pytest.approx(basket.total) == Decimal(23.99)
+    assert basket.total == Decimal("24.99")
+
+
+def test_basket_shipping_modifier_cost_setting(basket, settings):
+    settings.SHOP_SHIPPING_COST = Decimal("5.50")
+    basket.shipping_method = "deliver"
+    basket.save()
+    basket.update(request=None)
+    assert basket.extra_rows["shipping-cost"].data["amount"] == "5.50"
+    assert basket.total == Decimal("25.50")
+
+
+def test_basket_shipping_modifier_empty_basket(basket):
+    basket.shipping_method = "deliver"
+    basket.save()
+    basket.clear()
+    basket.update(request=None)
+    assert basket.extra_rows == {}
 
 
 def test_sale_modifier(freezer, sale_with_items, basket):
@@ -87,3 +104,12 @@ def test_sale_modifier_matches_displayed_price(freezer, sale_with_items, basket)
 
     assert variant.get_discounted_price() == Decimal("0.93")
     assert basket_item.total == Decimal("2.79")
+
+
+@pytest.mark.parametrize("shipping_method,needs_delivery", [("collect", False), ("deliver", True)])
+def test_needs_delivery(basket, order, shipping_method, needs_delivery):
+    basket.shipping_method = shipping_method
+    order.shipping_method = shipping_method
+    assert basket.needs_delivery == needs_delivery
+    assert order.needs_delivery == needs_delivery
+
