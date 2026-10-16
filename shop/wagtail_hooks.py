@@ -1,15 +1,16 @@
-from salesman.admin.wagtail.panels import ReadOnlyPanel
-from wagtail.admin.panels import FieldPanel
-from salesman.admin.wagtail_hooks import OrderAdmin as SalesmanOrderAdmin
-from salesman.core.utils import get_salesman_model
-from wagtail.admin.ui.tables import BooleanColumn
-from wagtail_modeladmin.options import modeladmin_register
 from django.contrib import messages
 from django.shortcuts import redirect
+from django.utils.translation import gettext_lazy as _
+from salesman.admin.wagtail.panels import ReadOnlyPanel
+from salesman.admin.wagtail_hooks import OrderAdmin as SalesmanOrderAdmin
+from salesman.core.utils import get_salesman_model
 from wagtail import hooks
 from wagtail.admin.admin_url_finder import AdminURLFinder
+from wagtail.admin.panels import FieldPanel, MultiFieldPanel, ObjectList, TabbedInterface
+from wagtail.admin.ui.tables import BooleanColumn
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
+from wagtail_modeladmin.options import modeladmin_register
 
 from .models import (
     PRODUCT_VARIANT_PANELS,
@@ -68,13 +69,54 @@ class ProductGroup(SnippetViewSetGroup):
     menu_order = 200
 
 
+def _with_name_and_shipping_method(contact_panel):
+    """
+    A copy of salesman's order Contact panel, with the order name and shipping
+    method added after the customer and email
+    """
+    children = list(contact_panel.children)
+    children[2:2] = [
+        ReadOnlyPanel("name"),
+        ReadOnlyPanel(
+            "shipping_method",
+            # Show the label (e.g. "Collect in store") rather than the value
+            formatter=lambda value, order, request: order.get_shipping_method_display(),
+        ),
+    ]
+    return MultiFieldPanel(children, heading=contact_panel.heading)
+
+
 class OrderAdmin(SalesmanOrderAdmin):
-    SalesmanOrderAdmin.list_display.insert(2, "name")
-    SalesmanOrderAdmin.list_display.insert(4, "shipping_method")
-    SalesmanOrderAdmin.search_fields.append("name")
-    SalesmanOrderAdmin.default_panels[2].children.insert(2, ReadOnlyPanel("name"))
-    SalesmanOrderAdmin.default_panels[2].children.insert(
-        3, ReadOnlyPanel("shipping_method")
+    """
+    Salesman's order admin, with the order name and shipping method added.
+    These build new lists and panels, rather than changing salesman's.
+    """
+
+    # After email, and after status
+    list_display = [
+        *SalesmanOrderAdmin.list_display[:2],
+        "name",
+        SalesmanOrderAdmin.list_display[2],
+        "shipping_method",
+        *SalesmanOrderAdmin.list_display[3:],
+    ]
+    search_fields = [*SalesmanOrderAdmin.search_fields, "name"]
+
+    # Salesman's default_edit_handler is built from its default panels, so this
+    # replaces it (salesman's get_edit_handler uses edit_handler if it's set)
+    default_panels = [
+        _with_name_and_shipping_method(panel) if index == 2 else panel
+        for index, panel in enumerate(SalesmanOrderAdmin.default_panels)
+    ]
+    edit_handler = TabbedInterface(
+        [
+            ObjectList(default_panels, heading=_("Summary")),
+            ObjectList(SalesmanOrderAdmin.default_items_panels, heading=_("Items")),
+            ObjectList(
+                SalesmanOrderAdmin.default_payments_panels, heading=_("Payments")
+            ),
+            ObjectList(SalesmanOrderAdmin.default_notes_panels, heading=_("Notes")),
+        ]
     )
     menu_order = 250
 
