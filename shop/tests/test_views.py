@@ -766,3 +766,14 @@ def test_basket_timeout_view_no_timeout(client, basket, freezer, settings):
     basket.refresh_from_db()
     assert basket.timeout == datetime(2023, 10, 1, 12, 30, tzinfo=timezone.utc)
 
+
+@mock.patch("shop.payment.PayByStripe.basket_payment")
+def test_post_checkout_view_anonymous_checkout_not_allowed(
+    mock_basket_payment, rf, basket, settings
+):
+    settings.SALESMAN_ALLOW_ANONYMOUS_USER_CHECKOUT = False
+    resp = checkout_view(checkout_request(rf, basket))
+    assert resp.status_code == 200
+    assert resp.context_data["checkout_error"]
+    assert not mock_basket_payment.called
+

@@ -308,3 +308,21 @@ def test_stripe_cancel_view_unlocks_basket(basket_client, paying_basket, request
     paying_basket.refresh_from_db()
     assert not paying_basket.payment_in_progress
     assert paying_basket.items.exists()
+
+
+def test_cancel_basket_payment_not_in_progress(basket, requests_mock):
+    # e.g. the payment was cancelled in another tab; nothing to do
+    assert PayByStripe.cancel_basket_payment(basket) is True
+    assert not requests_mock.called
+
+
+def test_stripe_cancel_view_stripe_error(
+    basket_client, paying_basket, requests_mock, caplog
+):
+    requests_mock.post(SESSION_URL + "/expire", status_code=500, json={"error": {}})
+    resp = basket_client.get(reverse("stripe-cancel"))
+    assert "Your payment was cancelled" in resp.content.decode()
+    assert "Error cancelling Stripe session test-session" in caplog.text
+    paying_basket.refresh_from_db()
+    assert paying_basket.payment_in_progress
+

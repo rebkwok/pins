@@ -381,12 +381,10 @@ class ProductVariantAdminForm(WagtailAdminModelForm):
         if self.instance.pk is not None and stock_shown is not None:
             change = self.cleaned_data["stock"] - stock_shown
             # Saving with an F expression adds the change to the stock in the
-            # database (UPDATE ... SET stock = stock + change)
+            # database (UPDATE ... SET stock = stock + change). Django then reads
+            # the new value back into the instance.
             self.instance.stock = models.F("stock") + change
-        instance = super().save(commit=commit)
-        if commit and isinstance(instance.stock, models.expressions.Combinable):
-            instance.refresh_from_db(fields=["stock"])
-        return instance
+        return super().save(commit=commit)
 
 
 class StockFieldPanel(FieldPanel):

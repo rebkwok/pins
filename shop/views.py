@@ -135,10 +135,6 @@ def get_existing_basket_quantity(request):
     return basket.quantity if basket is not None else 0
 
 
-def get_basket_quantity(request):
-    return get_or_create_basket(request).quantity
-
-
 def get_basket_item_data(basket_data, ref):
     """
     The serialized item with this ref from serialized basket data, or {}
