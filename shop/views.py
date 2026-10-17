@@ -19,7 +19,13 @@ from salesman.core.utils import get_salesman_model
 
 from .forms import CheckoutForm
 from .basket_serializers import BasketSerializer
-from .models import ProductVariant, Product, SHIPPING_METHODS
+from .models import (
+    SHIPPING_COLLECT,
+    SHIPPING_METHOD_NOTES,
+    SHIPPING_METHODS,
+    Product,
+    ProductVariant,
+)
 from .payment import PAYMENT_METHOD_DESCRIPTIONS, PayByStripe
 
 
@@ -507,7 +513,11 @@ def basket_view(request):
         }
         for method in payment_methods_pool.get_payments("basket", request)
     ]
-    shipping_methods = list(SHIPPING_METHODS.items())
+    # (value, label, note)
+    shipping_methods = [
+        (method, label, SHIPPING_METHOD_NOTES.get(method, ""))
+        for method, label in SHIPPING_METHODS.items()
+    ]
     return TemplateResponse(
         request,
         "shop/basket.html",
@@ -581,7 +591,12 @@ def checkout_view(request):
     ):
         messages.error(request, "Please select a shipping and payment method.")
         return HttpResponseRedirect(reverse("shop:basket"))
-    context = {"payment_method": payment_method, "shipping_method": shipping_method}
+    context = {
+        "payment_method": payment_method,
+        "shipping_method": shipping_method,
+        "shipping_method_label": SHIPPING_METHODS[shipping_method],
+        "collect_warning": shipping_method == SHIPPING_COLLECT,
+    }
     basket = get_or_create_basket(request)
 
     if request.method == "POST":

@@ -39,7 +39,14 @@ from wagtail.models import Page, Orderable
 
 SHIPPING_COLLECT = "collect"
 SHIPPING_DELIVER = "deliver"
-SHIPPING_METHODS = {SHIPPING_COLLECT: "Collect in store", SHIPPING_DELIVER: "Delivery"}
+SHIPPING_METHODS = {SHIPPING_COLLECT: "Collect in person", SHIPPING_DELIVER: "Delivery"}
+# Shown with the shipping method options in the basket
+SHIPPING_METHOD_NOTES = {
+    SHIPPING_COLLECT: (
+        "Only choose this if you have contacted PINS and confirmed that you can "
+        "collect your order in person."
+    ),
+}
 
 logger = logging.getLogger(__name__)
 
