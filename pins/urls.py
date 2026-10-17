@@ -11,7 +11,6 @@ from fundraising import urls
 from salesman.checkout.payment import payment_methods_pool
 from search import views as search_views
 from shop import urls as shop_urls
-from shop.payment import stripe_webhook_view
 
 
 urlpatterns = [
@@ -45,8 +44,8 @@ urlpatterns = [
         name="merch_info"
     ),
     path("shop/", include(shop_urls)),
-    path("stripe/webhook/", stripe_webhook_view, name="shop-stripe-webhook"),
-    # Only the payment urls (e.g. stripe success, cancel and webhook) from salesman;
+    path("stripe/", include("salesman_stripe_connect.urls")),
+    # Only the payment urls (stripe success and cancel) from salesman;
     # its basket, checkout and orders API would bypass the shop views' checks
     # (stock, live products, basket locked during payment)
     path("api/", include(payment_methods_pool.get_urls())),

@@ -1,0 +1,37 @@
+{% extends "modeladmin/delete.html" %}
+
+{% block content_main %}
+  <div class="nice-padding">
+    {% if instance.status == instance.Status.REFUNDED %}
+      <p>Order <strong>{{ instance }}</strong> has already been refunded.</p>
+      <a href="{{ view.edit_url }}" class="button button-secondary">Go back</a>
+    {% elif not stripe_payments %}
+      <p>Order <strong>{{ instance }}</strong> has no Stripe payments to refund.</p>
+      <a href="{{ view.edit_url }}" class="button button-secondary">Go back</a>
+    {% else %}
+      <p>Are you sure you want to refund order <strong>{{ instance }}</strong>?</p>
+      <p>
+        <strong>£{{ refund_amount|floatformat:2 }}</strong> will be refunded to the
+        customer{% if instance.amount_refunded %} (the amount paid, less
+        £{{ instance.amount_refunded|floatformat:2 }} already refunded){% endif %}.
+        To refund only part of an order, use the Stripe dashboard.
+      </p>
+      <div class="help-block help-warning">
+        <p>
+          <strong>Refunding doesn't change stock.</strong> If any of these items
+          are going back into stock, update their stock manually in Shop Stock:
+        </p>
+        <ul>
+          {% for item in instance.items.all %}
+            <li>{{ item.quantity }} x {{ item.name }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <form method="post">
+        {% csrf_token %}
+        <input type="submit" value="Yes, refund this order" class="button serious">
+        <a href="{{ view.edit_url }}" class="button button-secondary">No, take me back</a>
+      </form>
+    {% endif %}
+  </div>
+{% endblock %}

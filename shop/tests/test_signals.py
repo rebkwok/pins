@@ -8,6 +8,7 @@ from django.conf import settings
 from django.core import mail
 
 from salesman.core.utils import get_salesman_model
+from salesman_stripe_connect import signals as stripe_signals
 
 from ..models import ProductVariant
 
@@ -242,3 +243,37 @@ def test_email_send_failure_is_logged_not_raised(
         f"Error sending email 'Order '{new_order.ref}' has been received' "
         "to ['test@test.com']" in caplog.text
     )
+
+
+def test_order_email_links(django_capture_on_commit_callbacks):
+    # links include the scheme, so email clients make them clickable
+    with django_capture_on_commit_callbacks(execute=True):
+        order = baker.make(Order, status=Order.Status.PROCESSING, email="test@test.com")
+    status_url = f"https://podencosinneed.org/shop/order/{order.token}/"
+    assert f"View the status of your order: {status_url}" in mail.outbox[0].body
+
+
+@pytest.mark.parametrize(
+    "signal,subject",
+    [
+        (stripe_signals.dispute_created, "Payment for shop order '{ref}' has been disputed"),
+        (stripe_signals.dispute_closed, "Dispute for shop order '{ref}' closed"),
+    ],
+)
+def test_dispute_emails(shop_settings, order, signal, subject, django_capture_on_commit_callbacks):
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        signal.send(sender=None, order=order, dispute=None, message="Dispute message")
+    (email,) = mail.outbox
+    assert email.to == ["admin@test.com", "another_admin@test.com"]
+    assert email.subject == subject.format(ref=order.ref)
+    assert email.body == "Dispute message"
+
+
+def test_dispute_emails_no_notify_addresses(order, django_capture_on_commit_callbacks):
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        stripe_signals.dispute_created.send(
+            sender=None, order=order, dispute=None, message="Dispute message"
+        )
+    assert mail.outbox == []

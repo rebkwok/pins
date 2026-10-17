@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from django.conf import settings
 from django.contrib.messages import get_messages
 from django.urls import reverse
 
@@ -111,7 +112,7 @@ def test_basket_payment_already_in_progress(rf, paying_basket):
 def test_expire_basket_payment(paying_basket):
     variant = paying_basket.items.first().product
     basket, message = PayByStripe.expire_basket_payment(expired_session(paying_basket))
-    assert message == "Basket cleared"
+    assert message == "Payment expired"
     paying_basket.refresh_from_db()
     assert not paying_basket.items.exists()
     assert not paying_basket.payment_in_progress
@@ -138,16 +139,20 @@ def test_expire_basket_payment_ignored(reference):
     assert message == "Event ignored"
 
 
-@patch("salesman_stripe.payment.stripe.Webhook")
-def test_webhook_session_expired(mock_webhook, client, paying_basket):
-    mock_webhook.construct_event.return_value = Mock(
+def test_webhook_session_expired(client, paying_basket):
+    event = Mock(
         type="checkout.session.expired",
+        account=settings.SALESMAN_STRIPE_CONNECT_ACCOUNT,
         data=Mock(object=expired_session(paying_basket)),
     )
-    headers = {"STRIPE_SIGNATURE": "v1=dummy,t=1"}
-    resp = client.post(reverse("shop-stripe-webhook"), data={}, headers=headers)
+    with patch("salesman_stripe_connect.payment.stripe.Webhook") as mock_webhook:
+        mock_webhook.construct_event.return_value = event
+        resp = client.post(
+            reverse("stripe-connect-webhook"), data={}, headers={"Stripe-Signature": "t=1"}
+        )
     assert resp.status_code == 200
-    assert resp.content.decode() == "Basket cleared"
+    assert resp.content.decode() == "Payment expired"
+    # the basket's items are returned to stock
     assert not paying_basket.items.exists()
 
 
@@ -302,7 +307,7 @@ def test_stripe_cancel_view_unlocks_basket(basket_client, paying_basket, request
     requests_mock.post(
         SESSION_URL + "/expire", json=session_data(paying_basket, status="expired")
     )
-    resp = basket_client.get(reverse("stripe-cancel"))
+    resp = basket_client.get(reverse("stripe-connect-cancel"))
     assert "Your payment was cancelled" in resp.content.decode()
     assert reverse("shop:basket") in resp.content.decode()
     paying_basket.refresh_from_db()
@@ -320,7 +325,7 @@ def test_stripe_cancel_view_stripe_error(
     basket_client, paying_basket, requests_mock, caplog
 ):
     requests_mock.post(SESSION_URL + "/expire", status_code=500, json={"error": {}})
-    resp = basket_client.get(reverse("stripe-cancel"))
+    resp = basket_client.get(reverse("stripe-connect-cancel"))
     assert "Your payment was cancelled" in resp.content.decode()
     assert "Error cancelling Stripe session test-session" in caplog.text
     paying_basket.refresh_from_db()

@@ -225,12 +225,17 @@ def test_basket_view(rf, basket, product):
             "help": "Pay with stripe",
         }
     ]
+    # delivery is shown first
     assert resp.context_data["shipping_methods"] == [
-        ("collect", "Collect in person", COLLECT_NOTE),
         ("deliver", "Delivery", ""),
+        ("collect", "Collect in person", COLLECT_NOTE),
     ]
-    # the note is shown with the collection option
+    # the basket's shipping method is selected
+    assert resp.context_data["selected_shipping_method"] == "collect"
     content = resp.rendered_content
+    assert 'id="id_collect" value="collect" checked' in content
+    assert 'id="id_deliver" value="deliver" >' in content
+    # the note is shown with the collection option
     assert "Collect in person" in content
     assert COLLECT_NOTE in content
     # basket items are converted to a dict keyed by product, with product type and category added
@@ -238,6 +243,20 @@ def test_basket_view(rf, basket, product):
     item = resp.context_data["basket"]["items"][product.identifier][0]
     assert item["product_type"] == product.name
     assert item["category"] == product.category_page.title
+
+
+@pytest.mark.parametrize("has_basket", [True, False])
+def test_basket_view_delivery_default(rf, product, has_basket):
+    request = rf.get(reverse("shop:basket"))
+    request.session = {}
+    request.user = AnonymousUser()
+    if has_basket:
+        # a new basket is delivered
+        basket = baker.make(Basket)
+        assert basket.shipping_method == "deliver"
+        request.session = {"BASKET_ID": basket.id}
+    resp = basket_view(request)
+    assert resp.context_data["selected_shipping_method"] == "deliver"
 
 
 def test_add_to_basket(rf, product):

@@ -21,6 +21,7 @@ from .forms import CheckoutForm
 from .basket_serializers import BasketSerializer
 from .models import (
     SHIPPING_COLLECT,
+    SHIPPING_DELIVER,
     SHIPPING_METHOD_NOTES,
     SHIPPING_METHODS,
     Product,
@@ -525,6 +526,13 @@ def basket_view(request):
             **basket_context,
             "payment_methods": payment_methods,
             "shipping_methods": shipping_methods,
+            # The basket's shipping method (delivery for a new basket), which its
+            # total includes
+            "selected_shipping_method": (
+                existing_basket.shipping_method
+                if existing_basket is not None
+                else SHIPPING_DELIVER
+            ),
             "hide_basket": True,
         },
     )

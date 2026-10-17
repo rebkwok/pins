@@ -32,8 +32,13 @@
                         <li>Shipping address: {{ order.shipping_address }}</li>
                     {% endif %}
                     <li>Order total: £{{ order.total|floatformat:2 }}</li>
-                    <li>Amount paid: £{{ order.amount_paid|floatformat:2 }}</li>
-                    <li>Amount outstanding: £{{ order.amount_outstanding|floatformat:2 }}</li>
+                    <li>Amount paid: £{{ order.amount_received|floatformat:2 }}</li>
+                    {% if order.amount_refunded %}
+                        <li>Amount refunded: £{{ order.amount_refunded|floatformat:2 }}</li>
+                    {% endif %}
+                    {% if order.amount_due %}
+                        <li>Amount outstanding: £{{ order.amount_due|floatformat:2 }}</li>
+                    {% endif %}
                 </ul>
             </div>
         </div>

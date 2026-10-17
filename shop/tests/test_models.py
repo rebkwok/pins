@@ -574,7 +574,7 @@ def test_product_variant_base_price(product):
 
 def test_product_variant_base_price_in_basket(product):
     variant = baker.make("shop.ProductVariant", product=product, price=None, stock=5)
-    basket = baker.make("shop.Basket")
+    basket = baker.make("shop.Basket", shipping_method="collect")
     basket.add(variant, quantity=2)
     basket.update(request=None)
     assert basket.total == 24
