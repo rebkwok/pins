@@ -61,7 +61,7 @@ def test_order_admin_index(admin_client, order):
     assert resp.status_code == 200
     content = resp.content.decode()
     assert order.ref in content
-    assert "Collect in store" in content
+    assert "Collect in person" in content
 
 
 def test_order_admin_edit(admin_client, order):
@@ -70,4 +70,4 @@ def test_order_admin_edit(admin_client, order):
     assert resp.status_code == 200
     content = resp.content.decode()
     assert "Test User" in content
-    assert "Collect in store" in content
+    assert "Collect in person" in content

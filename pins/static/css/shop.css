@@ -17,6 +17,18 @@
   }
 }
 
+/* #checkout reminder, directly under the shipping method */
+.shop-shipping-reminder {
+  color: var(--bs-danger);
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+
+.shop-shipping-reminder a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 /* #sale banner */
 .shop-sale-banner {
   background-color: var(--pins);

@@ -79,7 +79,7 @@ def _with_name_and_shipping_method(contact_panel):
         ReadOnlyPanel("name"),
         ReadOnlyPanel(
             "shipping_method",
-            # Show the label (e.g. "Collect in store") rather than the value
+            # Show the label (e.g. "Collect in person") rather than the value
             formatter=lambda value, order, request: order.get_shipping_method_display(),
         ),
     ]

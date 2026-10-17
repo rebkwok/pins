@@ -32,6 +32,11 @@ from ..views import (
 
 
 Basket = get_salesman_model("Basket")
+
+COLLECT_NOTE = (
+    "Only choose this if you have contacted PINS and confirmed that you can "
+    "collect your order in person."
+)
 Order = get_salesman_model("Order")
 
 pytestmark = pytest.mark.django_db
@@ -221,9 +226,13 @@ def test_basket_view(rf, basket, product):
         }
     ]
     assert resp.context_data["shipping_methods"] == [
-        ("collect", "Collect in store"),
-        ("deliver", "Delivery"),
+        ("collect", "Collect in person", COLLECT_NOTE),
+        ("deliver", "Delivery", ""),
     ]
+    # the note is shown with the collection option
+    content = resp.rendered_content
+    assert "Collect in person" in content
+    assert COLLECT_NOTE in content
     # basket items are converted to a dict keyed by product, with product type and category added
     assert list(resp.context_data["basket"]["items"].keys()) == [product.identifier]
     item = resp.context_data["basket"]["items"][product.identifier][0]
@@ -581,6 +590,37 @@ def test_get_checkout_view(rf, basket):
     assert resp.status_code == 200
     basket = Basket.objects.get(id=basket.id)
     assert basket.shipping_method == "deliver"
+    content = resp.rendered_content
+    assert "Shipping method: Delivery" in content
+    assert "shop-shipping-reminder" not in content
+
+
+def test_get_checkout_view_sale_prices(rf, basket, sale_with_items, freezer):
+    # The full price is shown crossed out, with the sale price and label, as in
+    # the basket
+    freezer.move_to("2022-01-01 09:00")
+    request = rf.get(
+        reverse("shop:checkout") + "?payment-method=stripe&shipping-method=collect"
+    )
+    request.session = {"BASKET_ID": basket.id}
+    content = checkout_view(request).rendered_content
+    assert '<span class="text-strikethrough text-danger">£20.00</span>' in content
+    assert "£16.00" in content
+    assert "Sale: 20% off" in content
+
+
+def test_get_checkout_view_collect(rf, basket):
+    request = rf.get(
+        reverse("shop:checkout") + "?payment-method=stripe&shipping-method=collect"
+    )
+    request.session = {"BASKET_ID": basket.id}
+    content = checkout_view(request).rendered_content
+    # a warning about collecting in person
+    assert "Shipping method: Collect in person" in content
+    assert '<p class="shop-shipping-reminder">' in content
+    assert "Reminder: collection must be arranged with PINS in advance." in content
+    assert f'<a href="{reverse("shop:basket")}">Go back</a> to change delivery options.' in content
+    assert COLLECT_NOTE not in content
 
 
 CHECKOUT_FORM_DATA = {
@@ -697,7 +737,7 @@ def test_order_status_view(rf, order):
     assert f"Ref: {order.ref}" in content
     assert "Status: Created" in content
     assert "Test Product - Small (Test Category) - 2 - £20.00" in content
-    assert "Shipping method: Collect in store" in content
+    assert "Shipping method: Collect in person" in content
     assert "Order total: £20.00" in content
     assert "Amount paid: £0.00" in content
     assert "Amount outstanding: £20.00" in content
