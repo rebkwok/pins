@@ -4,10 +4,51 @@
   color: var(--pins);
   font-family: var(--font--primary);
   font-weight: 400;
-  font-size: 1.625rem;
-  line-height: 1.15;
+  font-size: 1.125rem;
+  line-height: 1.3;
   margin-top: 20px;
   margin-bottom: 20px;
+}
+
+@media (min-width: 768px) {
+  .shop-detail__introduction {
+    font-size: 1.625rem;
+    line-height: 1.15;
+  }
+}
+
+/* #sale banner */
+.shop-sale-banner {
+  background-color: var(--pins);
+  color: var(--dark);
+  text-align: center;
+  padding: 12px 0;
+  margin-bottom: 12px;
+}
+
+.shop-sale-banner p {
+  margin: 0;
+}
+
+.shop-sale-banner__title {
+  font-family: var(--font--primary);
+  font-size: 1.5rem;
+}
+
+.shop-sale-banner__end {
+  font-size: 0.875rem;
+}
+
+/* #basket icon, in the header's navigation row: at the far right, and before
+   the mobile menu button on smaller screens */
+.navigation__basket {
+  order: 1;
+  margin-left: auto;
+}
+
+.navigation:has(.navigation__basket) .navigation__mobile-toggle {
+  order: 2;
+  margin-left: 12px;
 }
 
 
@@ -60,8 +101,8 @@
   width: 100%;
   overflow: hidden;
   margin: 0;
-  max-width: 100px;
-  max-height: 110px;
+  max-width: 180px;
+  max-height: 180px;
 }
 
 .product-listing-card__image img {
@@ -214,8 +255,10 @@
 }
 
 /* the product page shows larger images */
-.carousel.shop-carousel--detail {
+.carousel.shop-carousel--detail,
+.shop-carousel--detail .product-listing-card__image {
   max-width: 300px;
+  max-height: 300px;
 }
 
 .carousel-control-next,

@@ -250,6 +250,9 @@ def test_add_to_basket(rf, product):
     content = resp.content.decode()
     # 3 items in basket
     assert '<i class="fa-solid fa-basket-shopping"></i>  (3)' in content
+    # the "Added!" message, with a link to the basket
+    assert "Added!" in content
+    assert f"<a href='{reverse('shop:basket')}'>Go to basket</a>" in content
     # quantity reset to 1
     assert (
         f'id="id_quantity_{product.id}" name="quantity" type="number" value=1'

@@ -307,7 +307,9 @@ def add_to_basket(request, product_id):
         variant.refresh_from_db()
         resp_str = f"<div>{_basket_icon_html(request, basket.quantity)}</div>"
         resp_str += f"""
-            <div id='added_{product_id}' class='alert-success mt-2' hx-swap-oob='true'>Added!</div>
+            <div id='added_{product_id}' class='alert-success mt-2' hx-swap-oob='true'>
+                Added! <a href='{reverse("shop:basket")}'>Go to basket</a>
+            </div>
         """
         # update variant dropdown, including out of stock message
         variant_html = render_to_string(
