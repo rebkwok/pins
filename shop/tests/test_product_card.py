@@ -5,6 +5,7 @@ fields, and that the elements the views update are present exactly once.
 """
 import re
 from collections import Counter
+from datetime import datetime, UTC
 from html.parser import HTMLParser
 
 import pytest
@@ -14,6 +15,7 @@ from django.urls import reverse
 import wagtail_factories
 from wagtail.models import Site
 
+from ..models import Sale, SaleProduct
 from .factories import CategoryPageFactory, ShopPageFactory
 
 pytestmark = pytest.mark.django_db
@@ -193,3 +195,57 @@ def test_product_card_single_image(client, shop_pages):
     assert "data-bs-ride" not in carousel
     assert parser.indicators == []
 
+
+
+# Sale banner
+
+
+def test_sale_banner_shown_during_sale(client, shop_pages, freezer):
+    freezer.move_to("2024-06-01 10:00")
+    sale = Sale.objects.create(
+        name="Summer sale",
+        banner_title="Summer sale!",
+        banner_content="20% off mugs",
+        banner_include_end=True,
+        start_date=datetime(2024, 5, 1, tzinfo=UTC),
+        end_date=datetime(2024, 7, 1, 12, 30, tzinfo=UTC),
+    )
+    SaleProduct.objects.create(sale=sale, product=shop_pages[0], discount=20)
+
+    for url in ["/shop/", "/shop/category/", reverse("shop:product_detail", args=(shop_pages[0].id,))]:
+        content = client.get(url).content.decode()
+        assert "Summer sale!" in content, url
+        assert "20% off mugs" in content
+        assert "Sale ends on 01 Jul 2024 at 12:30" in content
+
+
+def test_no_sale_banner_without_sale(client, shop_pages):
+    content = client.get("/shop/").content.decode()
+    assert "Sale ends on" not in content
+    assert "jumbotron" not in content
+
+
+# Product page layout
+
+
+def test_product_page_columns_stack_on_phones(client, shop_pages):
+    product = shop_pages[0]
+    product.description = "<p>A lovely mug</p>"
+    product.save()
+    content = client.get(reverse("shop:product_detail", args=(product.id,))).content.decode()
+    # full width on phones, side by side from tablet width
+    assert content.count('<div class="col-12 col-md-6">') == 2
+
+
+def test_basket_icon_in_navigation(client, shop_pages):
+    content = client.get("/shop/").content.decode()
+    navigation = content[content.index('<div class="navigation" data-navigation>'):]
+    navigation = navigation[: navigation.index('<div class="breadcrumb')] if '<div class="breadcrumb' in navigation else navigation
+    assert '<div id="basket-icon" class="navigation__basket">' in navigation
+    assert 'aria-label="Basket (0 items)"' in content
+
+
+def test_no_basket_icon_on_other_pages(client, home_page):
+    Site.objects.filter(is_default_site=True).update(root_page=home_page)
+    content = client.get("/").content.decode()
+    assert "navigation__basket" not in content

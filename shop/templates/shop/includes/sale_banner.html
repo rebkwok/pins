@@ -1,14 +1,14 @@
 {% if current_sale.banner_title or current_sale.banner_content %}
-    <div class="jumbotron jumbotron-fluid pt-4 pb-4">
+    <div class="shop-sale-banner">
         <div class="container">
             {% if current_sale.banner_title %}
-                <h3 class="text-danger">{{ current_sale.banner_title }}</h3>
-            {% endif %}    
+                <p class="shop-sale-banner__title">{{ current_sale.banner_title }}</p>
+            {% endif %}
             {% if current_sale.banner_content %}
-                <p class="text-danger mb-0  ">{{ current_sale.banner_content }}</p>
+                <p class="shop-sale-banner__content">{{ current_sale.banner_content }}</p>
             {% endif %}
             {% if current_sale.banner_include_end %}
-                <small class="text-danger mb-0">Sale ends on {{ current_sale.end_date|date:'d M Y' }} at {{ current_sale.end_date|date:'H:i' }}</small>
+                <p class="shop-sale-banner__end">Sale ends on {{ current_sale.end_date|date:'d M Y' }} at {{ current_sale.end_date|date:'H:i' }}</p>
             {% endif %}
         </div>
     </div>

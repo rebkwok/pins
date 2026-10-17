@@ -46,6 +46,9 @@
             {% include "includes/header.html" with parent=site_root calling_page=self %}
         {% endblock header %}
 
+        {# e.g. the shop's sale banner #}
+        {% block sale_banner %}{% endblock sale_banner %}
+
         {% block breadcrumbs %}
             {# breadcrumbs is defined in base/templatetags/navigation_tags.py #}
             {% if not hide_breadcrumbs %}

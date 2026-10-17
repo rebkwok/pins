@@ -7,8 +7,8 @@
     {% include "shop/includes/header-hero.html" with title=product.name %}
 
     <div class="container category-detail">
-        <div class="row">            
-            <div class="col">
+        <div class="row">
+            <div class="col-12 col-md-6">
                 <div class="container product-listing-card__container pt-2">
                     <div>
                         {% include "shop/includes/product-listing-card.html" %}
@@ -16,7 +16,7 @@
                 </div>
             </div>
             {% if product.description %}
-            <div class="col">
+            <div class="col-12 col-md-6">
                 <div class="container product-listing-card__container pt-0">
                     <p><strong>Description</strong></p>
                     <p>{{ product.description|richtext }}</p>
