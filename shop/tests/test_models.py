@@ -646,3 +646,14 @@ def test_category_link_escapes_title(product):
     assert "Mugs &amp; &lt;cups&gt;" in link
     variant = baker.make("shop.ProductVariant", product=product)
     assert variant.category_link() == link
+
+
+def test_product_variant_formset_other_unique_errors(product):
+    # Duplicate errors for anything other than name/colour/size use Django's
+    # default message
+    form = get_edit_handler(Product).get_form_class()(instance=product)
+    formset = form.formsets["variants"]
+    assert formset.get_unique_error_message(["sort_order"]) == (
+        "Please correct the duplicate data for sort_order."
+    )
+

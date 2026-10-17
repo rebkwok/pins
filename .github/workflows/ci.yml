@@ -49,3 +49,7 @@ jobs:
       - name: Run coverage
         run: |
           uv run coverage report
+
+      - name: Check shop coverage is 100%
+        run: |
+          uv run coverage report --include="shop/*" --fail-under=100

@@ -315,3 +315,24 @@ def test_product_edit_duplicate_variants_message(admin_client, variant):
     assert "This variant has the same name, colour and size as another variant." in content
     assert "Please correct the duplicate" not in content
     assert product.variants.count() == 1
+
+
+def test_variant_edit_missing_stock(admin_client, variant):
+    data = variant_form_data(variant, "", stock_shown=10)
+    resp = admin_client.post(edit_variant_url(variant), data)
+    assert resp.status_code == 200
+    assert "This field is required." in resp.content.decode()
+    variant.refresh_from_db()
+    assert variant.stock == 10
+
+
+def test_variant_form_save_refreshes_stock(variant):
+    # Saving the form directly (with commit) applies the change and refreshes
+    # the instance's stock from the database
+    form_class = ProductVariant.snippet_viewset.get_edit_handler().get_form_class()
+    take_stock(variant, 2)
+    form = form_class(variant_form_data(variant, 15, stock_shown=10), instance=variant)
+    assert form.is_valid(), form.errors
+    saved = form.save()
+    assert saved.stock == 13
+
