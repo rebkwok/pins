@@ -12,6 +12,7 @@ from django.urls import reverse
 
 from salesman.core.utils import get_salesman_model
 from salesman.orders.signals import status_changed
+from salesman_stripe_connect import signals as stripe_signals
 
 from .models import ProductVariant, ShopSettings, order_items_for_variants
 
@@ -54,12 +55,47 @@ def send_email(subject, message, to, reply_to):
     transaction.on_commit(_send)
 
 
+def order_status_url(order):
+    return f'https://{settings.DOMAIN}{reverse("shop:order_status", args=(order.token,))}'
+
+
+@receiver(stripe_signals.refund_recorded)
+def send_refund_email(sender, order, amount, fully_refunded, **kwargs):
+    """Tell the customer that (some or all of) their order has been refunded"""
+    _, reply_to = get_email_settings()
+    if fully_refunded:
+        subject = f"Order '{order.ref}' has been refunded"
+    else:
+        subject = f"Order '{order.ref}' has been partially refunded"
+    message = (
+        f"We have refunded £{amount:.2f} to the card (or other payment method) you "
+        "used for this order. It can take 5-10 working days to appear on your "
+        "statement.\n"
+        f"View the status of your order: {order_status_url(order)}"
+    )
+    send_email(subject, message, [order.email], reply_to)
+
+
+@receiver(stripe_signals.dispute_created)
+@receiver(stripe_signals.dispute_closed)
+def send_dispute_notification(sender, order, message, signal, **kwargs):
+    """Tell the shop about a disputed payment"""
+    notify_emails, reply_to = get_email_settings()
+    if not notify_emails:
+        return
+    if signal is stripe_signals.dispute_created:
+        subject = f"Payment for shop order '{order.ref}' has been disputed"
+    else:
+        subject = f"Dispute for shop order '{order.ref}' closed"
+    send_email(subject, message, notify_emails, reply_to)
+
+
 @receiver(status_changed)
 def send_notification(sender, order, new_status, old_status, **kwargs):
     """
     Send notification to customer when order is moved to completed.
     """
-    status_url = f'{settings.DOMAIN}{reverse("shop:order_status", args=(order.token,))}'
+    status_url = order_status_url(order)
     if new_status in [order.Status.COMPLETED, order.Status.PROCESSING]:
         _, reply_to = get_email_settings()
         if new_status == order.Status.COMPLETED:
@@ -84,9 +120,7 @@ def send_new_order_notifications(sender, instance, created, **kwargs):
     """
     Send notification to customer when order is first created
     """
-    status_url = (
-        f'{settings.DOMAIN}{reverse("shop:order_status", args=(instance.token,))}'
-    )
+    status_url = order_status_url(instance)
     if created:
         notify_emails, reply_to = get_email_settings()
 

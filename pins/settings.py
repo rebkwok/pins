@@ -128,7 +128,7 @@ INSTALLED_APPS = [
     "salesman.admin",
     "rest_framework",
     "shop",
-    "salesman_stripe",
+    "salesman_stripe_connect",
 ]
 
 
@@ -613,21 +613,17 @@ SALESMAN_BASKET_MODIFIERS = [
     "shop.modifiers.SaleModifier",
 ]
 
-SALESMAN_STRIPE_SECRET_KEY = env.str("SALESMAN_STRIPE_SECRET_KEY")
-SALESMAN_STRIPE_WEBHOOK_SECRET = env.str("SALESMAN_STRIPE_WEBHOOK_SECRET")
-
-# Account ID for Stripe connect account
-STRIPE_CONNECTED_ACCOUNT = env.str("STRIPE_CONNECTED_ACCOUNT")
-
-# Payment method label used when displayed in the basket.
-SALESMAN_STRIPE_PAYMENT_LABEL = "Pay with Stripe"
-
-# Default ISO currency used for payments (https://stripe.com/docs/currencies)
-SALESMAN_STRIPE_DEFAULT_CURRENCY = "gbp"
-
-SALESMAN_STRIPE_WEBHOOK_URL = "/stripe/webhook/"
-# Default paid status for fullfiled orders.
-SALESMAN_STRIPE_PAID_STATUS = "PROCESSING"
+# Stripe payments (salesman_stripe_connect), as direct charges on the connected
+# (PINS) account
+SALESMAN_STRIPE_CONNECT_SECRET_KEY = env.str("SALESMAN_STRIPE_CONNECT_SECRET_KEY")
+# Signing secret of the webhook endpoint for connected accounts' events
+SALESMAN_STRIPE_CONNECT_WEBHOOK_SECRET = env.str("SALESMAN_STRIPE_CONNECT_WEBHOOK_SECRET")
+# Id of the connected (PINS) account
+SALESMAN_STRIPE_CONNECT_ACCOUNT = env.str("SALESMAN_STRIPE_CONNECT_ACCOUNT")
+SALESMAN_STRIPE_CONNECT_PAYMENT_LABEL = "Pay with Stripe"
+SALESMAN_STRIPE_CONNECT_CURRENCY = "gbp"
+# Status of orders when they're paid
+SALESMAN_STRIPE_CONNECT_PAID_STATUS = "PROCESSING"
 
 # How long items are held in a basket. The Stripe checkout session expires 1 minute
 # after the basket timeout, and Stripe requires sessions to expire between 30

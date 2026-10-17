@@ -21,6 +21,7 @@ from salesman.orders.models import (
     BaseOrderPayment,
 )
 from modelcluster.forms import BaseChildFormSet
+from salesman_stripe_connect.mixins import OrderAmountsMixin, StripeBasketMixin
 from modelcluster.models import ClusterableModel, ParentalKey
 from wagtail.admin.forms import WagtailAdminModelForm
 from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, MultiFieldPanel
@@ -39,7 +40,8 @@ from wagtail.models import Page, Orderable
 
 SHIPPING_COLLECT = "collect"
 SHIPPING_DELIVER = "deliver"
-SHIPPING_METHODS = {SHIPPING_COLLECT: "Collect in person", SHIPPING_DELIVER: "Delivery"}
+# In the order they're shown in the basket; delivery is the default
+SHIPPING_METHODS = {SHIPPING_DELIVER: "Delivery", SHIPPING_COLLECT: "Collect in person"}
 # Shown with the shipping method options in the basket
 SHIPPING_METHOD_NOTES = {
     SHIPPING_COLLECT: (
@@ -51,10 +53,10 @@ SHIPPING_METHOD_NOTES = {
 logger = logging.getLogger(__name__)
 
 
-class Order(BaseOrder):
+class Order(OrderAmountsMixin, BaseOrder):
     name = models.CharField(max_length=255, verbose_name="Name")
     shipping_method = models.CharField(
-        choices=tuple(SHIPPING_METHODS.items()), default=SHIPPING_COLLECT
+        choices=tuple(SHIPPING_METHODS.items()), default=SHIPPING_DELIVER
     )
 
     @property
@@ -89,18 +91,15 @@ class OrderNote(BaseOrderNote):
 # BASKET
 
 
-class Basket(BaseBasket):
+class Basket(StripeBasketMixin, BaseBasket):
     shipping_method = models.CharField(
-        choices=tuple(SHIPPING_METHODS.items()), default=SHIPPING_COLLECT
+        choices=tuple(SHIPPING_METHODS.items()), default=SHIPPING_DELIVER
     )
     timeout = models.DateTimeField(null=True)
 
     @property
     def needs_delivery(self):
         return self.shipping_method != SHIPPING_COLLECT
-
-    # Key in extra for the Stripe checkout session while a payment is in progress
-    STRIPE_SESSION_KEY = "stripe_session"
 
     @classmethod
     def get_existing(cls, request):
@@ -124,35 +123,14 @@ class Basket(BaseBasket):
             return cls.objects.filter(id=basket_id, user=None).first()
         return None
 
-    @property
-    def payment_in_progress(self):
-        """
-        A Stripe checkout session has been started for this basket and hasn't
-        completed or expired; the basket can't be changed until it does.
-        """
-        return self.STRIPE_SESSION_KEY in self.extra
-
-    @property
-    def stripe_session_id(self):
-        return self.extra.get(self.STRIPE_SESSION_KEY, {}).get("id")
-
-    @property
-    def stripe_session_url(self):
-        return self.extra.get(self.STRIPE_SESSION_KEY, {}).get("url")
-
-    def start_payment(self, session_id, session_url, hold_until):
+    def start_payment(self, session_id, session_url, hold_until=None):
         """
         Record the Stripe checkout session for this basket, and hold the
         basket's items until hold_until
         """
-        self.extra[self.STRIPE_SESSION_KEY] = {"id": session_id, "url": session_url}
-        self.timeout = hold_until
-        self.save()
-
-    def end_payment(self):
-        """The basket's Stripe checkout session has expired or been cancelled"""
-        self.extra.pop(self.STRIPE_SESSION_KEY, None)
-        self.save()
+        if hold_until is not None:
+            self.timeout = hold_until
+        super().start_payment(session_id, session_url)
 
     def update(self, request):
         super().update(request)

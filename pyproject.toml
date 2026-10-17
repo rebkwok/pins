@@ -32,7 +32,6 @@ dependencies = [
     "envdir<=1.0.1",
     "django-ses[events]<=4.8.0",
     "pygments<=2.21.0",
-    "django-salesman-stripe",
     "stripe>=16.0.0,<17",
 ]
 
@@ -55,7 +54,6 @@ dependencies = [
 [tool.uv.sources]
 # Fork to allow django 6+
 django-salesman = { git = "https://github.com/rebkwok/django-salesman.git", rev="12a6cdb0d36bbd544590c151aa2e0422fb72489e" }
-django-salesman-stripe = { git = "https://github.com/rebkwok/django-salesman-stripe.git", rev="d35f897b86b52beb716bdf3d443c117ade5b9d47" }
 
 
 [tool.pytest]
@@ -77,9 +75,9 @@ django-salesman-stripe = { git = "https://github.com/rebkwok/django-salesman-str
         "FIELD_ENCRYPTION_KEY='ddD0dDddD0DddD00DDDDDd0DDdd0DddDdd-DdD0ddDd='",
         "PDF_ENCRYPTION_KEY=dummy",
         "RECIPE_SUBMISSIONS_OPEN=True",
-        "SALESMAN_STRIPE_SECRET_KEY=sk_test_dummy",
-        "SALESMAN_STRIPE_WEBHOOK_SECRET=whsec_dummy",
-        "STRIPE_CONNECTED_ACCOUNT=acct_dummy",
+        "SALESMAN_STRIPE_CONNECT_SECRET_KEY=sk_test_dummy",
+        "SALESMAN_STRIPE_CONNECT_WEBHOOK_SECRET=whsec_dummy",
+        "SALESMAN_STRIPE_CONNECT_ACCOUNT=acct_dummy",
     ]
 
 [tool.coverage.run]

@@ -332,6 +332,6 @@ def test_salesman_api_not_exposed(client, url):
 
 
 def test_salesman_payment_urls_exposed():
-    assert reverse("stripe-success") == "/api/payment/stripe/success/"
-    assert reverse("stripe-cancel") == "/api/payment/stripe/cancel/"
-    assert reverse("stripe-webhook") == "/api/payment/stripe/webhook/"
+    assert reverse("stripe-connect-success") == "/api/payment/stripe/success/"
+    assert reverse("stripe-connect-cancel") == "/api/payment/stripe/cancel/"
+    assert reverse("stripe-connect-webhook") == "/stripe/webhook/"

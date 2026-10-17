@@ -127,7 +127,7 @@
                             {% endif %}
                             {% for method in shipping_methods %}
                             <div class="form-check">
-                                <input class="form-check-input" type="radio" name="shipping-method" id="id_{{ method.0 }}" value="{{ method.0 }}" {% if forloop.first %}checked{% endif %}>
+                                <input class="form-check-input" type="radio" name="shipping-method" id="id_{{ method.0 }}" value="{{ method.0 }}" {% if method.0 == selected_shipping_method %}checked{% endif %}>
                                 <label class="form-check-label" for="id_{{ method.0 }}">
                                 {{ method.1 }}
                                 </label>
