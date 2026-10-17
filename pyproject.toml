@@ -77,6 +77,9 @@ django-salesman-stripe = { git = "https://github.com/rebkwok/django-salesman-str
         "FIELD_ENCRYPTION_KEY='ddD0dDddD0DddD00DDDDDd0DDdd0DddDdd-DdD0ddDd='",
         "PDF_ENCRYPTION_KEY=dummy",
         "RECIPE_SUBMISSIONS_OPEN=True",
+        "SALESMAN_STRIPE_SECRET_KEY=sk_test_dummy",
+        "SALESMAN_STRIPE_WEBHOOK_SECRET=whsec_dummy",
+        "STRIPE_CONNECTED_ACCOUNT=acct_dummy",
     ]
 
 [tool.coverage.run]
