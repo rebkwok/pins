@@ -325,6 +325,17 @@ def protected_variants_message(variants):
     return " ".join(sentences)
 
 
+VARIANT_NEEDS_NAME_MESSAGE = (
+    "When a product has more than one variant, each variant needs a name, "
+    "colour or size, so customers can tell them apart."
+)
+
+
+def is_blank_variant(data):
+    """data: a variant's (cleaned) field values"""
+    return not (data.get("variant_name") or data.get("colour") or data.get("size"))
+
+
 class ProductVariantAdminForm(WagtailAdminModelForm):
     """
     Admin form for product variants, on their own and in the product form.
@@ -346,6 +357,7 @@ class ProductVariantAdminForm(WagtailAdminModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        self._check_variant_names(cleaned_data)
         stock = cleaned_data.get("stock")
         stock_shown = cleaned_data.get("stock_shown")
         if stock is None:
@@ -375,6 +387,30 @@ class ProductVariantAdminForm(WagtailAdminModelForm):
                 )
             self.add_error("stock", message)
         return cleaned_data
+
+    def _check_variant_names(self, cleaned_data):
+        """
+        If the product has other variants, this variant and the others each need
+        a name, colour or size. Only for the variant form on its own (which has
+        the product field); in the product form, ProductVariantFormSet checks
+        all the variants together.
+        """
+        product = cleaned_data.get("product")
+        if "product" not in self.fields or product is None:
+            return
+        others = ProductVariant.objects.filter(product=product).exclude(
+            pk=self.instance.pk
+        )
+        if not others.exists():
+            return
+        if is_blank_variant(cleaned_data):
+            self.add_error("variant_name", VARIANT_NEEDS_NAME_MESSAGE)
+        elif others.filter(variant_name="", colour="", size="").exists():
+            self.add_error(
+                None,
+                f"{VARIANT_NEEDS_NAME_MESSAGE} Another variant of this product has no "
+                "name, colour or size; give it one first.",
+            )
 
     def save(self, commit=True):
         stock_shown = self.cleaned_data.get("stock_shown")
@@ -438,6 +474,24 @@ class ProductVariantFormSet(BaseChildFormSet):
     def get_form_error(self):
         # Shown on each duplicate variant
         return "This variant has the same name, colour and size as another variant."
+
+    def clean(self):
+        super().clean()
+        # The variants the product will have: not deleted, and not empty new rows
+        variant_forms = [
+            form
+            for form in self.forms
+            if hasattr(form, "cleaned_data")
+            and not self._should_delete_form(form)
+            and (form.instance.pk is not None or form.has_changed())
+        ]
+        if len(variant_forms) < 2:
+            return
+        blank_forms = [form for form in variant_forms if is_blank_variant(form.cleaned_data)]
+        for form in blank_forms:
+            form.add_error("variant_name", "This variant needs a name, colour or size.")
+        if blank_forms:
+            raise ValidationError(VARIANT_NEEDS_NAME_MESSAGE)
 
 
 class ProductVariantsInlinePanel(InlinePanel):
