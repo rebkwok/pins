@@ -5,6 +5,7 @@ import pytest
 from model_bakery import baker
 
 from salesman.admin.wagtail_hooks import OrderAdmin as SalesmanOrderAdmin
+from django.urls import reverse
 from salesman.core.utils import get_salesman_model
 from salesman.orders.serializers import OrderSerializer as SalesmanOrderSerializer
 
@@ -173,3 +174,41 @@ def test_order_admin_refunds_filter(admin_client, refunded_orders, value, expect
     resp = admin_client.get(OrderAdmin().url_helper.index_url, {"refunds": value})
     shown = set(resp.context["object_list"])
     assert shown == {refunded_orders[index] for index in expected}
+
+
+def breadcrumbs(content):
+    """The breadcrumb labels on an admin page"""
+    nav = re.search(r'<nav[^>]*aria-label="Breadcrumb">(.*?)</nav>', content, re.S).group(1)
+    return [
+        " ".join(re.sub(r"<[^>]+>", " ", item).split())
+        for item in re.findall(r"<li.*?</li>", nav, re.S)
+    ]
+
+
+@pytest.mark.parametrize(
+    "model,label,new_label",
+    [
+        ("product", "Products", "New: Product"),
+        ("productvariant", "Product variants", "New: Product variant"),
+        ("sale", "Sales", "New: Sale"),
+    ],
+)
+def test_shop_stock_breadcrumbs(
+    admin_client, product, sale_with_items, model, label, new_label
+):
+    instance = {
+        "product": product,
+        "productvariant": baker.make("shop.ProductVariant", product=product),
+        "sale": sale_with_items,
+    }[model]
+    prefix = f"wagtailsnippets_shop_{model}"
+    pages = [
+        (reverse(f"{prefix}:list"), []),
+        (reverse(f"{prefix}:add"), [new_label]),
+        (reverse(f"{prefix}:edit", args=(instance.pk,)), [str(instance)]),
+    ]
+    for url, last in pages:
+        content = admin_client.get(url).content.decode()
+        assert breadcrumbs(content) == ["Home", "Shop Stock", label, *last]
+        # the menu has no page, so Shop Stock isn't a link
+        assert not re.search(r"<a[^>]*>\s*Shop Stock", content)

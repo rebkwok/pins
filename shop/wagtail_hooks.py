@@ -29,7 +29,22 @@ from .models import (
 Order = get_salesman_model("Order")
 
 
-class ProductViewSet(SnippetViewSet):
+SHOP_STOCK_MENU_LABEL = "Shop Stock"
+
+
+class ShopStockViewSet(SnippetViewSet):
+    """
+    A snippet in the Shop Stock menu, with Shop Stock in its breadcrumbs
+    (Home > Shop Stock > Products). The menu has no page of its own, so it
+    isn't a link.
+    """
+
+    @property
+    def breadcrumbs_items(self):
+        return [*super().breadcrumbs_items, {"url": None, "label": SHOP_STOCK_MENU_LABEL}]
+
+
+class ProductViewSet(ShopStockViewSet):
     model = Product
     list_display = (
         "name",
@@ -41,7 +56,7 @@ class ProductViewSet(SnippetViewSet):
     list_filter = ("category_page",)
 
 
-class ProductVariantViewSet(SnippetViewSet):
+class ProductVariantViewSet(ShopStockViewSet):
     model = ProductVariant
     panels = [FieldPanel("product"), *PRODUCT_VARIANT_PANELS]
     list_display = (
@@ -55,7 +70,7 @@ class ProductVariantViewSet(SnippetViewSet):
     list_filter = ("product",)
 
 
-class SaleViewSet(SnippetViewSet):
+class SaleViewSet(ShopStockViewSet):
     model = Sale
     list_display = (
         "name",
@@ -65,7 +80,7 @@ class SaleViewSet(SnippetViewSet):
 
 
 class ProductGroup(SnippetViewSetGroup):
-    menu_label = "Shop Stock"
+    menu_label = SHOP_STOCK_MENU_LABEL
     menu_icon = "pick"
     items = (ProductViewSet, ProductVariantViewSet, SaleViewSet)
     menu_order = 200
