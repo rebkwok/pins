@@ -277,3 +277,19 @@ def test_dispute_emails_no_notify_addresses(order, django_capture_on_commit_call
             sender=None, order=order, dispute=None, message="Dispute message"
         )
     assert mail.outbox == []
+
+
+def test_account_deauthorized_email(shop_settings, django_capture_on_commit_callbacks):
+    with django_capture_on_commit_callbacks(execute=True):
+        stripe_signals.account_deauthorized.send(sender=None, account_id="acct_1")
+    (email,) = mail.outbox
+    assert email.to == ["admin@test.com", "another_admin@test.com"]
+    assert email.subject == "Stripe account disconnected: shop card payments are unavailable"
+    assert "The Stripe account acct_1 has been disconnected" in email.body
+    assert "https://podencosinneed.org/stripe/connect/" in email.body
+
+
+def test_account_deauthorized_no_notify_addresses(django_capture_on_commit_callbacks):
+    with django_capture_on_commit_callbacks(execute=True):
+        stripe_signals.account_deauthorized.send(sender=None, account_id="acct_1")
+    assert mail.outbox == []

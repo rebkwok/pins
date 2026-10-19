@@ -6,6 +6,7 @@ from django.urls import reverse
 
 from salesman.core.utils import get_salesman_model
 from shop.payment import PayInAdvance, PayByStripe
+from shop.tests.factories import STRIPE_ACCOUNT
 
 
 Basket = get_salesman_model("Basket")
@@ -89,7 +90,7 @@ def test_pay_by_stripe(mock_stripe, rf, basket, freezer):
     assert basket.stripe_session_url == "https://stripe-session-url"
     assert basket.timeout == datetime(2024, 1, 1, 10, 36, tzinfo=UTC)
     # the session is created on the connected account, as a direct charge
-    assert mock_stripe.last_request.headers["Stripe-Account"] == "acct_dummy"
+    assert mock_stripe.last_request.headers["Stripe-Account"] == STRIPE_ACCOUNT
     assert "payment_intent_data" not in mock_stripe.last_request.text
 
 

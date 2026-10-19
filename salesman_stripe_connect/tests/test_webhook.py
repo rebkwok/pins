@@ -1,4 +1,5 @@
 """The webhook, and fulfilling orders from completed checkout sessions"""
+import logging
 from unittest.mock import Mock, patch
 
 import pytest
@@ -7,9 +8,10 @@ from django.core.exceptions import ImproperlyConfigured
 from django.urls import reverse
 from salesman.core.utils import get_salesman_model
 
-from .. import views
+from .. import signals, views
+from ..models import ConnectedAccount
 from ..payment import StripeConnectPayment
-from .utils import mock_event, mock_session, post_event
+from .utils import logged, mock_event, mock_session, post_event
 
 pytestmark = pytest.mark.django_db
 
@@ -68,13 +70,18 @@ def test_webhook_get_not_allowed(client):
 
 @pytest.mark.parametrize("account", ["acct_other", None])
 def test_webhook_other_account_ignored(client, checkout_basket, account, caplog):
+    caplog.set_level(logging.INFO)
     # events from other connected accounts, or the platform's own events
     event = completed(checkout_basket)
     event.account = account
     resp = post_event(client, event)
     assert resp.content.decode() == "Event ignored"
     assert not Order.objects.exists()
-    assert f"Ignoring Stripe checkout.session.completed event from account {account}" in caplog.text
+    # e.g. another site's account if the platform is shared: not a warning
+    assert logged(caplog, logging.INFO) == [
+        f"Ignoring Stripe checkout.session.completed event from account {account}"
+    ]
+    assert logged(caplog, logging.WARNING) == []
 
 
 def test_webhook_platform_event_ignored(client):
@@ -90,9 +97,45 @@ def test_webhook_other_event_ignored(client):
 
 
 def test_webhook_account_deauthorized(client, account, caplog):
-    resp = post_event(client, mock_event("account.application.deauthorized", Mock()))
+    received = []
+
+    def receiver(sender, **kwargs):
+        received.append(kwargs["account_id"])
+
+    signals.account_deauthorized.connect(receiver)
+    try:
+        resp = post_event(client, mock_event("account.application.deauthorized", Mock()))
+    finally:
+        signals.account_deauthorized.disconnect(receiver)
     assert resp.content.decode() == "Account deauthorized"
     assert f"Stripe account {account} has disconnected from the platform" in caplog.text
+    # the account is forgotten, so payments can't be made
+    assert not ConnectedAccount.objects.exists()
+    assert received == [account]
+
+
+def test_webhook_other_account_deauthorized(client, account):
+    event = mock_event("account.application.deauthorized", Mock(), account="acct_other")
+    assert post_event(client, event).content.decode() == "Event ignored"
+    assert ConnectedAccount.get_account_id() == account
+
+
+@pytest.mark.parametrize("event_account", ["acct_test", "acct_other"])
+def test_webhook_account_authorized(client, event_account, caplog):
+    caplog.set_level(logging.INFO)
+    event = mock_event("account.application.authorized", Mock(), account=event_account)
+    assert post_event(client, event).content.decode() == "Account authorized"
+    assert f"Stripe account {event_account} has connected to the platform" in caplog.text
+
+
+def test_webhook_no_connected_account(client, connected_account, checkout_basket, caplog):
+    connected_account.delete()
+    resp = post_event(client, completed(checkout_basket))
+    assert resp.content.decode() == "Event ignored"
+    assert not Order.objects.exists()
+    # an account can still be connected
+    event = mock_event("account.application.authorized", Mock())
+    assert post_event(client, event).content.decode() == "Account authorized"
 
 
 def test_get_payment_method():
@@ -165,13 +208,20 @@ def test_session_completed_missing_basket(client, caplog):
     assert "Stripe payment pi_1 received for missing basket 1234" in caplog.text
 
 
-def test_session_completed_invalid_reference(client, caplog):
+@pytest.mark.parametrize("reference", ["unknown", None])
+def test_session_completed_not_shop_payment(client, caplog, reference):
+    # e.g. a payment link, or another integration on the connected account
+    caplog.set_level(logging.INFO)
     resp = post_event(
         client,
-        mock_event("checkout.session.completed", mock_session(client_reference_id="unknown")),
+        mock_event("checkout.session.completed", mock_session(client_reference_id=reference)),
     )
-    assert resp.content.decode() == "Invalid session reference"
-    assert "Invalid Stripe session reference: test-session" in caplog.text
+    assert resp.content.decode() == "Event ignored: not a shop payment"
+    assert logged(caplog, logging.INFO) == [
+        f"Stripe session test-session isn't a shop payment (reference {reference})"
+    ]
+    assert logged(caplog, logging.ERROR) == []
+    assert not Order.objects.exists()
 
 
 def test_session_completed_empty_basket(client, checkout_basket, caplog):

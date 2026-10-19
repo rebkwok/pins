@@ -21,3 +21,6 @@ NO_PRODUCT_IMAGES = {
     "product_images-MIN_NUM_FORMS": "0",
     "product_images-MAX_NUM_FORMS": "1000",
 }
+
+# The connected Stripe account in the tests (see conftest)
+STRIPE_ACCOUNT = "acct_shop_test"

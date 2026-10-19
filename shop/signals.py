@@ -90,6 +90,22 @@ def send_dispute_notification(sender, order, message, signal, **kwargs):
     send_email(subject, message, notify_emails, reply_to)
 
 
+@receiver(stripe_signals.account_deauthorized)
+def send_account_deauthorized_notification(sender, account_id, **kwargs):
+    """Tell the shop that card payments can't be taken"""
+    notify_emails, reply_to = get_email_settings()
+    if not notify_emails:
+        return
+    subject = "Stripe account disconnected: shop card payments are unavailable"
+    message = (
+        f"The Stripe account {account_id} has been disconnected from the website, so "
+        "the shop can't take card payments until a Stripe account is connected "
+        f"again, at https://{settings.DOMAIN}{reverse('stripe-connect')}\n"
+        "(If the connect page has been disabled, it needs to be enabled again.)"
+    )
+    send_email(subject, message, notify_emails, reply_to)
+
+
 @receiver(status_changed)
 def send_notification(sender, order, new_status, old_status, **kwargs):
     """

@@ -10,7 +10,6 @@ from urllib.parse import parse_qs
 import pytest
 from model_bakery import baker
 
-from django.conf import settings
 from django.contrib.messages import get_messages
 from django.core import mail
 from django.urls import reverse
@@ -19,6 +18,7 @@ from salesman.core.utils import get_salesman_model
 
 from ..payment import PayByStripe
 from ..wagtail_hooks import OrderAdmin
+from .factories import STRIPE_ACCOUNT
 
 pytestmark = pytest.mark.django_db
 
@@ -88,7 +88,7 @@ def test_refund_order(admin_client, paid_order, requests_mock, django_capture_on
 
     assert resp.status_code == 302
     # refunded on the connected account
-    assert stripe_refund.last_request.headers["Stripe-Account"] == "acct_dummy"
+    assert stripe_refund.last_request.headers["Stripe-Account"] == STRIPE_ACCOUNT
     assert parse_qs(stripe_refund.last_request.text) == {
         "payment_intent": ["pi_1"],
         "metadata[order]": [paid_order.ref],
@@ -165,7 +165,7 @@ def test_refund_order_no_stripe_payments(admin_client, order, requests_mock):
 def post_charge_refunded(client):
     event = Mock(
         type="charge.refunded",
-        account=settings.SALESMAN_STRIPE_CONNECT_ACCOUNT,
+        account=STRIPE_ACCOUNT,
         data=Mock(object=Mock(payment_intent="pi_1")),
     )
     with patch("salesman_stripe_connect.payment.stripe.Webhook") as mock_webhook:

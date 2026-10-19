@@ -1,11 +1,12 @@
 """Disputed payments (chargebacks)"""
+import logging
 from datetime import UTC, datetime
 from unittest.mock import Mock
 
 import pytest
 
 from .. import signals
-from .utils import mock_event, post_event
+from .utils import logged, mock_event, post_event
 
 pytestmark = pytest.mark.django_db
 
@@ -73,10 +74,14 @@ def test_dispute_created_no_due_date(client, paid_order):
 
 @pytest.mark.parametrize("event_type", ["charge.dispute.created", "charge.dispute.closed"])
 def test_dispute_unknown_payment(client, event_type, caplog, dispute_signals):
+    # e.g. a payment made outside the shop: logged as information, not an error
+    caplog.set_level(logging.INFO)
     resp = post_event(client, mock_event(event_type, dispute("pi_unknown")))
-    assert resp.content.decode() == "Order not found"
-    assert "Dispute dp_1" in caplog.text
-    assert "payment pi_unknown, which isn't on any order" in caplog.text
+    assert resp.content.decode() == "Event ignored: not a shop payment"
+    (message,) = logged(caplog, logging.INFO)
+    assert message.startswith("Dispute dp_1")
+    assert message.endswith("payment pi_unknown, which isn't a shop payment")
+    assert logged(caplog, logging.ERROR) == []
     assert dispute_signals == []
 
 

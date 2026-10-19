@@ -17,3 +17,8 @@ dispute_created = Signal()
 # A dispute has been closed (won or lost).
 # Arguments: order, dispute, message
 dispute_closed = Signal()
+
+# The connected account has disconnected from the platform, so payments can't be
+# made until an account is connected again.
+# Arguments: account_id
+account_deauthorized = Signal()

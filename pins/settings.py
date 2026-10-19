@@ -618,8 +618,14 @@ SALESMAN_BASKET_MODIFIERS = [
 SALESMAN_STRIPE_CONNECT_SECRET_KEY = env.str("SALESMAN_STRIPE_CONNECT_SECRET_KEY")
 # Signing secret of the webhook endpoint for connected accounts' events
 SALESMAN_STRIPE_CONNECT_WEBHOOK_SECRET = env.str("SALESMAN_STRIPE_CONNECT_WEBHOOK_SECRET")
-# Id of the connected (PINS) account
-SALESMAN_STRIPE_CONNECT_ACCOUNT = env.str("SALESMAN_STRIPE_CONNECT_ACCOUNT")
+# Connecting the PINS Stripe account at /stripe/connect/ (for users with the
+# connect_stripe_account permission): the platform's Connect client id (ca_...).
+# Set SALESMAN_STRIPE_CONNECT_PAGES_ENABLED to False to disable the connect pages
+# (e.g. after the account is connected).
+SALESMAN_STRIPE_CONNECT_CLIENT_ID = env.str("SALESMAN_STRIPE_CONNECT_CLIENT_ID")
+SALESMAN_STRIPE_CONNECT_PAGES_ENABLED = env.bool(
+    "SALESMAN_STRIPE_CONNECT_PAGES_ENABLED", default=True
+)
 SALESMAN_STRIPE_CONNECT_PAYMENT_LABEL = "Pay with Stripe"
 SALESMAN_STRIPE_CONNECT_CURRENCY = "gbp"
 # Status of orders when they're paid

@@ -8,7 +8,6 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from django.conf import settings
 from django.contrib.messages import get_messages
 from django.urls import reverse
 
@@ -17,6 +16,7 @@ from salesman.checkout.payment import PaymentError
 from salesman.core.utils import get_salesman_model
 
 from ..payment import PayByStripe
+from .factories import STRIPE_ACCOUNT
 
 pytestmark = pytest.mark.django_db
 
@@ -142,7 +142,7 @@ def test_expire_basket_payment_ignored(reference):
 def test_webhook_session_expired(client, paying_basket):
     event = Mock(
         type="checkout.session.expired",
-        account=settings.SALESMAN_STRIPE_CONNECT_ACCOUNT,
+        account=STRIPE_ACCOUNT,
         data=Mock(object=expired_session(paying_basket)),
     )
     with patch("salesman_stripe_connect.payment.stripe.Webhook") as mock_webhook:

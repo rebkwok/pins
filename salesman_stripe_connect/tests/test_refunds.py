@@ -1,4 +1,5 @@
 """Refunds: from the orders admin (refund_order), and recorded by the webhook"""
+import logging
 from decimal import Decimal
 from unittest.mock import Mock
 from urllib.parse import parse_qs
@@ -8,7 +9,7 @@ from salesman.core.utils import get_salesman_model
 
 from .. import signals
 from ..payment import StripeConnectPayment
-from .utils import REFUNDS_URL, mock_event, post_event
+from .utils import REFUNDS_URL, logged, mock_event, post_event
 
 pytestmark = pytest.mark.django_db
 
@@ -170,9 +171,14 @@ def test_charge_refunded_ignores_failed_refunds(client, paid_order, requests_moc
 
 
 def test_charge_refunded_unknown_payment(client, requests_mock, caplog):
+    # e.g. a payment made outside the shop: logged as information, not an error
+    caplog.set_level(logging.INFO)
     resp = post_event(client, charge_refunded("pi_unknown"))
-    assert resp.content.decode() == "Order not found"
-    assert "Refund received for payment pi_unknown, which isn't on any order" in caplog.text
+    assert resp.content.decode() == "Event ignored: not a shop payment"
+    assert logged(caplog, logging.INFO) == [
+        "Refund received for payment pi_unknown, which isn't a shop payment"
+    ]
+    assert logged(caplog, logging.ERROR) == []
     assert not requests_mock.called
 
 
