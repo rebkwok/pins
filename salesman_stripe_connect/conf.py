@@ -19,9 +19,22 @@ class AppSettings:
         return self._required("SALESMAN_STRIPE_CONNECT_WEBHOOK_SECRET")
 
     @property
-    def SALESMAN_STRIPE_CONNECT_ACCOUNT(self):
-        """Id of the connected account that payments are made to (acct_...)"""
-        return self._required("SALESMAN_STRIPE_CONNECT_ACCOUNT")
+    def SALESMAN_STRIPE_CONNECT_CLIENT_ID(self):
+        """The platform's Connect client id (ca_...), for connecting the account"""
+        return self._required("SALESMAN_STRIPE_CONNECT_CLIENT_ID")
+
+    @property
+    def SALESMAN_STRIPE_CONNECT_ALLOW_DISCONNECT(self):
+        """Set to False to remove the page for disconnecting the account"""
+        return getattr(settings, "SALESMAN_STRIPE_CONNECT_ALLOW_DISCONNECT", True)
+
+    @property
+    def SALESMAN_STRIPE_CONNECT_PAGES_ENABLED(self):
+        """
+        Set to False to disable the connect pages (e.g. once the account is
+        connected)
+        """
+        return getattr(settings, "SALESMAN_STRIPE_CONNECT_PAGES_ENABLED", True)
 
     @property
     def SALESMAN_STRIPE_CONNECT_CURRENCY(self):

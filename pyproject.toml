@@ -77,7 +77,7 @@ django-salesman = { git = "https://github.com/rebkwok/django-salesman.git", rev=
         "RECIPE_SUBMISSIONS_OPEN=True",
         "SALESMAN_STRIPE_CONNECT_SECRET_KEY=sk_test_dummy",
         "SALESMAN_STRIPE_CONNECT_WEBHOOK_SECRET=whsec_dummy",
-        "SALESMAN_STRIPE_CONNECT_ACCOUNT=acct_dummy",
+        "SALESMAN_STRIPE_CONNECT_CLIENT_ID=ca_dummy",
     ]
 
 [tool.coverage.run]

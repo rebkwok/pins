@@ -5,18 +5,35 @@ the basket and order fixtures from the project's conftest.
 from decimal import Decimal
 
 import pytest
-from django.conf import settings
 from django.core import mail
 from salesman.core.utils import get_salesman_model
 
+from ..models import ConnectedAccount
 from ..payment import StripeConnectPayment
+from .utils import ACCOUNT
 
 Order = get_salesman_model("Order")
 
 
+@pytest.fixture(autouse=True)
+def connected_account(request):
+    """
+    Tests that use the database have a connected Stripe account (ACCOUNT)
+    """
+    marker = request.node.get_closest_marker("django_db")
+    if marker is None:
+        yield None
+        return
+    transaction = marker.kwargs.get("transaction", False)
+    request.getfixturevalue("transactional_db" if transaction else "db")
+    account = ConnectedAccount(account_id=ACCOUNT, livemode=False)
+    account.save()
+    yield account
+
+
 @pytest.fixture
 def account():
-    return settings.SALESMAN_STRIPE_CONNECT_ACCOUNT
+    return ACCOUNT
 
 
 @pytest.fixture

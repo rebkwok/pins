@@ -12,8 +12,11 @@ Webhook events handled:
 - charge.refund.updated: a refund failed or was cancelled (handle_refund_updated)
 - charge.dispute.created, charge.dispute.closed: a customer disputed a payment
   (handle_dispute_created, handle_dispute_closed)
-- account.application.deauthorized: the connected account disconnected from
-  the platform (handle_account_deauthorized)
+- account.application.authorized, account.application.deauthorized: an account
+  connected to or disconnected from the platform (handle_account_authorized,
+  handle_account_deauthorized)
+
+The connected account is saved by the connect pages (see connect_views).
 """
 
 import logging
@@ -33,6 +36,7 @@ from salesman.core.utils import get_salesman_model
 
 from . import signals
 from .conf import app_settings
+from .models import ConnectedAccount
 
 # The Stripe API version the code is written for; webhook endpoints should use
 # the same version
@@ -40,12 +44,20 @@ API_VERSION = "2026-09-30.endive"
 
 CURRENCY_SYMBOLS = {"gbp": "£", "eur": "€", "usd": "$"}
 
+# Webhook response for events about payments that weren't made through the shop
+# (the connected account may take other payments)
+NOT_SHOP_PAYMENT = "Event ignored: not a shop payment"
+
 Basket = get_salesman_model("Basket")
 Order = get_salesman_model("Order")
 OrderNote = get_salesman_model("OrderNote")
 OrderPayment = get_salesman_model("OrderPayment")
 
 logger = logging.getLogger(__name__)
+
+
+class StripeAccountNotConnected(stripe.StripeError):
+    """No Stripe account is connected, so payments can't be made"""
 
 
 @cache
@@ -103,13 +115,20 @@ class StripeConnectPayment(PaymentMethod):
 
     @classmethod
     def get_connected_account(cls):
-        """Id of the connected account that payments are made to"""
-        return app_settings.SALESMAN_STRIPE_CONNECT_ACCOUNT
+        """Id of the connected account that payments are made to, or None"""
+        return ConnectedAccount.get_account_id()
 
     @classmethod
     def request_options(cls):
-        """Options for Stripe API requests, which are made on the connected account"""
-        return {"stripe_account": cls.get_connected_account()}
+        """
+        Options for Stripe API requests, which are made on the connected account.
+        Raises StripeAccountNotConnected (a StripeError) if no account is
+        connected.
+        """
+        account = cls.get_connected_account()
+        if account is None:
+            raise StripeAccountNotConnected("No Stripe account is connected")
+        return {"stripe_account": account}
 
     @classmethod
     def retrieve_session(cls, session_id):
@@ -142,16 +161,27 @@ class StripeConnectPayment(PaymentMethod):
         return self.process_payment(order, request)
 
     def process_payment(self, obj, request):
-        """Create a checkout session; returns its URL"""
+        """
+        Create a checkout session; returns its URL. Raises PaymentError, with a
+        message for the customer, if it can't be created.
+        """
         try:
             session = self.client().v1.checkout.sessions.create(
                 self.get_session_data(obj, request), options=self.request_options()
             )
-        except stripe.StripeError as e:
+        except StripeAccountNotConnected:
+            logger.error("Stripe payment refused: no Stripe account is connected")
+            raise PaymentError(
+                "Sorry, card payments aren't available at the moment. Please try "
+                "again later."
+            )
+        except stripe.StripeError:
             logger.exception(
                 "Error creating Stripe checkout session for %s", self.get_reference(obj)
             )
-            raise PaymentError(str(e))
+            raise PaymentError(
+                "Sorry, there was a problem starting your payment. Please try again."
+            )
         self.session_created(obj, session, request)
         return session.url
 
@@ -292,8 +322,13 @@ class StripeConnectPayment(PaymentMethod):
         """
         kind, id = cls.parse_reference(session.client_reference_id)
         if kind is None:
-            logger.error("Invalid Stripe session reference: %s", session.id)
-            return None, "Invalid session reference"
+            # e.g. a payment link, or another integration on the same account
+            logger.info(
+                "Stripe session %s isn't a shop payment (reference %s)",
+                session.id,
+                session.client_reference_id,
+            )
+            return None, NOT_SHOP_PAYMENT
 
         with transaction.atomic():
             # Lock the basket or order so that concurrent calls for the same
@@ -551,11 +586,11 @@ class StripeConnectPayment(PaymentMethod):
         """
         order = cls.get_order_for_payment(charge.payment_intent)
         if order is None:
-            logger.error(
-                "Refund received for payment %s, which isn't on any order",
+            logger.info(
+                "Refund received for payment %s, which isn't a shop payment",
                 charge.payment_intent,
             )
-            return "Order not found"
+            return NOT_SHOP_PAYMENT
         # The charge's refunds aren't included in the event, so fetch them
         refunds = cls.client().v1.refunds.list(
             {"payment_intent": charge.payment_intent, "limit": 100},
@@ -603,12 +638,12 @@ class StripeConnectPayment(PaymentMethod):
         """
         order = cls.get_order_for_payment(dispute.payment_intent)
         if order is None:
-            logger.error(
-                "Dispute %s received for payment %s, which isn't on any order",
+            logger.info(
+                "Dispute %s received for payment %s, which isn't a shop payment",
                 dispute.id,
                 dispute.payment_intent,
             )
-            return "Order not found"
+            return NOT_SHOP_PAYMENT
         message = (
             f"Payment {dispute.payment_intent} has been disputed by the customer "
             f"(reason: {dispute.reason.replace('_', ' ')}), for "
@@ -633,12 +668,12 @@ class StripeConnectPayment(PaymentMethod):
         """A dispute has been closed: note the outcome on the order"""
         order = cls.get_order_for_payment(dispute.payment_intent)
         if order is None:
-            logger.error(
-                "Dispute %s closed for payment %s, which isn't on any order",
+            logger.info(
+                "Dispute %s closed for payment %s, which isn't a shop payment",
                 dispute.id,
                 dispute.payment_intent,
             )
-            return "Order not found"
+            return NOT_SHOP_PAYMENT
         outcome = {
             "won": "won",
             "lost": (
@@ -658,11 +693,26 @@ class StripeConnectPayment(PaymentMethod):
     # The connected account
 
     @classmethod
+    def handle_account_authorized(cls, account):
+        """An account has connected to the platform (e.g. by the connect pages)"""
+        logger.info("Stripe account %s has connected to the platform", account)
+        return "Account authorized"
+
+    @classmethod
     def handle_account_deauthorized(cls, account):
-        """The connected account has disconnected from the platform"""
+        """
+        An account has disconnected from the platform. If it's the connected
+        account, forget it; payments can't be made until an account is
+        connected again.
+        """
+        with transaction.atomic():
+            deleted, _ = ConnectedAccount.objects.filter(account_id=account).delete()
+            if not deleted:
+                return "Event ignored"
+            signals.account_deauthorized.send(sender=cls, account_id=account)
         logger.error(
             "Stripe account %s has disconnected from the platform; Stripe payments "
-            "will fail until it's reconnected",
+            "can't be made until an account is connected again",
             account,
         )
         return "Account deauthorized"
@@ -715,10 +765,15 @@ class StripeConnectPayment(PaymentMethod):
         response is still a 200, so Stripe doesn't keep retrying.
         """
         account = getattr(event, "account", None)
-        if account != cls.get_connected_account():
-            logger.warning(
-                "Ignoring Stripe %s event from account %s", event.type, account
-            )
+        # Events about connecting accounts can be for accounts other than the
+        # connected one (or there may be no connected account)
+        if event.type == "account.application.authorized":
+            return cls.handle_account_authorized(account)
+        if event.type == "account.application.deauthorized":
+            return cls.handle_account_deauthorized(account)
+        if account is None or account != cls.get_connected_account():
+            # e.g. another site's connected account, if the platform is shared
+            logger.info("Ignoring Stripe %s event from account %s", event.type, account)
             return "Event ignored"
         obj = event.data.object
         match event.type:
@@ -734,8 +789,6 @@ class StripeConnectPayment(PaymentMethod):
                 message = cls.handle_dispute_created(obj)
             case "charge.dispute.closed":
                 message = cls.handle_dispute_closed(obj)
-            case "account.application.deauthorized":
-                message = cls.handle_account_deauthorized(account)
             case _:
                 message = "Event ignored"
         return message

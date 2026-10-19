@@ -33,12 +33,17 @@ from the connected account's Stripe dashboard as well as from the site.
    webhook:
    ```python
    path("api/", include(payment_methods_pool.get_urls())),
-   path("stripe/", include("salesman_stripe_connect.urls")),  # /stripe/webhook/
+   # /stripe/webhook/, and the connect pages /stripe/connect/ and /stripe/oauth/callback/
+   path("stripe/", include("salesman_stripe_connect.urls")),
    ```
 6. Settings:
    - `SALESMAN_STRIPE_CONNECT_SECRET_KEY`: the platform's secret key
    - `SALESMAN_STRIPE_CONNECT_WEBHOOK_SECRET`: the webhook endpoint's signing secret
-   - `SALESMAN_STRIPE_CONNECT_ACCOUNT`: the connected account's id (`acct_...`)
+   - `SALESMAN_STRIPE_CONNECT_CLIENT_ID`: the platform's Connect client id (`ca_...`)
+   - `SALESMAN_STRIPE_CONNECT_PAGES_ENABLED` (default True): set to False to
+     disable the connect pages, e.g. once the account is connected
+   - `SALESMAN_STRIPE_CONNECT_ALLOW_DISCONNECT` (default True): set to False to
+     remove the page for disconnecting the account
    - `SALESMAN_STRIPE_CONNECT_CURRENCY` (default `gbp`; currencies with 2 decimal places)
    - `SALESMAN_STRIPE_CONNECT_PAYMENT_LABEL` (default "Pay with Stripe")
    - `SALESMAN_STRIPE_CONNECT_PAID_STATUS`: status of paid orders (default `PROCESSING`)
@@ -46,8 +51,22 @@ from the connected account's Stripe dashboard as well as from the site.
    **connected accounts**, using API version `2026-09-30.endive`, for these
    events: `checkout.session.completed`, `checkout.session.expired`,
    `charge.refunded`, `charge.refund.updated`, `charge.dispute.created`,
-   `charge.dispute.closed`, `account.application.deauthorized`. Locally, use
+   `charge.dispute.closed`, `account.application.authorized`,
+   `account.application.deauthorized`. Locally, use
    `stripe listen --forward-connect-to localhost:8000/stripe/webhook/`.
+8. Connect the account that payments go to. In the platform's Connect settings,
+   enable OAuth and add the redirect URI `https://<domain>/stripe/oauth/callback/`.
+   Then go to `/stripe/connect/` and connect the account on Stripe's page.
+   Only one account can be connected (`ConnectedAccount`); until it is, Stripe
+   payments are refused. It can be disconnected at `/stripe/connect/disconnect/`
+   (so another can be connected), and if it disconnects from the platform in
+   Stripe, the webhook removes it.
+
+   The connect pages are for logged-in users with the
+   `salesman_stripe_connect.connect_stripe_account` permission ("Can connect or
+   disconnect the Stripe account"; superusers have it). Others are sent to
+   `LOGIN_URL` or refused. Override `salesman_stripe_connect/base.html` to use
+   the site's layout (the pages fill its `title` and `content` blocks).
 
 ## Customising
 
@@ -57,7 +76,7 @@ Subclass `StripeConnectPayment` and override its hooks:
 `get_view_context`, and `success_template_name` / `cancel_template_name`.
 
 Signals (`salesman_stripe_connect.signals`): `refund_recorded`,
-`dispute_created`, `dispute_closed`, e.g. for emails.
+`dispute_created`, `dispute_closed`, `account_deauthorized`, e.g. for emails.
 
 Refunds are recorded as order payments with negative amounts.
 `StripeConnectPayment.refund_order(order)` fully refunds an order; partial

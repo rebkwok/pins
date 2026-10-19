@@ -719,10 +719,12 @@ def test_post_checkout_view_non_stripe_payment_method(rf, basket):
 
 @mock.patch("shop.payment.PayByStripe.basket_payment")
 def test_post_checkout_view_error(mock_basket_payment, rf, basket):
-    mock_basket_payment.side_effect = PaymentError("Stripe error")
+    mock_basket_payment.side_effect = PaymentError("Sorry, payments aren't working")
     resp = checkout_view(checkout_request(rf, basket))
     assert resp.status_code == 200
-    assert resp.context_data["checkout_error"]
+    # the payment error is shown to the customer
+    assert resp.context_data["checkout_error"] == "Sorry, payments aren't working"
+    assert "Sorry, payments aren&#x27;t working" in resp.rendered_content
 
 
 def test_post_checkout_view_invalid_payment_method_in_form(rf, basket):
@@ -732,7 +734,7 @@ def test_post_checkout_view_invalid_payment_method_in_form(rf, basket):
     request.POST["payment_method"] = "unknown"
     resp = checkout_view(request)
     assert resp.status_code == 200
-    assert resp.context_data["checkout_error"]
+    assert resp.context_data["checkout_error"] == "There was an error submitting this order"
 
 
 ### ORDER STATUS VIEWS

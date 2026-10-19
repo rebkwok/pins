@@ -12,8 +12,8 @@ from django.test import RequestFactory
 from salesman.checkout.payment import PaymentError
 
 from ..conf import app_settings
-from ..payment import StripeConnectPayment, get_client
-from .utils import SESSIONS_URL, session_json
+from ..payment import StripeAccountNotConnected, StripeConnectPayment, get_client
+from .utils import ACCOUNT, SESSIONS_URL, session_json
 
 pytestmark = pytest.mark.django_db
 
@@ -58,7 +58,7 @@ def test_payment_stripe_error(payment, checkout_basket, request_, requests_mock,
     requests_mock.post(
         SESSIONS_URL, status_code=400, json={"error": {"message": "Invalid request"}}
     )
-    with pytest.raises(PaymentError, match="Invalid request"):
+    with pytest.raises(PaymentError, match="there was a problem starting your payment"):
         payment.basket_payment(checkout_basket, request_)
     assert f"Error creating Stripe checkout session for basket_{checkout_basket.id}" in caplog.text
     checkout_basket.refresh_from_db()
@@ -236,19 +236,43 @@ def test_format_amount(settings, currency, expected):
 
 
 def test_settings_defaults(settings):
-    for name in ["CURRENCY", "PAYMENT_LABEL", "PAID_STATUS"]:
+    for name in ["CURRENCY", "PAYMENT_LABEL", "PAID_STATUS", "PAGES_ENABLED"]:
         delattr(settings, f"SALESMAN_STRIPE_CONNECT_{name}")
     assert app_settings.SALESMAN_STRIPE_CONNECT_CURRENCY == "gbp"
     assert app_settings.SALESMAN_STRIPE_CONNECT_PAYMENT_LABEL == "Pay with Stripe"
     assert app_settings.SALESMAN_STRIPE_CONNECT_PAID_STATUS == "PROCESSING"
+    assert app_settings.SALESMAN_STRIPE_CONNECT_PAGES_ENABLED is True
+    assert app_settings.SALESMAN_STRIPE_CONNECT_ALLOW_DISCONNECT is True
 
 
 def test_required_setting(settings):
-    settings.SALESMAN_STRIPE_CONNECT_ACCOUNT = ""
+    settings.SALESMAN_STRIPE_CONNECT_CLIENT_ID = ""
     with pytest.raises(
-        ImproperlyConfigured, match="The SALESMAN_STRIPE_CONNECT_ACCOUNT setting is required"
+        ImproperlyConfigured, match="The SALESMAN_STRIPE_CONNECT_CLIENT_ID setting is required"
     ):
+        app_settings.SALESMAN_STRIPE_CONNECT_CLIENT_ID
+
+
+# No connected account
+
+
+def test_request_options_no_account(connected_account):
+    assert StripeConnectPayment.request_options() == {"stripe_account": ACCOUNT}
+    connected_account.delete()
+    with pytest.raises(StripeAccountNotConnected):
         StripeConnectPayment.request_options()
+
+
+def test_payment_no_account(
+    payment, checkout_basket, request_, connected_account, requests_mock, caplog
+):
+    connected_account.delete()
+    with pytest.raises(PaymentError, match="card payments aren't available"):
+        payment.basket_payment(checkout_basket, request_)
+    assert not requests_mock.called
+    assert "Stripe payment refused: no Stripe account is connected" in caplog.text
+    checkout_basket.refresh_from_db()
+    assert not checkout_basket.payment_in_progress
 
 
 def test_client():

@@ -557,30 +557,35 @@ def cancel_payment(request):
     return HttpResponseRedirect(reverse("shop:basket"))
 
 
+CHECKOUT_ERROR = "There was an error submitting this order"
+
+
 def _checkout(request, basket):
     """
     Process the checkout with salesman's checkout serializer: save the
     customer's details on the basket and start the payment.
-    Returns the payment URL, or None if the checkout failed.
+    Returns (the payment URL, None), or (None, an error message for the
+    customer) if the checkout failed.
     """
     if not (
         salesman_settings.SALESMAN_ALLOW_ANONYMOUS_USER_CHECKOUT
         or request.user.is_authenticated
     ):
-        return None
+        return None, CHECKOUT_ERROR
     basket.update(request)
     serializer = CheckoutSerializer(
         data=request.POST, context={"request": request, "basket": basket}
     )
     if not serializer.is_valid():
         logger.error("Checkout failed: %s", serializer.errors)
-        return None
+        return None, CHECKOUT_ERROR
     try:
         serializer.save()
     except PaymentError as e:
+        # Payment errors are written for the customer
         logger.error("Checkout payment failed: %s", e)
-        return None
-    return serializer.data["url"]
+        return None, str(e)
+    return serializer.data["url"], None
 
 
 @require_http_methods(["GET", "POST"])
@@ -614,11 +619,11 @@ def checkout_view(request):
             data=request.POST,
         )
         if form.is_valid():
-            url = _checkout(request, basket)
+            url, error = _checkout(request, basket)
             if url is not None:
                 # Stripe checkout, or the new order status page
                 return HttpResponseRedirect(url)
-            context["checkout_error"] = True
+            context["checkout_error"] = error
     else:
         # update basket with shipping method
         basket.shipping_method = shipping_method

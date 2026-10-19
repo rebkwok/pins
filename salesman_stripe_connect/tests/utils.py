@@ -1,8 +1,10 @@
 """Helpers for the tests"""
 from unittest.mock import Mock, patch
 
-from django.conf import settings
 from django.urls import reverse
+
+# The connected account in the tests (see conftest)
+ACCOUNT = "acct_test"
 
 API = "https://api.stripe.com/v1"
 SESSIONS_URL = f"{API}/checkout/sessions"
@@ -32,7 +34,7 @@ def mock_session(**params):
 def mock_event(event_type, obj, account=None):
     return Mock(
         type=event_type,
-        account=account or settings.SALESMAN_STRIPE_CONNECT_ACCOUNT,
+        account=account or ACCOUNT,
         data=Mock(object=obj),
     )
 
@@ -57,3 +59,8 @@ def post_event(client, event):
             data={},
             headers={"Stripe-Signature": "t=1,v1=dummy"},
         )
+
+
+def logged(caplog, level):
+    """Messages logged at the level (e.g. logging.INFO)"""
+    return [record.getMessage() for record in caplog.records if record.levelno == level]
