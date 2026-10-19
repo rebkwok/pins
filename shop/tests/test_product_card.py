@@ -129,8 +129,7 @@ def test_product_cards(client, shop_pages, page):
 
 
 def add_images(product, count):
-    product.image = wagtail_factories.ImageFactory()
-    product.save()
+    baker.make("shop.ProductImage", product=product, image=wagtail_factories.ImageFactory())
     for i in range(count - 1):
         baker.make(
             "shop.ProductVariant",
@@ -182,7 +181,7 @@ def test_product_card_carousel_links(client, shop_pages):
     # product page: images link to the image files, in a larger carousel
     parser = get_page(client, "product", shop_pages)
     for image in product.images:
-        assert parser.image_links.count(image.file.url) == 1
+        assert parser.image_links.count(image.image.file.url) == 1
     assert detail_url not in parser.image_links
     assert "shop-carousel--detail" in parser.carousels[0]["class"]
 
@@ -195,6 +194,22 @@ def test_product_card_single_image(client, shop_pages):
     assert "data-bs-ride" not in carousel
     assert parser.indicators == []
 
+
+
+def test_product_card_alt_text(client, shop_pages):
+    product = shop_pages[0]
+    image = wagtail_factories.ImageFactory(title="Mug photo")
+    baker.make("shop.ProductImage", product=product, image=image, alt_text="Mug front")
+    baker.make(
+        "shop.ProductImage", product=product, image=wagtail_factories.ImageFactory(title="Side")
+    )
+    for url in [reverse("shop:product_detail", args=(product.id,)), "/shop/category/"]:
+        content = client.get(url).content.decode()
+        assert 'alt="Mug front"' in content
+        # an image without alt text uses its title
+        assert 'alt="Side"' in content
+        # the alt text isn't shown as a caption
+        assert ">Mug front<" not in content
 
 
 # Sale banner

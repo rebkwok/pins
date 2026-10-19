@@ -17,6 +17,7 @@ from django.urls import reverse
 from wagtail.admin.panels import get_edit_handler
 
 from ..models import Product, ProductVariant, protected_variants_message
+from .factories import NO_PRODUCT_IMAGES
 
 pytestmark = pytest.mark.django_db
 
@@ -166,6 +167,7 @@ def product_form_data(product, delete):
         "description": json.dumps({"blocks": [], "entityMap": {}}),
         "index": str(product.index),
         "live": "on",
+        **NO_PRODUCT_IMAGES,
         "variants-TOTAL_FORMS": str(product.variants.count()),
         "variants-INITIAL_FORMS": str(product.variants.count()),
         "variants-MIN_NUM_FORMS": "0",

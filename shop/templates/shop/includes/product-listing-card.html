@@ -13,18 +13,18 @@
                 </div>
             {% endif %}
             <div class="carousel-inner">
-                {% for pimage in images %}
+                {% for item in images %}
                 <div class="carousel-item{% if forloop.first %} active{% endif %}">
                     {% if detail_page %}
-                        <a href="{{ pimage.file.url }}">
+                        <a href="{{ item.image.file.url }}">
                             <figure class="product-listing-card__image">
-                                {% image pimage fill-300x300-c100 loading="lazy" class="d-block" %}
+                                {% image item.image fill-300x300-c100 loading="lazy" class="d-block" alt=item.alt %}
                             </figure>
                         </a>
                     {% else %}
                         <a href="{% url 'shop:product_detail' product.id %}">
                             <figure class="product-listing-card__image">
-                                {% image pimage fill-180x180-c100 loading="lazy" class="d-block w-180" %}
+                                {% image item.image fill-180x180-c100 loading="lazy" class="d-block w-180" alt=item.alt %}
                             </figure>
                         </a>
                     {% endif %}
