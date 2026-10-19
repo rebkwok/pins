@@ -12,11 +12,19 @@ from PIL import ImageDraw, ImageFont
 from wagtail.images.models import Image
 from wagtail.models import Collection, Site
 
-from shop.models import CategoryPage, Product, ProductVariant, Sale, SaleProduct, ShopPage
+from shop.models import (
+    CategoryPage,
+    Product,
+    ProductImage,
+    ProductVariant,
+    Sale,
+    SaleProduct,
+    ShopPage,
+)
 
 IMAGE_COLLECTION = "Shop seed images"
 
-# Categories, in display order, with their products. Each product has its image
+# Categories, in display order, with their products. Each product has its images
 # (title, colour and optional size of a generated image) and variants, which can
 # also have images.
 SHOP_DATA = [
@@ -65,7 +73,7 @@ SHOP_DATA = [
                 "name": "PINS T-shirt",
                 "price": "18.00",
                 "description": "Organic cotton T-shirt with the PINS logo.",
-                "images": [("T-shirt", "#333333", (900, 600))],
+                "images": [("T-shirt", "#333333", (900, 600)), ("T-shirt back", "#555555")],
                 "variants": [
                     *[{"colour": "Black", "size": size, "stock": 3} for size in ["S", "M", "L", "XL"]],
                     {"colour": "White", "size": "M", "stock": 0},
@@ -193,14 +201,16 @@ class Command(BaseCommand):
         if Product.objects.filter(category_page=category, name=data["name"]).exists():
             self.skipped.append(f"product '{data['name']}'")
             return
-        images = [self.get_image(*image) for image in data.get("images", [])]
         product = Product.objects.create(
             category_page=category,
             name=data["name"],
             price=Decimal(data["price"]),
             description=f"<p>{data['description']}</p>",
-            image=images[0] if images else None,
         )
+        for sort_order, image in enumerate(data.get("images", [])):
+            ProductImage.objects.create(
+                product=product, image=self.get_image(*image), sort_order=sort_order
+            )
         for sort_order, variant in enumerate(data["variants"]):
             variant = dict(variant)
             if "price" in variant:

@@ -13,6 +13,7 @@ from django.urls import reverse
 from wagtail.admin.panels import get_edit_handler
 
 from ..models import Product, ProductVariant
+from .factories import NO_PRODUCT_IMAGES
 
 pytestmark = pytest.mark.django_db
 
@@ -151,6 +152,7 @@ def product_form_data(product, stock, stock_shown):
         "description": json.dumps({"blocks": [], "entityMap": {}}),
         "index": str(product.index),
         "live": "on",
+        **NO_PRODUCT_IMAGES,
         "variants-TOTAL_FORMS": "1",
         "variants-INITIAL_FORMS": "1",
         "variants-MIN_NUM_FORMS": "0",
@@ -360,6 +362,7 @@ def product_form(product, variants, delete=()):
         "description": json.dumps({"blocks": [], "entityMap": {}}),
         "index": str(product.index),
         "live": "on",
+        **NO_PRODUCT_IMAGES,
         "variants-TOTAL_FORMS": str(len(variants)),
         "variants-INITIAL_FORMS": str(len([v for v in variants if "id" in v])),
         "variants-MIN_NUM_FORMS": "0",

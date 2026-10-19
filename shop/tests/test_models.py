@@ -15,8 +15,16 @@ from wagtail.admin.panels import get_edit_handler
 
 from salesman.core.utils import get_salesman_model
 
-from .factories import CategoryPageFactory, ShopPageFactory
-from ..models import CategoryPage, Product, Sale, SaleCategory, SaleProduct
+from .factories import NO_PRODUCT_IMAGES, CategoryPageFactory, ShopPageFactory
+from ..models import (
+    CarouselImage,
+    CategoryPage,
+    Product,
+    ProductImage,
+    Sale,
+    SaleCategory,
+    SaleProduct,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -181,26 +189,39 @@ def test_product_out_of_stock_no_variants(product):
 
 
 def test_product_images(product):
-    # images are collated across product and product variants, duplicates are ignores
-    image1 = baker.make("wagtailimages.Image")
-    image2 = baker.make("wagtailimages.Image")
-    product.image = image1
-    product.save()
+    # the product's images in order, then its live variants' images (with the
+    # variant name as alt text); duplicates are ignored
+    image1, image2, image3, image4 = baker.make("wagtailimages.Image", _quantity=4)
+    baker.make("shop.ProductImage", product=product, image=image2, sort_order=1)
     baker.make(
-        "shop.ProductVariant",
-        product=product,
-        variant_name="Small",
-        price=10,
-        image=image1,
+        "shop.ProductImage", product=product, image=image1, sort_order=0, alt_text="Front"
     )
+    baker.make("shop.ProductVariant", product=product, variant_name="Small", image=image1)
+    baker.make("shop.ProductVariant", product=product, variant_name="Medium", image=image3)
     baker.make(
-        "shop.ProductVariant",
-        product=product,
-        variant_name="Medium",
-        price=10,
-        image=image2,
+        "shop.ProductVariant", product=product, variant_name="Large", image=image4, live=False
     )
-    assert len(product.images) == 2
+    baker.make("shop.ProductVariant", product=product, variant_name="XL", image=None)
+    assert product.images == [
+        CarouselImage(image1, "Front"),
+        CarouselImage(image2, ""),
+        CarouselImage(image3, "Medium"),
+    ]
+
+
+def test_carousel_image_alt():
+    image = baker.prepare("wagtailimages.Image", title="Photo", description="")
+    # the alt text, or the image's default alt text (description or title)
+    assert CarouselImage(image, "Front").alt == "Front"
+    assert CarouselImage(image).alt == "Photo"
+    image.description = "A mug"
+    assert CarouselImage(image).alt == "A mug"
+
+
+def test_product_image_str():
+    image = baker.prepare("wagtailimages.Image", title="Photo")
+    assert str(ProductImage(image=image, alt_text="Front")) == "Front"
+    assert str(ProductImage(image=image)) == "Photo"
 
 
 def test_basket_item(product):
@@ -511,6 +532,7 @@ def test_product_admin_form_rejects_duplicate_variants(product):
         "description": json.dumps({"blocks": [], "entityMap": {}}),
         "index": "1",
         "live": "on",
+        **NO_PRODUCT_IMAGES,
         "variants-TOTAL_FORMS": "2",
         "variants-INITIAL_FORMS": "0",
         "variants-MIN_NUM_FORMS": "0",

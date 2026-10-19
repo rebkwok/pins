@@ -66,9 +66,16 @@ def test_seed_shop(seed_settings):
     assert Product.objects.count() == 6
     assert ProductVariant.objects.count() == 12
     collection = Collection.objects.get(name="Shop seed images")
-    assert Image.objects.filter(collection=collection).count() == 6
+    assert Image.objects.filter(collection=collection).count() == 7
     calendar = Product.objects.get(name="2027 Podenco Calendar")
-    assert len(calendar.images) == 3
+    # the product's image, then its variants' images
+    assert [image.image.title for image in calendar.images] == [
+        "Calendar front",
+        "Calendar inside",
+        "Calendar pack",
+    ]
+    tshirt = Product.objects.get(name="PINS T-shirt")
+    assert [image.image.title for image in tshirt.images] == ["T-shirt", "T-shirt back"]
     assert calendar.variants.get(variant_name="Single").base_price == Decimal("12.00")
     assert calendar.variants.get(variant_name="Pack of 3").base_price == Decimal("30.00")
     assert Product.objects.get(name="Notebook").out_of_stock()
@@ -84,7 +91,7 @@ def test_seed_shop_twice(seed_settings):
     assert CategoryPage.objects.count() == 3
     assert Product.objects.count() == 6
     assert ProductVariant.objects.count() == 12
-    assert Image.objects.count() == 6
+    assert Image.objects.count() == 7
     assert output.startswith("Created 0: -")
     assert "Skipped (already exist) 10" in output
 

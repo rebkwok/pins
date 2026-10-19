@@ -28,6 +28,13 @@ from shop.tests.factories import CategoryPageFactory, ShopPageFactory
 
 Basket = get_salesman_model("Basket")
 
+
+@pytest.fixture(autouse=True)
+def media_root(settings, tmp_path):
+    # Files saved by tests (e.g. images) go in a temporary directory, not the
+    # project's media directory
+    settings.MEDIA_ROOT = str(tmp_path / "media")
+
 Order = get_salesman_model("Order")
 
 pytestmark = pytest.mark.django_db

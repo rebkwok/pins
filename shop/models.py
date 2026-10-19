@@ -1,4 +1,5 @@
 from datetime import timedelta
+from typing import NamedTuple
 from decimal import ROUND_HALF_UP, Decimal
 
 import logging
@@ -32,6 +33,7 @@ from wagtail.contrib.settings.models import (
     register_setting,
 )
 from wagtail.fields import RichTextField
+from wagtail.images.models import Image
 from wagtail.models import Page, Orderable
 
 
@@ -530,14 +532,6 @@ class Product(ClusterableModel):
 
     name = models.CharField(max_length=255)
 
-    image = models.ForeignKey(
-        "wagtailimages.Image",
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="+",
-        help_text="Images can be added to product and/or product variants, all will be displayed",
-    )
     description = RichTextField(help_text="Description of the product", blank=True)
     price = models.DecimalField(
         max_digits=18,
@@ -563,7 +557,15 @@ class Product(ClusterableModel):
         ),
         FieldPanel("category_page"),
         FieldPanel("name"),
-        FieldPanel("image"),
+        InlinePanel(
+            "product_images",
+            heading="Images",
+            label="Image",
+            help_text=(
+                "Shown in this order, followed by the images of the product's live "
+                "variants. Use the arrows to reorder them."
+            ),
+        ),
         FieldPanel("price"),
         FieldPanel("description"),
         FieldPanel("index"),
@@ -625,16 +627,52 @@ class Product(ClusterableModel):
 
     @property
     def images(self):
-        all_images = list()
-        if self.image:
-            all_images.append(self.image)
-        for variant in self.live_variants.filter(image__isnull=False):
-            if variant.image not in all_images:
-                all_images.append(variant.image)
-        return all_images
+        """
+        The product's images in order, then its live variants' images (with the
+        variant's name as alt text), without duplicates. Returns CarouselImages.
+        """
+        images = [
+            CarouselImage(product_image.image, product_image.alt_text)
+            for product_image in self.product_images.select_related("image")
+        ]
+        variants = self.live_variants.filter(image__isnull=False).select_related("image")
+        for variant in variants:
+            if variant.image not in [image.image for image in images]:
+                images.append(CarouselImage(variant.image, variant.variant_full_name()))
+        return images
 
     def get_absolute_url(self):
         return reverse("shop:product_detail", kwargs={"pk": self.pk})
+
+
+class CarouselImage(NamedTuple):
+    """An image in a product's carousel"""
+
+    image: Image
+    alt_text: str = ""
+
+    @property
+    def alt(self):
+        return self.alt_text or self.image.default_alt_text
+
+
+class ProductImage(Orderable):
+    product = ParentalKey(Product, on_delete=models.CASCADE, related_name="product_images")
+    image = models.ForeignKey("wagtailimages.Image", on_delete=models.CASCADE, related_name="+")
+    alt_text = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text=(
+            "Optional description of the image for people using screen readers. "
+            "If blank, the image's own description (or title) is used."
+        ),
+    )
+
+    panels = [FieldPanel("image"), FieldPanel("alt_text")]
+
+    def __str__(self):
+        return self.alt_text or self.image.title
 
 
 class ProductVariant(Orderable):
