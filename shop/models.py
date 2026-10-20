@@ -42,8 +42,12 @@ from wagtail.models import Page, Orderable
 
 SHIPPING_COLLECT = "collect"
 SHIPPING_DELIVER = "deliver"
-# In the order they're shown in the basket; delivery is the default
+# For baskets and orders with no items that need shipping
+SHIPPING_NONE = "none"
+# The methods customers can choose, in the order they're shown in the basket;
+# delivery is the default
 SHIPPING_METHODS = {SHIPPING_DELIVER: "Delivery", SHIPPING_COLLECT: "Collect in person"}
+SHIPPING_METHOD_CHOICES = {**SHIPPING_METHODS, SHIPPING_NONE: "No shipping needed"}
 # Shown with the shipping method options in the basket
 SHIPPING_METHOD_NOTES = {
     SHIPPING_COLLECT: (
@@ -58,12 +62,12 @@ logger = logging.getLogger(__name__)
 class Order(OrderAmountsMixin, BaseOrder):
     name = models.CharField(max_length=255, verbose_name="Name")
     shipping_method = models.CharField(
-        choices=tuple(SHIPPING_METHODS.items()), default=SHIPPING_DELIVER
+        choices=tuple(SHIPPING_METHOD_CHOICES.items()), default=SHIPPING_DELIVER
     )
 
     @property
     def needs_delivery(self):
-        return self.shipping_method != SHIPPING_COLLECT
+        return self.shipping_method == SHIPPING_DELIVER
 
     @transaction.atomic
     def populate_from_basket(
@@ -95,13 +99,30 @@ class OrderNote(BaseOrderNote):
 
 class Basket(StripeBasketMixin, BaseBasket):
     shipping_method = models.CharField(
-        choices=tuple(SHIPPING_METHODS.items()), default=SHIPPING_DELIVER
+        choices=tuple(SHIPPING_METHOD_CHOICES.items()), default=SHIPPING_DELIVER
     )
     timeout = models.DateTimeField(null=True)
 
     @property
+    def requires_shipping(self):
+        """
+        Whether any of the basket's items need shipping (a basket with only
+        e.g. competition entries doesn't). An empty basket doesn't.
+        """
+        return any(
+            item.product is not None and item.product.product.requires_shipping
+            for item in self.get_items()
+        )
+
+    @property
     def needs_delivery(self):
-        return self.shipping_method != SHIPPING_COLLECT
+        """
+        Whether the basket is delivered (so needs an address and shipping cost):
+        it has items that need shipping, and isn't being collected. (A basket
+        that was checked out with no items needing shipping, then had some
+        added, is delivered unless collection is chosen.)
+        """
+        return self.requires_shipping and self.shipping_method != SHIPPING_COLLECT
 
     @classmethod
     def get_existing(cls, request):
@@ -545,6 +566,15 @@ class Product(ClusterableModel):
     live = models.BooleanField(
         default=True, help_text="Display this product in the shop"
     )
+    requires_shipping = models.BooleanField(
+        default=True,
+        verbose_name="Needs shipping",
+        help_text=(
+            "Untick for products that aren't posted or collected (e.g. competition "
+            "entries). A basket with only these products doesn't ask for a shipping "
+            "method or address, and has no shipping cost."
+        ),
+    )
 
     panels = [
         HelpPanel(
@@ -570,6 +600,7 @@ class Product(ClusterableModel):
         FieldPanel("description"),
         FieldPanel("index"),
         FieldPanel("live"),
+        FieldPanel("requires_shipping"),
         ProductVariantsInlinePanel(
             "variants",
             panels=PRODUCT_VARIANT_PANELS,

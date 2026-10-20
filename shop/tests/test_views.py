@@ -230,11 +230,16 @@ def test_basket_view(rf, basket, product):
         ("deliver", "Delivery", ""),
         ("collect", "Collect in person", COLLECT_NOTE),
     ]
-    # the basket's shipping method is selected
-    assert resp.context_data["selected_shipping_method"] == "collect"
-    content = resp.rendered_content
-    assert 'id="id_collect" value="collect" checked' in content
-    assert 'id="id_deliver" value="deliver" >' in content
+    # delivery is selected (the basket's method was collect), and the total
+    # includes its shipping cost
+    assert resp.context_data["selected_shipping_method"] == "deliver"
+    assert Basket.objects.get(id=basket.id).shipping_method == "deliver"
+    assert resp.context_data["basket"]["total"] == "24.99"
+    content = " ".join(resp.rendered_content.split())
+    assert 'id="id_deliver" value="deliver" checked' in content
+    assert 'id="id_collect" value="collect" hx-post' in content
+    # changing the method updates the basket
+    assert f'hx-post="{reverse("shop:update_shipping_method")}"' in content
     # the note is shown with the collection option
     assert "Collect in person" in content
     assert COLLECT_NOTE in content
@@ -257,6 +262,50 @@ def test_basket_view_delivery_default(rf, product, has_basket):
         request.session = {"BASKET_ID": basket.id}
     resp = basket_view(request)
     assert resp.context_data["selected_shipping_method"] == "deliver"
+
+
+def post_shipping_method(client, shipping_method):
+    return client.post(
+        reverse("shop:update_shipping_method"), {"shipping-method": shipping_method}
+    )
+
+
+@pytest.mark.parametrize("shipping_method,total", [("collect", "20.00"), ("deliver", "24.99")])
+def test_update_shipping_method(client, basket, shipping_method, total):
+    set_session_basket(client, basket)
+    basket.shipping_method = "deliver" if shipping_method == "collect" else "collect"
+    basket.save()
+    resp = post_shipping_method(client, shipping_method)
+    assert resp.status_code == 200
+    assert Basket.objects.get(id=basket.id).shipping_method == shipping_method
+    content = resp.content.decode()
+    # the total and shipping cost are updated
+    assert f"<span id='total' hx-swap-oob='true'>{total}</span>" in content
+    assert ("Shipping" in content) == (shipping_method == "deliver")
+
+
+@pytest.mark.parametrize("shipping_method", ["none", "unknown", ""])
+def test_update_shipping_method_invalid(client, basket, shipping_method):
+    set_session_basket(client, basket)
+    resp = post_shipping_method(client, shipping_method)
+    assert resp.content == b""
+    assert Basket.objects.get(id=basket.id).shipping_method == "collect"
+
+
+def test_update_shipping_method_no_basket(client):
+    assert post_shipping_method(client, "collect").content == b""
+    assert not Basket.objects.exists()
+
+
+def test_update_shipping_method_payment_in_progress(client, basket):
+    set_session_basket(client, basket)
+    basket.start_payment("cs_1", "https://stripe", hold_until=None)
+    assert post_shipping_method(client, "deliver").content == b""
+    assert Basket.objects.get(id=basket.id).shipping_method == "collect"
+
+
+def test_update_shipping_method_get_not_allowed(client):
+    assert client.get(reverse("shop:update_shipping_method")).status_code == 405
 
 
 def test_add_to_basket(rf, product):

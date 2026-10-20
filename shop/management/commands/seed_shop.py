@@ -113,6 +113,13 @@ SHOP_DATA = [
                 "description": "Dishwasher safe.",
                 "variants": [{"stock": 12}],
             },
+            {
+                "name": "Raffle ticket",
+                "price": "2.00",
+                "description": "Entry into the PINS raffle; nothing is posted.",
+                "requires_shipping": False,
+                "variants": [{"stock": 100}],
+            },
         ],
     },
 ]
@@ -206,6 +213,7 @@ class Command(BaseCommand):
             name=data["name"],
             price=Decimal(data["price"]),
             description=f"<p>{data['description']}</p>",
+            requires_shipping=data.get("requires_shipping", True),
         )
         for sort_order, image in enumerate(data.get("images", [])):
             ProductImage.objects.create(

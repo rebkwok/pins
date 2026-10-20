@@ -4,15 +4,13 @@
 {% block title %}Order Status{% endblock %}
 
 {% block content %}
-    {% include "includes/header-hero.html" %}
+    {% include "shop/includes/header-hero.html" with title="Order status" %}
 
     <div class="container shop-basket">
         <div class="row">
             <div class="col-md-12">
-                <h1>Order Status</h1>
-
                 {% if new_order %}
-                    <h4>Thank you for your order!</h4>
+                    <h2>Thank you for your order!</h2>
                 {% endif %}
 
                 <ul>
