@@ -188,15 +188,14 @@ def _can_increase_quantity(request, variant, value, in_basket=False):
         )
         current_quantity = item.quantity if item is not None else 0
         logger.info("Current quantity %s", current_quantity)
-        logger.info("Stock %s", variant.stock)
+        logger.info("Available %s", variant.available)
         logger.info("New quantity %s", value)
-        stock_excluding_current_basket = variant.stock + current_quantity
-        return (stock_excluding_current_basket - value) >= 0
+        return variant.has_stock_for(value, in_basket=current_quantity)
     else:
         logger.info("Variant %s", variant)
-        logger.info("Stock %s", variant.stock)
+        logger.info("Available %s", variant.available)
         logger.info("New quantity %s", value)
-        return (variant.stock - value) >= 0
+        return variant.has_stock_for(value)
 
 
 # VIEWS
@@ -289,10 +288,12 @@ def add_to_basket(request, product_id):
         return HttpResponse(resp_str)
 
     with transaction.atomic():
-        # Lock the variant until the item has been added, so that concurrent
-        # requests can't both reserve the last items in stock
+        # Lock the variant and its product (whose stock it may share) until the
+        # item has been added, so that concurrent requests can't both reserve
+        # the last items in stock
         variant = (
-            ProductVariant.objects.select_for_update()
+            ProductVariant.objects.select_related("product")
+            .select_for_update()
             .filter(id=variant_id, live=True, product__live=True)
             .first()
         )
@@ -312,8 +313,9 @@ def add_to_basket(request, product_id):
             basket.update(request)
 
     if can_increase:
-        # refresh variant to ensure stock is up to date
+        # refresh the variant and product to ensure stock is up to date
         variant.refresh_from_db()
+        variant.product.refresh_from_db()
         resp_str = f"<div>{_basket_icon_html(request, basket.quantity)}</div>"
         resp_str += f"""
             <div id='added_{product_id}' class='alert-success mt-2' hx-swap-oob='true'>
@@ -343,7 +345,7 @@ def add_to_basket(request, product_id):
             """
     else:
         logger.info(
-            "Can't add %s x %s to basket: %s in stock", quantity, variant, variant.stock
+            "Can't add %s x %s to basket: %s available", quantity, variant, variant.available
         )
         resp_str = f"<div>{_basket_icon_html(request, get_existing_basket_quantity(request))}</div>"
         resp_str += f"""
@@ -369,16 +371,18 @@ def update_quantity(request, ref):
         result_html = f"<div id='updated_{product_id}' class='alert-info' hx-swap-oob='true'></div>"
     else:
         with transaction.atomic():
-            # Lock the variant until the item has been updated, so that concurrent
-            # requests can't both reserve the last items in stock.
-            variant = ProductVariant.objects.select_for_update().get(
-                id=item.product_id
+            # Lock the variant and its product (whose stock it may share) until
+            # the item has been updated, so that concurrent requests can't both
+            # reserve the last items in stock.
+            variant = (
+                ProductVariant.objects.select_related("product")
+                .select_for_update()
+                .get(id=item.product_id)
             )
             # Decreasing is always allowed; stock already excludes the current
             # basket quantity
-            can_update = (
-                new_quantity < current_quantity
-                or variant.stock + current_quantity - new_quantity >= 0
+            can_update = new_quantity < current_quantity or variant.has_stock_for(
+                new_quantity, in_basket=current_quantity
             )
             if can_update:
                 item.quantity = new_quantity

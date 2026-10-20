@@ -6,9 +6,10 @@ import logging
 from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MaxValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.contenttypes.models import ContentType
 from django.db import models, transaction
+from django.db.models import Q
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.text import slugify
@@ -24,7 +25,7 @@ from salesman.orders.models import (
 from modelcluster.forms import BaseChildFormSet
 from salesman_stripe_connect.mixins import OrderAmountsMixin, StripeBasketMixin
 from modelcluster.models import ClusterableModel, ParentalKey
-from wagtail.admin.forms import WagtailAdminModelForm
+from wagtail.admin.forms import WagtailAdminModelForm, WagtailAdminPageForm
 from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, MultiFieldPanel
 from wagtail.admin.panels.base import get_form_for_model
 from wagtail.contrib.forms.models import validate_to_address
@@ -229,7 +230,31 @@ class BasketItem(BaseBasketItem):
 # PRODUCTS
 
 
+class CategoryPageForm(WagtailAdminPageForm):
+    """
+    A category's title must be unique in its shop, so customers and the shop
+    stock lists can tell the categories apart.
+    """
+
+    def clean(self):
+        cleaned_data = super().clean()
+        title = cleaned_data.get("title")
+        if title and self.parent_page is not None:
+            others = (
+                CategoryPage.objects.child_of(self.parent_page)
+                .filter(title__iexact=title)
+                .exclude(pk=self.instance.pk)
+            )
+            if others.exists():
+                self.add_error(
+                    "title", f"There's already a category called '{title}' in this shop."
+                )
+        return cleaned_data
+
+
 class CategoryPage(Page):
+    base_form_class = CategoryPageForm
+
     body = RichTextField(
         verbose_name="Page body",
         blank=True,
@@ -339,14 +364,21 @@ VARIANT_NEEDS_NAME_MESSAGE = (
 )
 
 
+PACK_SIZE_NOT_SHARED_MESSAGE = (
+    "Items per pack is only used when the product's variants share stock: tick "
+    "'Variants share stock' on the product, or set this to 1."
+)
+
+
 def is_blank_variant(data):
     """data: a variant's (cleaned) field values"""
     return not (data.get("variant_name") or data.get("colour") or data.get("size"))
 
 
-class ProductVariantAdminForm(WagtailAdminModelForm):
+class RelativeStockFormMixin:
     """
-    Admin form for product variants, on their own and in the product form.
+    For admin forms of models with a stock field (variants, and products whose
+    variants share stock), which also declare a stock_shown field.
 
     Stock is changed relative to the stock shown when the form was loaded, so
     that stock taken or returned by customers' baskets while the form is being
@@ -354,18 +386,11 @@ class ProductVariantAdminForm(WagtailAdminModelForm):
     but 2 have been added to baskets meanwhile (so stock is 8), stock becomes 13.
     """
 
-    # The stock when the form was loaded (a submitted field, so it's kept if the
-    # form is redisplayed with errors)
-    stock_shown = forms.IntegerField(required=False, widget=forms.HiddenInput)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def _init_stock_shown(self):
         if self.instance.pk is not None:
             self.fields["stock_shown"].initial = self.instance.stock
 
-    def clean(self):
-        cleaned_data = super().clean()
-        self._check_variant_names(cleaned_data)
+    def _clean_stock(self, cleaned_data):
         stock = cleaned_data.get("stock")
         stock_shown = cleaned_data.get("stock_shown")
         if stock is None:
@@ -380,7 +405,8 @@ class ProductVariantAdminForm(WagtailAdminModelForm):
             # Stock isn't changed (even if it's already negative)
             return cleaned_data
         current_stock = (
-            ProductVariant.objects.filter(pk=self.instance.pk)
+            type(self.instance)
+            .objects.filter(pk=self.instance.pk)
             .values_list("stock", flat=True)
             .first()
         )
@@ -395,6 +421,51 @@ class ProductVariantAdminForm(WagtailAdminModelForm):
                 )
             self.add_error("stock", message)
         return cleaned_data
+
+    def _apply_stock_change(self):
+        stock_shown = self.cleaned_data.get("stock_shown")
+        if self.instance.pk is not None and stock_shown is not None:
+            change = self.cleaned_data["stock"] - stock_shown
+            # Saving with an F expression adds the change to the stock in the
+            # database (UPDATE ... SET stock = stock + change). Django then reads
+            # the new value back into the instance.
+            self.instance.stock = models.F("stock") + change
+
+
+class ProductVariantAdminForm(RelativeStockFormMixin, WagtailAdminModelForm):
+    """
+    Admin form for product variants, on their own and in the product form.
+    Stock is changed relative to the stock shown (see RelativeStockFormMixin).
+
+    If the product's variants share stock, the variant's own stock isn't used, so
+    it isn't in the form (or shown). (Its pack size is always shown, so it can be
+    set in the same save as ticking the product's "Variants share stock".)
+    """
+
+    # The stock when the form was loaded (a submitted field, so it's kept if the
+    # form is redisplayed with errors)
+    stock_shown = forms.IntegerField(required=False, widget=forms.HiddenInput)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._init_stock_shown()
+        if self.instance.product_id is not None and self.instance.product.shares_stock:
+            del self.fields["stock"]
+            del self.fields["stock_shown"]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        self._check_variant_names(cleaned_data)
+        # On the variant's own page (in the product form, ProductAdminForm checks
+        # this, as "Variants share stock" may be ticked in the same save)
+        product = cleaned_data.get("product")
+        if (
+            product is not None
+            and not product.shares_stock
+            and (cleaned_data.get("pack_size") or 1) > 1
+        ):
+            self.add_error("pack_size", PACK_SIZE_NOT_SHARED_MESSAGE)
+        return self._clean_stock(cleaned_data)
 
     def _check_variant_names(self, cleaned_data):
         """
@@ -420,22 +491,45 @@ class ProductVariantAdminForm(WagtailAdminModelForm):
                 "name, colour or size; give it one first.",
             )
 
+    def is_made_live(self):
+        """Whether saving makes an existing (not live) variant live"""
+        return (
+            self.instance.pk is not None
+            and "live" in self.changed_data
+            and self.cleaned_data.get("live")
+        )
+
     def save(self, commit=True):
-        stock_shown = self.cleaned_data.get("stock_shown")
-        if self.instance.pk is not None and stock_shown is not None:
-            change = self.cleaned_data["stock"] - stock_shown
-            # Saving with an F expression adds the change to the stock in the
-            # database (UPDATE ... SET stock = stock + change). Django then reads
-            # the new value back into the instance.
-            self.instance.stock = models.F("stock") + change
-        return super().save(commit=commit)
+        made_live = self.is_made_live()
+        self._apply_stock_change()
+        variant = super().save(commit=commit)
+        # A variant made live again may have stock left from before, which may
+        # not be right any more (see the after_edit_snippet hook)
+        variant.stock_reminders = stock_reminders([variant] if made_live else [])
+        return variant
+
+
+def stock_reminders(variants):
+    """
+    Reminders to check the stock of variants that have just been made live (see
+    ProductVariant.stock_reminder), using their saved stock (the forms save stock
+    as a change, so the instances may not have it)
+    """
+    reminders = []
+    for variant in variants:
+        variant.refresh_from_db(fields=["stock"])
+        variant.product.refresh_from_db(fields=["stock"])
+        reminder = variant.stock_reminder()
+        if reminder:
+            reminders.append(reminder)
+    return reminders
 
 
 class StockFieldPanel(FieldPanel):
     """
-    Panel for a variant's stock, which includes ProductVariantAdminForm's hidden
-    stock_shown field (rendered with the stock field, rather than as its own
-    empty panel)
+    Panel for a stock field (of a variant, or a product whose variants share
+    stock), which includes the form's hidden stock_shown field (rendered with
+    the stock field, rather than as its own empty panel)
     """
 
     def get_form_options(self):
@@ -450,11 +544,48 @@ class StockFieldPanel(FieldPanel):
             )
 
 
+class VariantStockHelpPanel(HelpPanel):
+    """
+    On a variant's own edit page: whether the product's variants share stock
+    (which is set on the product's page), with a link to the product's page
+    """
+
+    class BoundPanel(HelpPanel.BoundPanel):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self.content = self._content()
+
+        def _content(self):
+            product = self.instance.product if self.instance.product_id else None
+            if product is None:
+                return (
+                    "Variants of the same product can share stock (e.g. single cards "
+                    "and packs of 5): this is set on the product's page."
+                )
+            url = reverse("wagtailsnippets_shop_product:edit", args=(product.pk,))
+            if product.shares_stock:
+                return format_html(
+                    "This product's variants share stock: <strong>{}</strong> single "
+                    "items in stock, from which this variant uses its items per "
+                    "pack. Change the shared stock on the "
+                    '<a href="{}">product\'s page</a>.',
+                    product.stock,
+                    url,
+                )
+            return format_html(
+                "To sell this product's variants from the same stock (e.g. single "
+                "cards and packs of 5), tick 'Variants share stock' on the "
+                '<a href="{}">product\'s page</a>.',
+                url,
+            )
+
+
 PRODUCT_VARIANT_PANELS = [
     FieldPanel("variant_name"),
     FieldPanel("image"),
     FieldPanel("price"),
     StockFieldPanel("stock"),
+    FieldPanel("pack_size"),
     FieldPanel("live"),
     FieldPanel("colour"),
     FieldPanel("size"),
@@ -523,9 +654,50 @@ class ProductVariantsInlinePanel(InlinePanel):
         return options
 
 
-class ProductAdminForm(WagtailAdminModelForm):
+class ProductAdminForm(RelativeStockFormMixin, WagtailAdminModelForm):
+    """
+    The product's shared stock (used if its variants share stock) is changed
+    relative to the stock shown (see RelativeStockFormMixin).
+    """
+
+    stock_shown = forms.IntegerField(required=False, widget=forms.HiddenInput)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._init_stock_shown()
+
+    def save(self, commit=True):
+        # Variants made live (see ProductVariantAdminForm.save), checked before
+        # saving
+        variants_formset = self.formsets.get("variants")
+        made_live = [
+            form.instance
+            for form in (variants_formset.forms if variants_formset else [])
+            if not variants_formset._should_delete_form(form) and form.is_made_live()
+        ]
+        self._apply_stock_change()
+        product = super().save(commit=commit)
+        product.stock_reminders = stock_reminders(made_live)
+        return product
+
+    def _check_pack_sizes(self, cleaned_data):
+        """
+        Variants can only have more than 1 item per pack if the product's
+        variants share stock (which may be ticked in the same save)
+        """
+        variants_formset = self.formsets.get("variants")
+        if variants_formset is None or cleaned_data.get("shares_stock"):
+            return
+        variants_formset.errors  # clean the variant forms
+        for form in variants_formset.forms:
+            pack_size = (getattr(form, "cleaned_data", None) or {}).get("pack_size") or 1
+            if pack_size > 1 and not variants_formset._should_delete_form(form):
+                form.add_error("pack_size", PACK_SIZE_NOT_SHARED_MESSAGE)
+
     def clean(self):
         cleaned_data = super().clean()
+        self._clean_stock(cleaned_data)
+        self._check_pack_sizes(cleaned_data)
         # Variants removed from the product in the form can't be deleted if
         # they've been ordered or are in customers' baskets
         variants_formset = self.formsets.get("variants")
@@ -566,6 +738,22 @@ class Product(ClusterableModel):
     live = models.BooleanField(
         default=True, help_text="Display this product in the shop"
     )
+    shares_stock = models.BooleanField(
+        default=False,
+        verbose_name="Variants share stock",
+        help_text=(
+            "Tick if the variants are sold from the same stock, e.g. single items "
+            "and packs of 5. Then set the shared stock below."
+        ),
+    )
+    stock = models.IntegerField(
+        default=0,
+        verbose_name="Shared stock",
+        help_text=(
+            "The number of single items in stock, if the variants share stock (not "
+            "counting items in customers' baskets)."
+        ),
+    )
     requires_shipping = models.BooleanField(
         default=True,
         verbose_name="Needs shipping",
@@ -601,24 +789,30 @@ class Product(ClusterableModel):
         FieldPanel("index"),
         FieldPanel("live"),
         FieldPanel("requires_shipping"),
+        MultiFieldPanel(
+            [FieldPanel("shares_stock"), StockFieldPanel("stock")],
+            heading="Shared stock",
+        ),
         ProductVariantsInlinePanel(
             "variants",
             panels=PRODUCT_VARIANT_PANELS,
             heading="Product variants",
             label="Variant",
             help_text=mark_safe(
-                """A variant represents a single item that can be ordered/purchased. E.g.
-            A product 'Pen' might have variants 'Single', 'Pack of 5', 'Pack of 10'.<br/>
-            Can be left blank if there is only one variant for this product, or if it
-            only varies by colour and/or size.<br/> 
-            e.g.
+                """Variants are the options customers choose from when they buy this
+            product. If there's more than one, each needs a name, colour or size.
             <ul>
-            <li>Product Mug: one product variant, with no name, colour or size specifications.</li>
-            <li>Product T-shirt: size/colour variants with no separate name (e.g. black,S)</li>
-            <li>Product Hoodie: variants with name "Men's Hoodie", "Women's Hoodie", each 
-              with size and colour options</li>
+            <li>Only one option (e.g. a mug): add one variant, with no name, colour
+              or size.</li>
+            <li>Sizes or colours (e.g. a T-shirt): a variant for each, with a colour
+              and size (e.g. Black, S) and no name.</li>
+            <li>Different versions (e.g. a hoodie): a name for each (e.g. Men's,
+              Women's), with a colour and size if needed.</li>
+            <li>Packs (e.g. cards sold as Single and Pack of 5): tick "Variants share
+              stock" above and set the shared stock, then give each variant its
+              items per pack (1 and 5).</li>
             </ul>
-            Use the arrows to reorder items.
+            Use the arrows to reorder the variants.
             """
             ),
         ),
@@ -639,8 +833,12 @@ class Product(ClusterableModel):
     def out_of_stock(self):
         """
         Nothing from this product can be added to the basket: no live variant has
-        any stock. (Variants that aren't live don't count, even if they have stock.)
+        any stock (or, if the variants share stock, there isn't enough for any of
+        their pack sizes). (Variants that aren't live don't count, even if they
+        have stock.)
         """
+        if self.shares_stock:
+            return not self.live_variants.filter(pack_size__lte=self.stock).exists()
         return not self.live_variants.filter(stock__gt=0).exists()
 
     @property
@@ -745,6 +943,12 @@ class ProductVariant(Orderable):
             "save, so items added to or removed from baskets meanwhile aren't lost."
         ),
     )
+    pack_size = models.PositiveIntegerField(
+        default=1,
+        validators=[MinValueValidator(1)],
+        verbose_name="Items per pack",
+        help_text="If the variants share stock: e.g. 5 for a pack of 5.",
+    )
     live = models.BooleanField(
         default=True, help_text="Display this product variant in the shop"
     )
@@ -755,6 +959,10 @@ class ProductVariant(Orderable):
     # Inherit Orderable's Meta, so variants are ordered by sort_order
     class Meta(Orderable.Meta):
         constraints = [
+            # stock calculations divide by the pack size
+            models.CheckConstraint(
+                condition=Q(pack_size__gte=1), name="pack_size_at_least_1"
+            ),
             models.UniqueConstraint(
                 fields=["product", "variant_name", "colour", "size"],
                 name="unique_product_variant",
@@ -788,6 +996,62 @@ class ProductVariant(Orderable):
         return name
 
     variant_full_name.short_description = "Variant name"
+
+    # Stock. A variant's stock is its own, unless the product's variants share
+    # stock: then it's the product's stock, in single items, and the variant uses
+    # pack_size items from it. Basket quantities are in variants (e.g. packs).
+
+    @property
+    def stock_holder(self):
+        """The variant, or the product if its variants share stock"""
+        return self.product if self.product.shares_stock else self
+
+    @property
+    def items_per_unit(self):
+        """How many items of stock one of this variant uses"""
+        return self.pack_size if self.product.shares_stock else 1
+
+    @property
+    def available(self):
+        """How many of this variant can be added to baskets"""
+        return self.stock_holder.stock // self.items_per_unit
+
+    def has_stock_for(self, quantity, in_basket=0):
+        """
+        Whether there's stock for this quantity of the variant, if the basket
+        already has in_basket of it (which have been taken from stock)
+        """
+        return self.stock_holder.stock + (in_basket - quantity) * self.items_per_unit >= 0
+
+    def stock_display(self):
+        """
+        The variant's stock, for the admin list. A variant that isn't live is
+        marked, as its stock may be out of date.
+        """
+        not_live = "" if self.live else ", not live"
+        if not self.product.shares_stock:
+            return f"{self.stock} (not live)" if not self.live else self.stock
+        if self.pack_size == 1:
+            return f"{self.product.stock} (shared stock{not_live})"
+        return f"{self.available} packs (from {self.product.stock} shared{not_live})"
+
+    def stock_reminder(self):
+        """
+        A reminder to check the stock, when the variant is made live (its stock
+        may not be right any more); None if it has no stock to sell
+        """
+        if self.product.shares_stock:
+            if self.available <= 0:
+                return None
+            return (
+                f"{self} is now live, sold from the product's shared stock of "
+                f"{self.product.stock}. Check that's still right."
+            )
+        if self.stock <= 0:
+            return None
+        return f"{self} is now live with {self.stock} in stock. Check that's still right."
+
+    stock_display.short_description = "Stock"
 
     @property
     def base_price(self):

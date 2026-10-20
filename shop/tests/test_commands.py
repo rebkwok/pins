@@ -78,6 +78,9 @@ def test_seed_shop(seed_settings):
     assert [image.image.title for image in tshirt.images] == ["T-shirt", "T-shirt back"]
     assert calendar.variants.get(variant_name="Single").base_price == Decimal("12.00")
     assert calendar.variants.get(variant_name="Pack of 3").base_price == Decimal("30.00")
+    # the calendar's singles and packs of 3 share its stock
+    assert calendar.shares_stock and calendar.stock == 25
+    assert [v.available for v in calendar.variants.all()] == [25, 8]
     assert Product.objects.get(name="Notebook").out_of_stock()
     # a product that doesn't need shipping
     assert not Product.objects.get(name="Raffle ticket").requires_shipping
@@ -124,6 +127,16 @@ def test_seed_shop_doesnt_change_existing(seed_settings, product):
     # the other seed products are added to the existing shop
     assert Product.objects.count() == 8
     assert CategoryPage.objects.child_of(shop_page).count() == 4
+
+
+def test_seed_shop_existing_category_title(seed_settings, shop_page):
+    # a category with a seed category's title, but a different slug, is used
+    # rather than creating another with the same title
+    clothing = CategoryPageFactory(parent=shop_page, title="clothing", slug="clothes")
+    output = seed()
+    assert CategoryPage.objects.filter(title__iexact="clothing").get() == clothing
+    assert Product.objects.get(name="PINS T-shirt").category_page == clothing
+    assert "category 'clothing'" in output.split("Skipped")[1]
 
 
 def test_seed_shop_requires_debug(seed_settings):

@@ -22,6 +22,7 @@ from .models import (
     Sale,
     SaleCategory,
     SaleProduct,
+    VariantStockHelpPanel,
     protected_variants_message,
 )
 
@@ -44,6 +45,17 @@ class ShopStockViewSet(SnippetViewSet):
         return [*super().breadcrumbs_items, {"url": None, "label": SHOP_STOCK_MENU_LABEL}]
 
 
+# The default order of the shop stock lists (unless a column is sorted): by
+# category (by id too, so categories with the same title aren't mixed together),
+# then product, in their shop page order
+PRODUCT_ORDERING = (
+    "category_page__title",
+    "category_page_id",
+    "index",
+    "name",
+)
+
+
 class ProductViewSet(ShopStockViewSet):
     model = Product
     list_display = (
@@ -55,19 +67,40 @@ class ProductViewSet(ShopStockViewSet):
     )
     list_filter = ("category_page",)
 
+    def get_queryset(self, request):
+        return Product.objects.select_related("category_page").order_by(
+            *PRODUCT_ORDERING
+        )
+
 
 class ProductVariantViewSet(ShopStockViewSet):
     model = ProductVariant
-    panels = [FieldPanel("product"), *PRODUCT_VARIANT_PANELS]
+    # Variants are ordered within their product (on the product's page), so the
+    # list doesn't offer reordering all variants together
+    sort_order_field = None
+    panels = [
+        FieldPanel("product"),
+        VariantStockHelpPanel(classname="help-block help-info"),
+        *PRODUCT_VARIANT_PANELS,
+    ]
     list_display = (
         "product",
         "variant_full_name",
         "category_link",
         "base_price",
-        "stock",
+        "stock_display",
         BooleanColumn("live"),
     )
     list_filter = ("product",)
+
+    def get_queryset(self, request):
+        # Each product's variants are listed together, in the product's order
+        return ProductVariant.objects.select_related(
+            "product__category_page"
+        ).order_by(
+            *(f"product__{field}" for field in PRODUCT_ORDERING),
+            "sort_order",
+        )
 
 
 class SaleViewSet(ShopStockViewSet):
@@ -236,6 +269,16 @@ def _protected_variants_response(request, variants, obj):
             AdminURLFinder(request.user).get_edit_url(obj)
             or request.META.get("HTTP_REFERER", "/")
         )
+
+
+@hooks.register("after_edit_snippet")
+def remind_to_check_stock(request, instance):
+    """
+    A variant (on its own, or in its product's form) has been made live again;
+    its stock may be left from before, so remind the admin to check it
+    """
+    for reminder in getattr(instance, "stock_reminders", []):
+        messages.warning(request, reminder)
 
 
 @hooks.register("before_delete_snippet")

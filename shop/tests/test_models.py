@@ -15,7 +15,7 @@ from wagtail.admin.panels import get_edit_handler
 
 from salesman.core.utils import get_salesman_model
 
-from .factories import NO_PRODUCT_IMAGES, CategoryPageFactory, ShopPageFactory
+from .factories import PRODUCT_FORM_DEFAULTS, CategoryPageFactory, ShopPageFactory
 from ..models import (
     CarouselImage,
     CategoryPage,
@@ -532,7 +532,7 @@ def test_product_admin_form_rejects_duplicate_variants(product):
         "description": json.dumps({"blocks": [], "entityMap": {}}),
         "index": "1",
         "live": "on",
-        **NO_PRODUCT_IMAGES,
+        **PRODUCT_FORM_DEFAULTS,
         "variants-TOTAL_FORMS": "2",
         "variants-INITIAL_FORMS": "0",
         "variants-MIN_NUM_FORMS": "0",
@@ -545,6 +545,7 @@ def test_product_admin_form_rejects_duplicate_variants(product):
                 f"variants-{i}-colour": "",
                 f"variants-{i}-size": "",
                 f"variants-{i}-stock": "1",
+                f"variants-{i}-pack_size": "1",
                 f"variants-{i}-live": "on",
                 f"variants-{i}-ORDER": str(i + 1),
             }

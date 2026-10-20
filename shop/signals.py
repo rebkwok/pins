@@ -162,12 +162,17 @@ def send_new_order_notifications(sender, instance, created, **kwargs):
 
 def adjust_stock(variant, change):
     """
-    Add change (which may be negative) to the variant's stock. Uses an F
-    expression so concurrent updates can't overwrite each other, then refreshes
-    the in-memory stock value.
+    Add change (a quantity of the variant, which may be negative) to its stock:
+    the variant's own stock, or the product's if its variants share stock (in
+    single items, so change x the variant's pack size). Uses an F expression so
+    concurrent updates can't overwrite each other, then refreshes the in-memory
+    stock value.
     """
-    ProductVariant.objects.filter(pk=variant.pk).update(stock=F("stock") + change)
-    variant.refresh_from_db(fields=["stock"])
+    holder = variant.stock_holder
+    type(holder).objects.filter(pk=holder.pk).update(
+        stock=F("stock") + change * variant.items_per_unit
+    )
+    holder.refresh_from_db(fields=["stock"])
 
 
 @receiver(post_init, sender=BasketItem)

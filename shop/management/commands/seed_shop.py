@@ -6,6 +6,7 @@ from django.conf import settings
 from django.core.files.images import ImageFile
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from PIL import Image as PILImage
 from PIL import ImageDraw, ImageFont
@@ -37,16 +38,20 @@ SHOP_DATA = [
                 "price": "12.00",
                 "description": "A4 wall calendar with a podenco for every month.",
                 "images": [("Calendar front", "#b5543f")],
+                # Singles and packs of 3 are sold from the same 25 calendars
+                "shares_stock": True,
+                "stock": 25,
                 "variants": [
                     {
                         "variant_name": "Single",
-                        "stock": 25,
+                        "stock": 0,
                         "image": ("Calendar inside", "#3f6fb5"),
                     },
                     {
                         "variant_name": "Pack of 3",
                         "price": "30.00",
-                        "stock": 5,
+                        "stock": 0,
+                        "pack_size": 3,
                         "image": ("Calendar pack", "#3fb56f"),
                     },
                 ],
@@ -192,8 +197,12 @@ class Command(BaseCommand):
         return shop_page
 
     def get_category(self, shop_page, data, index):
+        # An existing category with the slug or title (e.g. one created in the
+        # admin with a different slug)
         category = (
-            CategoryPage.objects.child_of(shop_page).filter(slug=data["slug"]).first()
+            CategoryPage.objects.child_of(shop_page)
+            .filter(Q(slug=data["slug"]) | Q(title__iexact=data["title"]))
+            .first()
         )
         if category is not None:
             self.skipped.append(f"category '{category.title}'")
@@ -214,6 +223,8 @@ class Command(BaseCommand):
             price=Decimal(data["price"]),
             description=f"<p>{data['description']}</p>",
             requires_shipping=data.get("requires_shipping", True),
+            shares_stock=data.get("shares_stock", False),
+            stock=data.get("stock", 0),
         )
         for sort_order, image in enumerate(data.get("images", [])):
             ProductImage.objects.create(

@@ -13,7 +13,7 @@ from django.urls import reverse
 from wagtail.admin.panels import get_edit_handler
 
 from ..models import Product, ProductVariant
-from .factories import NO_PRODUCT_IMAGES
+from .factories import PRODUCT_FORM_DEFAULTS
 
 pytestmark = pytest.mark.django_db
 
@@ -45,6 +45,7 @@ def variant_form_data(variant, stock, stock_shown, **extra):
         "variant_name": variant.variant_name,
         "price": "10.00",
         "stock": str(stock),
+        "pack_size": "1",
         "live": "on",
         "colour": "",
         "size": "",
@@ -127,6 +128,7 @@ def test_variant_create(admin_client, product):
             "variant_name": "Large",
             "price": "",
             "stock": "7",
+            "pack_size": "1",
             "live": "on",
             "colour": "",
             "size": "",
@@ -152,7 +154,7 @@ def product_form_data(product, stock, stock_shown):
         "description": json.dumps({"blocks": [], "entityMap": {}}),
         "index": str(product.index),
         "live": "on",
-        **NO_PRODUCT_IMAGES,
+        **PRODUCT_FORM_DEFAULTS,
         "variants-TOTAL_FORMS": "1",
         "variants-INITIAL_FORMS": "1",
         "variants-MIN_NUM_FORMS": "0",
@@ -161,6 +163,7 @@ def product_form_data(product, stock, stock_shown):
         "variants-0-variant_name": variant.variant_name,
         "variants-0-price": "10.00",
         "variants-0-stock": str(stock),
+        "variants-0-pack_size": "1",
         "variants-0-stock_shown": str(stock_shown),
         "variants-0-live": "on",
         "variants-0-colour": "",
@@ -270,6 +273,7 @@ def test_variant_create_negative_stock(admin_client, product):
             "variant_name": "Large",
             "price": "",
             "stock": "-1",
+            "pack_size": "1",
             "live": "on",
             "colour": "",
             "size": "",
@@ -302,6 +306,7 @@ def test_product_edit_duplicate_variants_message(admin_client, variant):
             "variants-1-variant_name": variant.variant_name,
             "variants-1-price": "",
             "variants-1-stock": "1",
+            "variants-1-pack_size": "1",
             "variants-1-live": "on",
             "variants-1-colour": "",
             "variants-1-size": "",
@@ -362,7 +367,7 @@ def product_form(product, variants, delete=()):
         "description": json.dumps({"blocks": [], "entityMap": {}}),
         "index": str(product.index),
         "live": "on",
-        **NO_PRODUCT_IMAGES,
+        **PRODUCT_FORM_DEFAULTS,
         "variants-TOTAL_FORMS": str(len(variants)),
         "variants-INITIAL_FORMS": str(len([v for v in variants if "id" in v])),
         "variants-MIN_NUM_FORMS": "0",
@@ -376,6 +381,7 @@ def product_form(product, variants, delete=()):
                 f"variants-{i}-colour": variant.get("colour", ""),
                 f"variants-{i}-size": variant.get("size", ""),
                 f"variants-{i}-stock": "1",
+                f"variants-{i}-pack_size": "1",
                 f"variants-{i}-stock_shown": "1" if "id" in variant else "",
                 f"variants-{i}-live": "on",
                 f"variants-{i}-ORDER": str(i + 1),
@@ -449,6 +455,7 @@ def variant_create_data(product, **fields):
         "variant_name": "",
         "price": "",
         "stock": "1",
+        "pack_size": "1",
         "live": "on",
         "colour": "",
         "size": "",

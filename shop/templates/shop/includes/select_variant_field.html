@@ -9,8 +9,8 @@
         class="form-control"
     >
         {% for variant in product.live_variants %}
-            {% if variant.stock > 0 %}
-                <option value="{{ variant.id }}">{{ variant.name_and_price }} ({{ variant.stock }} in stock)</option>
+            {% if variant.available > 0 %}
+                <option value="{{ variant.id }}">{{ variant.name_and_price }} ({{ variant.available }} in stock)</option>
             {% else %}
                 <option disabled=disabled value="{{ variant.id }}">{{ variant.name_and_price }} (out of stock)</option>
             {% endif %}
