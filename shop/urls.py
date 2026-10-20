@@ -13,6 +13,7 @@ from .views import (
     new_order_view,
     order_status_view,
     update_quantity,
+    update_shipping_method,
 )
 
 
@@ -29,6 +30,11 @@ urlpatterns = [
     path("basket/update/<str:ref>", update_quantity, name="update_quantity"),
     path("basket/delete/<str:ref>", delete_basket_item, name="delete_basket_item"),
     path("basket/", basket_view, name="basket"),
+    path(
+        "basket/shipping-method/",
+        update_shipping_method,
+        name="update_shipping_method",
+    ),
     path("basket-timeout/<int:basket_id>", basket_timeout, name="basket_timeout"),
     path("checkout/", checkout_view, name="checkout"),
     path("checkout/cancel/", cancel_payment, name="cancel_payment"),

@@ -64,10 +64,11 @@
                                             <button type="submit" 
                                                 class="btn basket-btn basket-btn-danger ml-4"
                                                 value="X"
+                                                aria-label="Remove {{ item.product.name }}"
                                                 hx-post="{% url 'shop:delete_basket_item' item.ref %}"
                                                 hx-trigger="click"
                                             >
-                                                <i class="fa-regular fa-trash-can"></i>
+                                                <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
                                             </button>
                                         </div>
                                         <input type="hidden" name="product_id" value="{{ item.product_id }}">
@@ -102,42 +103,7 @@
                     <hr class="mt-2 mb-4">
                     <div class="col-md-12">
                     
-                    <div class="row">
-                        <h4>Select shipping {% if payment_methods|length > 1 %}and payment {% endif %}method</h4>
-                    </div>
-                    
-                    <div class="row">
-                        <form action="{% url 'shop:checkout' %}" method="GET">
-                            {% if payment_methods|length > 1 %}
-                                <h6>Payment method</h6>
-                                {% for method in payment_methods %}
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="payment-method" id="id_{{ method.identifier }}" value="{{ method.identifier }}" {% if forloop.first %}checked{% endif %}>
-                                    <label class="form-check-label" for="id_{{ method.identifier }}">
-                                    {{ method.label }}
-                                    </label>
-                                    <div><em class="text-muted text-italic">{{ method.help }}</em></div>
-                                </div>
-                                {% endfor %}
-                            {% else %}
-                                <input type="hidden" name="payment-method" id="id_{{ payment_methods.0.identifier }}" value="{{ payment_methods.0.identifier }}">
-                            {% endif %}
-                            {% if payment_methods|length > 1 %}
-                                <h6>Shipping method</h6>
-                            {% endif %}
-                            {% for method in shipping_methods %}
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="shipping-method" id="id_{{ method.0 }}" value="{{ method.0 }}" {% if method.0 == selected_shipping_method %}checked{% endif %}>
-                                <label class="form-check-label" for="id_{{ method.0 }}">
-                                {{ method.1 }}
-                                </label>
-                                <div><em class="text-muted text-italic">{{ method.2 }}</em></div>
-                            </div>
-                            {% endfor %}
-
-                            <input class="btn mt-2 mb-2 btn btn-primary" type="submit" value="Checkout">
-                        </form>
-                    </div>
+                    {% include "shop/includes/basket_checkout_options.html" %}
                 </div>
                 </div>
             {% else %}

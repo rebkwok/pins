@@ -63,8 +63,8 @@ def test_seed_shop(seed_settings):
         "Clothing",
         "Mugs & Gifts",
     ]
-    assert Product.objects.count() == 6
-    assert ProductVariant.objects.count() == 12
+    assert Product.objects.count() == 7
+    assert ProductVariant.objects.count() == 13
     collection = Collection.objects.get(name="Shop seed images")
     assert Image.objects.filter(collection=collection).count() == 7
     calendar = Product.objects.get(name="2027 Podenco Calendar")
@@ -79,8 +79,11 @@ def test_seed_shop(seed_settings):
     assert calendar.variants.get(variant_name="Single").base_price == Decimal("12.00")
     assert calendar.variants.get(variant_name="Pack of 3").base_price == Decimal("30.00")
     assert Product.objects.get(name="Notebook").out_of_stock()
+    # a product that doesn't need shipping
+    assert not Product.objects.get(name="Raffle ticket").requires_shipping
+    assert Product.objects.get(name="Podenco mug").requires_shipping
     assert not Sale.objects.exists()
-    assert output.startswith("Created 10:")
+    assert output.startswith("Created 11:")
     assert "Skipped (already exist) 0" in output
 
 
@@ -89,11 +92,11 @@ def test_seed_shop_twice(seed_settings):
     output = seed()
     assert ShopPage.objects.count() == 1
     assert CategoryPage.objects.count() == 3
-    assert Product.objects.count() == 6
-    assert ProductVariant.objects.count() == 12
+    assert Product.objects.count() == 7
+    assert ProductVariant.objects.count() == 13
     assert Image.objects.count() == 7
     assert output.startswith("Created 0: -")
-    assert "Skipped (already exist) 10" in output
+    assert "Skipped (already exist) 11" in output
 
 
 def test_seed_shop_doesnt_change_existing(seed_settings, product):
@@ -119,7 +122,7 @@ def test_seed_shop_doesnt_change_existing(seed_settings, product):
     assert not tshirt.variants.exists()
     assert "product 'PINS T-shirt'" in output.split("Skipped")[1]
     # the other seed products are added to the existing shop
-    assert Product.objects.count() == 7
+    assert Product.objects.count() == 8
     assert CategoryPage.objects.child_of(shop_page).count() == 4
 
 
@@ -129,7 +132,7 @@ def test_seed_shop_requires_debug(seed_settings):
         seed()
     assert not Product.objects.exists()
     seed("--force")
-    assert Product.objects.count() == 6
+    assert Product.objects.count() == 7
 
 
 def test_seed_shop_slug_conflict(seed_settings):

@@ -1,27 +1,26 @@
 {% extends "shop/base.html" %}
 {% load wagtailcore_tags wagtailimages_tags %}
 
-{% block title %}Payment Success{% endblock %}
+{% block title %}Order confirmed{% endblock %}
 
 {% block content %}
-    {% include "includes/header-hero.html" %}
+    {% include "shop/includes/header-hero.html" with title="Order confirmed" %}
 
     <div class="container shop-basket">
         <div class="row">
             <div class="col-md-12">
-                <h2>Thank you for your order!</h2>
-
+                <p class="mt-4">Thank you for your order!</p>
                 {% if order %}
-                    <p class="mt-4">Your order reference is <strong>{{ order.ref }}</strong>.</p>
+                    <p>Your order reference is <strong>{{ order.ref }}</strong>.</p>
                 {% endif %}
                 {% if total %}
-                    <p {% if not order %}class="mt-4"{% endif %}>You have been charged £{{ total|floatformat:2 }}.</p>
+                    <p>You have been charged £{{ total|floatformat:2 }}.</p>
                 {% endif %}
                 {% if order %}
                     <p>Your order confirmation has been emailed to {{ email }}.</p>
                     <p><a href="{% url 'shop:order_status' order.token %}">View your order</a></p>
                 {% else %}
-                    <p {% if not total %}class="mt-4"{% endif %}>Your order is being processed. You will receive a confirmation email{% if email %} at {{ email }}{% endif %} shortly.</p>
+                    <p>Your order is being processed. You will receive a confirmation email{% if email %} at {{ email }}{% endif %} shortly.</p>
                 {% endif %}
             </div>
         </div>

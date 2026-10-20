@@ -22,8 +22,10 @@ from .basket_serializers import BasketSerializer
 from .models import (
     SHIPPING_COLLECT,
     SHIPPING_DELIVER,
+    SHIPPING_METHOD_CHOICES,
     SHIPPING_METHOD_NOTES,
     SHIPPING_METHODS,
+    SHIPPING_NONE,
     Product,
     ProductVariant,
 )
@@ -439,8 +441,14 @@ def delete_basket_item(request, ref):
         # No items in the basket
         resp_str += "<div id='basket-total-and-payment' hx-swap-oob='true'><p>Basket is empty.</p></div>"
     else:
-        # Still items left, update the total
+        # Still items left, update the total, and the shipping options (e.g. if
+        # nothing left needs shipping)
         resp_str += f"<span id='total' hx-swap-oob='true'>{basket_data['total']}</span>"
+        resp_str += render_to_string(
+            "shop/includes/basket_checkout_options.html",
+            {**get_checkout_options_context(request, basket), "oob": True},
+            request,
+        )
 
     basket_extra_html = render_to_string(
         "shop/includes/basket_extra.html",
@@ -499,13 +507,34 @@ def basket_view(request):
                 },
             )
 
+    if existing_basket is not None and existing_basket.shipping_method != SHIPPING_DELIVER:
+        # The basket page starts with delivery selected (choosing another method
+        # updates the basket, see update_shipping_method), so the total includes
+        # its shipping cost
+        existing_basket.shipping_method = SHIPPING_DELIVER
+        existing_basket.save(update_fields=["shipping_method"])
     # Viewing the basket page doesn't create a basket
     basket_data = (
         serialize_basket(request, existing_basket)
         if existing_basket is not None
         else {"items": []}
     )
-    basket_context = get_basket_context(basket_data)
+    return TemplateResponse(
+        request,
+        "shop/basket.html",
+        {
+            **get_basket_context(basket_data),
+            **get_checkout_options_context(request, existing_basket),
+            "hide_basket": True,
+        },
+    )
+
+
+def get_checkout_options_context(request, basket):
+    """
+    Context for the basket page's shipping and payment options
+    (shop/includes/basket_checkout_options.html)
+    """
     payment_methods = [
         {
             "identifier": method.identifier,
@@ -514,27 +543,52 @@ def basket_view(request):
         }
         for method in payment_methods_pool.get_payments("basket", request)
     ]
-    # (value, label, note)
-    shipping_methods = [
-        (method, label, SHIPPING_METHOD_NOTES.get(method, ""))
-        for method, label in SHIPPING_METHODS.items()
-    ]
-    return TemplateResponse(
+    # (value, label, note); none if nothing in the basket needs shipping
+    requires_shipping = basket is not None and basket.requires_shipping
+    shipping_methods = (
+        [
+            (method, label, SHIPPING_METHOD_NOTES.get(method, ""))
+            for method, label in SHIPPING_METHODS.items()
+        ]
+        if requires_shipping
+        else []
+    )
+    return {
+        "payment_methods": payment_methods,
+        "shipping_methods": shipping_methods,
+        "requires_shipping": requires_shipping,
+        # The basket's shipping method, which its total includes
+        "selected_shipping_method": (
+            basket.shipping_method if basket is not None else SHIPPING_DELIVER
+        ),
+    }
+
+
+@require_POST
+def update_shipping_method(request):
+    """
+    The shipping method has been changed on the basket page (htmx): save it on
+    the basket, and update the total (which includes any shipping cost).
+    """
+    basket = get_existing_basket(request)
+    shipping_method = request.POST.get("shipping-method")
+    if (
+        basket is None
+        or basket.payment_in_progress
+        or shipping_method not in SHIPPING_METHODS
+    ):
+        return HttpResponse("")
+    basket.shipping_method = shipping_method
+    basket.save(update_fields=["shipping_method"])
+    basket_data = serialize_basket(request, basket)
+    basket_extra_html = render_to_string(
+        "shop/includes/basket_extra.html",
+        {"extra_rows": basket_data["extra_rows"]},
         request,
-        "shop/basket.html",
-        {
-            **basket_context,
-            "payment_methods": payment_methods,
-            "shipping_methods": shipping_methods,
-            # The basket's shipping method (delivery for a new basket), which its
-            # total includes
-            "selected_shipping_method": (
-                existing_basket.shipping_method
-                if existing_basket is not None
-                else SHIPPING_DELIVER
-            ),
-            "hide_basket": True,
-        },
+    )
+    return HttpResponse(
+        f"<span id='total' hx-swap-oob='true'>{basket_data['total']}</span>"
+        f"<div id='basket-extra' class='col-md-12' hx-swap-oob='true'>{basket_extra_html}</div>"
     )
 
 
@@ -593,24 +647,36 @@ def checkout_view(request):
     if _payment_in_progress(request):
         return HttpResponseRedirect(reverse("shop:basket"))
     payment_method = request.GET.get("payment-method")
-    shipping_method = request.GET.get("shipping-method")
+    existing_basket = get_existing_basket(request)
+    if existing_basket is not None and existing_basket.requires_shipping:
+        # Delivery or collection
+        shipping_method = request.GET.get("shipping-method")
+        valid_shipping_methods = SHIPPING_METHODS
+    else:
+        # Nothing needs shipping (whatever the basket page sent, in case the
+        # basket has changed since)
+        shipping_method = SHIPPING_NONE
+        valid_shipping_methods = [SHIPPING_NONE]
     valid_payment_methods = {
         method.identifier
         for method in payment_methods_pool.get_payments("basket", request)
     }
     if (
         payment_method not in valid_payment_methods
-        or shipping_method not in SHIPPING_METHODS
+        or shipping_method not in valid_shipping_methods
     ):
         messages.error(request, "Please select a shipping and payment method.")
         return HttpResponseRedirect(reverse("shop:basket"))
     context = {
         "payment_method": payment_method,
         "shipping_method": shipping_method,
-        "shipping_method_label": SHIPPING_METHODS[shipping_method],
+        "shipping_method_label": SHIPPING_METHOD_CHOICES[shipping_method],
         "collect_warning": shipping_method == SHIPPING_COLLECT,
     }
     basket = get_or_create_basket(request)
+    # The basket's total includes shipping for delivery
+    basket.shipping_method = shipping_method
+    basket.save()
 
     if request.method == "POST":
         form = CheckoutForm(
@@ -625,9 +691,6 @@ def checkout_view(request):
                 return HttpResponseRedirect(url)
             context["checkout_error"] = error
     else:
-        # update basket with shipping method
-        basket.shipping_method = shipping_method
-        basket.save()
         form = CheckoutForm(
             payment_method=payment_method, shipping_method=shipping_method
         )

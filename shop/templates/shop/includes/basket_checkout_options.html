@@ -1,0 +1,55 @@
+{% comment %}
+The basket's shipping and payment options, and the checkout button. Replaced
+(by id) when the basket changes, e.g. when the last item that needs shipping is
+removed.
+{% endcomment %}
+<div id="basket-checkout-options"{% if oob %} hx-swap-oob="true"{% endif %}>
+    <div class="row">
+        {% if requires_shipping %}
+            <h4>Select shipping {% if payment_methods|length > 1 %}and payment {% endif %}method</h4>
+        {% elif payment_methods|length > 1 %}
+            <h4>Select payment method</h4>
+        {% endif %}
+    </div>
+    
+    <div class="row">
+        <form action="{% url 'shop:checkout' %}" method="GET">
+            {% if payment_methods|length > 1 %}
+                <h6>Payment method</h6>
+                {% for method in payment_methods %}
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="payment-method" id="id_{{ method.identifier }}" value="{{ method.identifier }}" {% if forloop.first %}checked{% endif %}>
+                    <label class="form-check-label" for="id_{{ method.identifier }}">
+                    {{ method.label }}
+                    </label>
+                    <div><em class="text-muted text-italic">{{ method.help }}</em></div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <input type="hidden" name="payment-method" id="id_{{ payment_methods.0.identifier }}" value="{{ payment_methods.0.identifier }}">
+            {% endif %}
+            {% if not requires_shipping %}
+                <p>Nothing in your basket needs shipping.</p>
+            {% elif payment_methods|length > 1 %}
+                <h6>Shipping method</h6>
+            {% endif %}
+            {% for method in shipping_methods %}
+            <div class="form-check">
+                {# Changing the shipping method updates the basket's total #}
+                <input class="form-check-input" type="radio" name="shipping-method" id="id_{{ method.0 }}" value="{{ method.0 }}" {% if method.0 == selected_shipping_method %}checked{% endif %}
+                    hx-post="{% url 'shop:update_shipping_method' %}"
+                    hx-trigger="change"
+                    hx-swap="none"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                >
+                <label class="form-check-label" for="id_{{ method.0 }}">
+                {{ method.1 }}
+                </label>
+                <div><em class="text-muted text-italic">{{ method.2 }}</em></div>
+            </div>
+            {% endfor %}
+
+            <input class="btn mt-2 mb-2 btn btn-primary" type="submit" value="Checkout">
+        </form>
+    </div>
+</div>
