@@ -21,6 +21,8 @@ class CheckoutForm(forms.Form):
     def __init__(self, **kwargs):
         payment_method = kwargs.pop("payment_method")
         shipping_method = kwargs.pop("shipping_method")
+        # Nothing to pay (a discount code covers the whole basket)
+        free = kwargs.pop("free", False)
         super().__init__(**kwargs)
         self.helper = FormHelper()
         self.fields["payment_method"].initial = payment_method
@@ -44,7 +46,10 @@ class CheckoutForm(forms.Form):
             "email",
             "email1",
             shipping_address_layout,
-            Submit("submit", PAYMENT_METHOD_BUTTON_TEXT[payment_method]),
+            Submit(
+                "submit",
+                "Place order" if free else PAYMENT_METHOD_BUTTON_TEXT[payment_method],
+            ),
         )
 
     def clean(self):

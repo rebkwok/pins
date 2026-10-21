@@ -2,16 +2,19 @@
 from datetime import UTC, datetime, timedelta
 
 from django.conf import settings
+from django.db import transaction
 from django.urls import reverse
 
 from salesman.basket.models import BaseBasket
-from salesman.checkout.payment import PaymentMethod
+from salesman.checkout.payment import PaymentError, PaymentMethod
 from salesman.core.utils import get_salesman_model
+from salesman_stripe_connect.conf import app_settings as stripe_settings
 from salesman_stripe_connect.payment import StripeConnectPayment
 
 
 Basket = get_salesman_model("Basket")
 Order = get_salesman_model("Order")
+OrderNote = get_salesman_model("OrderNote")
 
 
 
@@ -77,7 +80,34 @@ class PayByStripe(StripeConnectPayment):
     def basket_payment(self, basket, request):
         basket.extra["name"] = request.POST.get("name")
         basket.update(request)
-        return super().basket_payment(basket, request)
+        if basket.discount_problem:
+            # Don't take the full price when the customer expects a discount
+            raise PaymentError(basket.discount_problem)
+        # Claiming the discount code and starting the payment happen together:
+        # the code is locked until the payment has started, and if it can't be
+        # started, the claim is undone
+        with transaction.atomic():
+            error = basket.claim_discount_code()
+            if error:
+                raise PaymentError(error)
+            if basket.total == 0:
+                # Paid in full by a discount code: no card payment is needed
+                return self.free_order(basket, request)
+            return super().basket_payment(basket, request)
+
+    def free_order(self, basket, request):
+        """Create a paid order for a basket with nothing to pay"""
+        order = Order.objects.create_from_basket(
+            basket, request, status=stripe_settings.SALESMAN_STRIPE_CONNECT_PAID_STATUS
+        )
+        OrderNote.objects.create(
+            order=order,
+            message=f"Paid in full by discount code {order.discount_code}.",
+            public=False,
+        )
+        basket.delete()
+        url = reverse("shop:new_order_status", args=(order.token,))
+        return request.build_absolute_uri(url)
 
     def session_created(self, obj, session, request):
         if isinstance(obj, BaseBasket):

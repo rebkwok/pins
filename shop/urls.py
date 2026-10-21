@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     ProductDetailView,
     add_to_basket,
+    apply_discount_code,
     basket_view,
     basket_timeout,
     cancel_payment,
@@ -12,6 +13,7 @@ from .views import (
     increase_quantity,
     new_order_view,
     order_status_view,
+    remove_discount_code,
     update_quantity,
     update_shipping_method,
 )
@@ -30,6 +32,10 @@ urlpatterns = [
     path("basket/update/<str:ref>", update_quantity, name="update_quantity"),
     path("basket/delete/<str:ref>", delete_basket_item, name="delete_basket_item"),
     path("basket/", basket_view, name="basket"),
+    path("basket/discount/", apply_discount_code, name="apply_discount_code"),
+    path(
+        "basket/discount/remove/", remove_discount_code, name="remove_discount_code"
+    ),
     path(
         "basket/shipping-method/",
         update_shipping_method,

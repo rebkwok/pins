@@ -20,12 +20,16 @@ from salesman.core.utils import get_salesman_model
 from .forms import CheckoutForm
 from .basket_serializers import BasketSerializer
 from .models import (
+    DISCOUNT_CODE_IN_USE,
+    DISCOUNT_CODE_INVALID,
+    DISCOUNT_CODE_USED,
     SHIPPING_COLLECT,
     SHIPPING_DELIVER,
     SHIPPING_METHOD_CHOICES,
     SHIPPING_METHOD_NOTES,
     SHIPPING_METHODS,
     SHIPPING_NONE,
+    DiscountCode,
     Product,
     ProductVariant,
 )
@@ -410,7 +414,7 @@ def update_quantity(request, ref):
                 <span id='total' hx-swap-oob='true'>{basket_data['total']}</span>
                 <div id='updated_{product_id}' class='alert-success' hx-swap-oob='true'>Basket updated</div>
                 <div id='basket-extra' class='col-md-12' hx-swap-oob='true'>{basket_extra_html}</div>
-            """
+            """ + _discount_oob_html(request, basket)
     return HttpResponse(result_html)
 
 
@@ -453,6 +457,7 @@ def delete_basket_item(request, ref):
             {**get_checkout_options_context(request, basket), "oob": True},
             request,
         )
+        resp_str += _discount_oob_html(request, basket)
 
     basket_extra_html = render_to_string(
         "shop/includes/basket_extra.html",
@@ -529,9 +534,89 @@ def basket_view(request):
         {
             **get_basket_context(basket_data),
             **get_checkout_options_context(request, existing_basket),
+            **get_discount_context(existing_basket),
             "hide_basket": True,
         },
     )
+
+
+def get_discount_context(basket):
+    """
+    Context for the basket's discount code (shop/includes/basket_discount.html).
+    The basket must have been updated (e.g. serialized), which applies the code.
+    """
+    code = basket.extra.get(basket.DISCOUNT_CODE_KEY) if basket is not None else None
+    if not code:
+        return {"discount_code": None}
+    return {
+        "discount_code": code,
+        "discount_problem": basket.discount_problem,
+        "discount_covers_order": basket.total == 0,
+        "discount_unused": basket.discount_unused,
+    }
+
+
+def _discount_problem_redirect(request, basket):
+    """
+    Back to the basket, saying why its discount code doesn't apply. A code that
+    isn't valid (invalid, disabled, used, or being paid for in another basket) is
+    removed; one that would leave too little to pay is kept, as it applies if the
+    basket changes, with the reason shown on the basket.
+    """
+    problem = basket.discount_problem
+    if problem in (DISCOUNT_CODE_INVALID, DISCOUNT_CODE_USED, DISCOUNT_CODE_IN_USE):
+        code = basket.extra.get(basket.DISCOUNT_CODE_KEY)
+        basket.set_discount_code(None)
+        messages.error(request, f"Discount code {code} removed: {problem}")
+    else:
+        messages.error(request, problem)
+    return HttpResponseRedirect(reverse("shop:basket"))
+
+
+def _discount_oob_html(request, basket):
+    """The basket's discount code section, to replace it (htmx)"""
+    return render_to_string(
+        "shop/includes/basket_discount.html",
+        {**get_discount_context(basket), "oob": True},
+        request,
+    )
+
+
+@require_POST
+def apply_discount_code(request):
+    """Apply a discount code to the basket (from the basket page)"""
+    basket = get_existing_basket(request)
+    if basket is None or not basket.count:
+        messages.error(request, "Your basket is empty.")
+    elif basket.payment_in_progress:
+        messages.error(request, PAYMENT_IN_PROGRESS_MESSAGE)
+    else:
+        code = DiscountCode.find(request.POST.get("code"))
+        problem = DISCOUNT_CODE_INVALID if code is None else code.unavailable_reason(basket)
+        if problem is None:
+            basket.set_discount_code(code)
+            basket.update(request)
+            # e.g. it would leave too little to pay
+            problem = basket.discount_problem
+            if problem is not None:
+                basket.set_discount_code(None)
+        if problem is not None:
+            messages.error(request, problem)
+        else:
+            messages.success(request, f"Discount code {code.code} applied.")
+    return HttpResponseRedirect(reverse("shop:basket"))
+
+
+@require_POST
+def remove_discount_code(request):
+    """Remove the discount code from the basket (from the basket page)"""
+    basket = get_existing_basket(request)
+    if basket is not None and basket.payment_in_progress:
+        messages.error(request, PAYMENT_IN_PROGRESS_MESSAGE)
+    elif basket is not None:
+        basket.set_discount_code(None)
+        messages.info(request, "Discount code removed.")
+    return HttpResponseRedirect(reverse("shop:basket"))
 
 
 def get_checkout_options_context(request, basket):
@@ -593,6 +678,7 @@ def update_shipping_method(request):
     return HttpResponse(
         f"<span id='total' hx-swap-oob='true'>{basket_data['total']}</span>"
         f"<div id='basket-extra' class='col-md-12' hx-swap-oob='true'>{basket_extra_html}</div>"
+        + _discount_oob_html(request, basket)
     )
 
 
@@ -681,11 +767,19 @@ def checkout_view(request):
     # The basket's total includes shipping for delivery
     basket.shipping_method = shipping_method
     basket.save()
+    basket.update(request)
+    if basket.discount_problem:
+        # The discount code doesn't apply (any more): back to the basket, rather
+        # than paying the full price
+        return _discount_problem_redirect(request, basket)
+    # A discount code may cover the whole basket, so there's nothing to pay
+    free = basket.count > 0 and basket.total == 0
 
     if request.method == "POST":
         form = CheckoutForm(
             payment_method=payment_method,
             shipping_method=shipping_method,
+            free=free,
             data=request.POST,
         )
         if form.is_valid():
@@ -696,13 +790,14 @@ def checkout_view(request):
             context["checkout_error"] = error
     else:
         form = CheckoutForm(
-            payment_method=payment_method, shipping_method=shipping_method
+            payment_method=payment_method, shipping_method=shipping_method, free=free
         )
 
     context = {
         **context,
         "form": form,
         **get_basket_context(serialize_basket(request, basket)),
+        **get_discount_context(basket),
     }
 
     return TemplateResponse(request, "shop/checkout.html", context)

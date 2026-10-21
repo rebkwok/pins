@@ -3,11 +3,21 @@
 
     {% for extra_row in extra_rows %}
         <div class="row">
-            <div class="col">{{ extra_row.label}}</div>
+            <div class="col">
+                {{ extra_row.label }}
+                {% if extra_row.extra.code and not is_checkout %}
+                    {# The applied discount code, which can be removed on the basket page #}
+                    <form method="post" action="{% url 'shop:remove_discount_code' %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-link p-0 ms-2 align-baseline">Remove</button>
+                    </form>
+                {% endif %}
+            </div>
             {% if not is_checkout %}
                 <div class="col"></div>
             {% endif %}
-            <div class="col">£{{extra_row.amount}}</div> 
+            {# e.g. -£5.00 for a discount #}
+            <div class="col">{% if extra_row.amount|slice:":1" == "-" %}-£{{ extra_row.amount|slice:"1:" }}{% else %}£{{ extra_row.amount }}{% endif %}</div>
         </div>    
     {% endfor %}
 {% endif %}

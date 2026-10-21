@@ -3,6 +3,7 @@ from typing import NamedTuple
 from decimal import ROUND_HALF_UP, Decimal
 
 import logging
+import secrets
 from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -80,7 +81,21 @@ class Order(OrderAmountsMixin, BaseOrder):
         basket.extra["basket_id"] = basket.id
         self.name = basket.extra.pop("name", "")
         self.shipping_method = basket.shipping_method
-        return super().populate_from_basket(basket, request, **kwargs)
+        super().populate_from_basket(basket, request, **kwargs)
+        # The discount code applied to the basket (if any) has now been used
+        code = self.discount_code
+        if code:
+            DiscountCode.objects.filter(code=code).update(
+                order=self, basket=None, date_used=timezone.now()
+            )
+
+    @property
+    def discount_code(self):
+        """The discount code applied to the order, or None"""
+        for row in self.extra_rows:
+            if row.get("modifier") == DISCOUNT_ROW:
+                return row["extra"].get("code")
+        return None
 
 
 class OrderItem(BaseOrderItem):
@@ -147,6 +162,48 @@ class Basket(StripeBasketMixin, BaseBasket):
             return cls.objects.filter(id=basket_id, user=None).first()
         return None
 
+    # Key in extra for the discount code applied to the basket
+    DISCOUNT_CODE_KEY = "discount_code"
+
+    @property
+    def discount_code(self):
+        """The DiscountCode applied to the basket, or None"""
+        code = self.extra.get(self.DISCOUNT_CODE_KEY)
+        return DiscountCode.find(code) if code else None
+
+    def set_discount_code(self, code):
+        """Apply a DiscountCode to the basket (or remove it, with None)"""
+        if code is None:
+            self.extra.pop(self.DISCOUNT_CODE_KEY, None)
+        else:
+            self.extra[self.DISCOUNT_CODE_KEY] = code.code
+        self.save()
+
+    def claim_discount_code(self):
+        """
+        Claim the basket's discount code (if any) for its payment, so it can't be
+        used for another order meanwhile. Returns an error message if it can't be
+        used any more, otherwise None. Call in a transaction.
+        """
+        code_value = self.extra.get(self.DISCOUNT_CODE_KEY)
+        if not code_value:
+            return None
+        code = DiscountCode.objects.select_for_update().filter(code=code_value).first()
+        reason = DISCOUNT_CODE_INVALID if code is None else code.unavailable_reason(self)
+        if reason:
+            return reason
+        code.basket = self
+        code.save(update_fields=["basket"])
+        return None
+
+    def release_discount_code(self):
+        """The basket's payment has ended without an order: release its code"""
+        DiscountCode.objects.filter(basket=self, order__isnull=True).update(basket=None)
+
+    def end_payment(self):
+        super().end_payment()
+        self.release_discount_code()
+
     def start_payment(self, session_id, session_url, hold_until=None):
         """
         Record the Stripe checkout session for this basket, and hold the
@@ -196,6 +253,7 @@ class Basket(StripeBasketMixin, BaseBasket):
             # Any checkout session has expired by now
             basket.extra.pop(cls.STRIPE_SESSION_KEY, None)
             basket.save(update_fields=["timeout", "extra"])
+            basket.release_discount_code()
             count += 1
         if count:
             logger.info("Cleared %s expired basket(s)", count)
@@ -1299,3 +1357,162 @@ class Sale(ClusterableModel):
     def save(self, *args, **kwargs):
         self.clean()
         super().save(*args, **kwargs)
+
+
+# DISCOUNT CODES
+
+# The basket's (and order's) extra row for a discount code
+DISCOUNT_ROW = "discount-code"
+
+# Stripe's minimum card payment in GBP; a discount can't leave less than this to
+# pay (but can cover the whole basket, which then doesn't need a card payment)
+MIN_CARD_PAYMENT = Decimal("0.30")
+
+# Letters and numbers that can't be confused with each other (no 0/O or 1/I/L)
+DISCOUNT_CODE_CHARACTERS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+DISCOUNT_CODE_LENGTH = 8
+
+DISCOUNT_CODE_INVALID = "Invalid discount code."
+DISCOUNT_CODE_USED = "Discount code already used."
+# (A code being paid for in another basket; it may become valid again if that
+# payment is cancelled)
+DISCOUNT_CODE_IN_USE = "Discount code is no longer valid."
+DISCOUNT_CODE_TOO_LITTLE_LEFT = (
+    "Discount code can't be used: it would leave less than £0.30 to pay "
+    "(the minimum card payment)."
+)
+
+
+class DiscountCode(models.Model):
+    """
+    A single-use code for a fixed amount off the whole basket (including
+    shipping, and after sale prices).
+
+    A code is claimed by a basket when its payment starts (so it can't be used
+    for two orders at once), released if the payment is cancelled or expires,
+    and used when the order is created.
+    """
+
+    FIXED_AMOUNT = "fixed"
+
+    code = models.CharField(
+        max_length=50,
+        unique=True,
+        blank=True,
+        help_text=(
+            "What customers enter, e.g. PINS5OFF (not case-sensitive). Leave blank "
+            "to create a random code."
+        ),
+    )
+    # Only fixed amounts for now (percentages could be added later)
+    discount_type = models.CharField(
+        max_length=20,
+        choices=[(FIXED_AMOUNT, "Fixed amount")],
+        default=FIXED_AMOUNT,
+        editable=False,
+    )
+    amount = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+        help_text=(
+            "Taken off the whole basket, including shipping. If it's more than the "
+            "basket's total, the order is free, and the rest isn't refunded."
+        ),
+    )
+    active = models.BooleanField(
+        default=True, help_text="Untick to stop the code being used."
+    )
+    description = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Optional, for your reference (e.g. who it was given to). Not shown to customers.",
+    )
+    date_created = models.DateTimeField(auto_now_add=True)
+    # The basket whose payment has claimed the code
+    basket = models.ForeignKey(
+        "shop.Basket",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        editable=False,
+    )
+    order = models.ForeignKey(
+        "shop.Order",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="discount_codes",
+        editable=False,
+    )
+    date_used = models.DateTimeField(null=True, blank=True, editable=False)
+
+    panels = [
+        FieldPanel("code"),
+        FieldPanel("amount"),
+        FieldPanel("active"),
+        FieldPanel("description"),
+    ]
+
+    class Meta:
+        ordering = ("-date_created",)
+
+    def __str__(self):
+        return self.code
+
+    @staticmethod
+    def normalise(code):
+        return (code or "").strip().upper()
+
+    @classmethod
+    def generate_code(cls):
+        while True:
+            code = "".join(
+                secrets.choice(DISCOUNT_CODE_CHARACTERS)
+                for _ in range(DISCOUNT_CODE_LENGTH)
+            )
+            if not cls.objects.filter(code=code).exists():
+                return code
+
+    def clean(self):
+        self.code = self.normalise(self.code) or self.generate_code()
+
+    def save(self, *args, **kwargs):
+        self.code = self.normalise(self.code) or self.generate_code()
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def find(cls, code):
+        """The code (not case-sensitive), or None"""
+        return cls.objects.filter(code=cls.normalise(code)).first()
+
+    def unavailable_reason(self, basket):
+        """
+        Why the code can't be used for the basket, or None if it can. A code
+        claimed by the basket's payment can still be used for it, even if it has
+        been disabled since.
+        """
+        if self.order_id is not None:
+            return DISCOUNT_CODE_USED
+        if self.basket_id is not None and self.basket_id == basket.id:
+            return None
+        if not self.active:
+            return DISCOUNT_CODE_INVALID
+        if self.basket_id is not None and self.basket_is_paying():
+            return DISCOUNT_CODE_IN_USE
+        return None
+
+    def basket_is_paying(self):
+        return self.basket is not None and self.basket.payment_in_progress
+
+    def status(self):
+        if self.order_id is not None:
+            return f"Used (order {self.order})"
+        if self.basket_is_paying():
+            return "Payment in progress"
+        if not self.active:
+            return "Disabled"
+        return "Available"
+
+    status.short_description = "Status"

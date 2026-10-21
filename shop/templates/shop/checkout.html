@@ -41,6 +41,12 @@
                             <a href="{% url 'shop:basket' %}">Go back</a> to change delivery options.
                         </p>
                     {% endif %}
+                    {% if discount_covers_order %}
+                        <p>
+                            Your discount code covers the whole order, so there's nothing to pay.
+                            {% if discount_unused %}The £{{ discount_unused }} left on the code can't be refunded or used again.{% endif %}
+                        </p>
+                    {% endif %}
                     
                     <hr class="mt-2 mb-2"/>
 

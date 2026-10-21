@@ -17,6 +17,7 @@ from .admin_views import OrderRefundView
 from .models import (
     PRODUCT_VARIANT_PANELS,
     CategoryPage,
+    DiscountCode,
     Product,
     ProductVariant,
     Sale,
@@ -112,10 +113,18 @@ class SaleViewSet(ShopStockViewSet):
     )
 
 
+class DiscountCodeViewSet(ShopStockViewSet):
+    model = DiscountCode
+    icon = "tag"
+    list_display = ("code", "amount", "status", "description", "date_created")
+    list_filter = ("active",)
+    search_fields = ("code", "description")
+
+
 class ProductGroup(SnippetViewSetGroup):
     menu_label = SHOP_STOCK_MENU_LABEL
     menu_icon = "pick"
-    items = (ProductViewSet, ProductVariantViewSet, SaleViewSet)
+    items = (ProductViewSet, ProductVariantViewSet, SaleViewSet, DiscountCodeViewSet)
     menu_order = 200
 
 

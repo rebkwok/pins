@@ -611,6 +611,7 @@ SALESMAN_PAYMENT_METHODS = [
 SALESMAN_BASKET_MODIFIERS = [
     "shop.modifiers.ShippingCostModifier",
     "shop.modifiers.SaleModifier",
+    "shop.modifiers.DiscountModifier",
 ]
 
 # Stripe payments (salesman_stripe_connect), as direct charges on the connected
