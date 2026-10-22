@@ -361,13 +361,23 @@ class Basket(StripeBasketMixin, BaseBasket):
         if self.items.exists():
             self.reset_timeout()
 
+    # update() (and so reset_timeout) is called several times whenever the
+    # basket is displayed (salesman's serializer updates the basket for each
+    # item), so the timeout isn't saved again if it was reset this recently
+    TIMEOUT_RESET_INTERVAL = timedelta(seconds=10)
+
     def reset_timeout(self):
         timeout = timezone.now() + timedelta(minutes=settings.BASKET_TIMEOUT_MINUTES)
         if self.payment_in_progress and self.timeout and self.timeout > timeout:
             # Don't release items before the checkout session expires
-            # (update() is called whenever the basket is displayed)
             return
-        logger.info("Resetting basket timeout")
+        if (
+            self.timeout
+            and timedelta(0) <= timeout - self.timeout < self.TIMEOUT_RESET_INTERVAL
+        ):
+            # Reset just now
+            return
+        logger.debug("Resetting basket timeout")
         self.timeout = timeout
         self.save()
 

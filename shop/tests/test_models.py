@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timedelta
 from datetime import timezone as datetime_tz
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 from model_bakery import baker
@@ -680,3 +681,19 @@ def test_product_variant_formset_other_unique_errors(product):
         "Please correct the duplicate data for sort_order."
     )
 
+
+def test_basket_timeout_not_reset_again_straight_away(basket, freezer, settings):
+    # update() is called several times whenever the basket is displayed
+    settings.BASKET_TIMEOUT_MINUTES = 30
+    freezer.move_to(datetime(2024, 1, 1, 10, 0, tzinfo=datetime_tz.utc))
+    basket.reset_timeout()
+    assert basket.timeout == datetime(2024, 1, 1, 10, 30, tzinfo=datetime_tz.utc)
+    freezer.move_to(datetime(2024, 1, 1, 10, 0, 9, tzinfo=datetime_tz.utc))
+    with patch.object(Basket, "save") as save:
+        basket.reset_timeout()
+    assert not save.called
+    assert basket.timeout == datetime(2024, 1, 1, 10, 30, tzinfo=datetime_tz.utc)
+    # 10 seconds later, it's reset
+    freezer.move_to(datetime(2024, 1, 1, 10, 0, 10, tzinfo=datetime_tz.utc))
+    basket.reset_timeout()
+    assert basket.timeout == datetime(2024, 1, 1, 10, 30, 10, tzinfo=datetime_tz.utc)
