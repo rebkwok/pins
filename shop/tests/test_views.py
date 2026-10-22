@@ -7,6 +7,7 @@ from model_bakery import baker
 
 from django.contrib.auth.models import AnonymousUser
 from django.http import Http404
+from django.contrib.messages import get_messages
 from django.urls import reverse
 
 from salesman.checkout.payment import PaymentError, payment_methods_pool
@@ -828,6 +829,14 @@ def set_session_basket(client, basket):
     session.save()
 
 
+def assert_countdown(resp, seconds_left, time_left):
+    # the countdown, which the browser counts down from seconds_left
+    countdown = resp.content.decode()
+    assert f'data-seconds-left="{seconds_left}"' in countdown
+    assert f">{time_left}</span>" in countdown
+    assert 'hx-trigger="every 60s, countdown-ended delay:1s"' in countdown
+
+
 def test_basket_timeout_view(client, basket, freezer):
     set_session_basket(client, basket)
     url = reverse("shop:basket_timeout", args=(basket.id,))
@@ -839,31 +848,73 @@ def test_basket_timeout_view(client, basket, freezer):
     basket.timeout = datetime(2023, 10, 1, 12, 10, tzinfo=timezone.utc)
     basket.save()
     resp = client.get(url, headers=headers)
-    assert resp.content.decode() == "10m 0s"
+    assert_countdown(resp, 600, "10m 0s")
 
     # basket times out in 5.5 mins
     freezer.move_to(datetime(2023, 10, 1, 12, 4, 30, tzinfo=timezone.utc))
     resp = client.get(url, headers=headers)
-    assert resp.content.decode() == "5m 30s"
+    assert_countdown(resp, 330, "5m 30s")
 
     # basket times out now
     freezer.move_to(datetime(2023, 10, 1, 12, 10, tzinfo=timezone.utc))
     resp = client.get(url, headers=headers)
-    assert resp.content.decode() == "0m 0s"
+    assert_countdown(resp, 0, "0m 0s")
 
-    # basket has expired
+    # basket has expired: its items are released, and the page reloads, saying
+    # so
     freezer.move_to(datetime(2023, 10, 1, 12, 10, 30, tzinfo=timezone.utc))
     resp = client.get(url, headers=headers)
-    assert resp.status_code == 302
-    assert resp.url == reverse("shop:basket")
+    assert resp.headers["HX-Refresh"] == "true"
+    assert [str(m) for m in get_messages(resp.wsgi_request)] == ["Your basket has expired."]
     assert not basket.items.exists()
+    # the reloaded page shows the message
+    assert "Your basket has expired." in client.get(reverse("shop:basket")).content.decode()
 
-    # basket has no items
-    resp = client.get(url, headers=headers)
-    assert (
-        resp.content.decode()
-        == "<div></div><div id='basket-countdown-container' hx-swap-oob='true'></div>"
-    )
+
+def test_basket_page_countdown(client, basket, freezer, settings):
+    settings.BASKET_TIMEOUT_MINUTES = 30
+    freezer.move_to(datetime(2023, 10, 1, 12, 0, tzinfo=timezone.utc))
+    set_session_basket(client, basket)
+    # (viewing the basket resets its timeout)
+    resp = client.get(reverse("shop:basket"))
+    assert_countdown(resp, 1800, "30m 0s")
+    content = resp.content.decode()
+    assert "shop/js/basket_countdown.js" in content
+    # the shop's other scripts are still there
+    assert "kit.fontawesome.com" in content
+
+    # part seconds are rounded up
+    basket.timeout = datetime(2023, 10, 1, 12, 10, 0, 500000, tzinfo=timezone.utc)
+    basket.save()
+    resp = client.get(reverse("shop:basket_timeout", args=(basket.id,)))
+    assert_countdown(resp, 601, "10m 1s")
+
+    # no countdown for an empty basket
+    basket.clear()
+    resp = client.get(reverse("shop:basket"))
+    assert 'id="countdown"' not in resp.content.decode()
+    assert "basket_countdown.js" not in resp.content.decode()
+
+
+def test_basket_timeout_view_cleared(client, basket, freezer):
+    # cleared by clear_expired (e.g. the cron job) while the page was open
+    set_session_basket(client, basket)
+    freezer.move_to(datetime(2023, 10, 1, 12, 0, tzinfo=timezone.utc))
+    basket.timeout = datetime(2023, 10, 1, 11, 0, tzinfo=timezone.utc)
+    basket.save()
+    assert Basket.clear_expired() == 1
+    resp = client.get(reverse("shop:basket_timeout", args=(basket.id,)))
+    assert resp.headers["HX-Refresh"] == "true"
+    assert [str(m) for m in get_messages(resp.wsgi_request)] == ["Your basket has expired."]
+
+
+def test_basket_timeout_view_emptied(client, basket):
+    # e.g. emptied in another tab: the page reloads, without a message
+    set_session_basket(client, basket)
+    basket.clear()
+    resp = client.get(reverse("shop:basket_timeout", args=(basket.id,)))
+    assert resp.headers["HX-Refresh"] == "true"
+    assert list(get_messages(resp.wsgi_request)) == []
 
 
 def test_basket_timeout_view_no_timeout(client, basket, freezer, settings):
@@ -875,7 +926,7 @@ def test_basket_timeout_view_no_timeout(client, basket, freezer, settings):
     set_session_basket(client, basket)
     url = reverse("shop:basket_timeout", args=(basket.id,))
     resp = client.get(url, headers={"hx-request": True})
-    assert resp.content.decode() == "30m 0s"
+    assert_countdown(resp, 1800, "30m 0s")
     basket.refresh_from_db()
     assert basket.timeout == datetime(2023, 10, 1, 12, 30, tzinfo=timezone.utc)
 

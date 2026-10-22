@@ -312,12 +312,19 @@ def test_checkout_method_not_allowed(basket_client):
 def test_basket_timeout_other_basket(basket_client, basket):
     other_basket = baker.make("shop.Basket")
     resp = basket_client.get(reverse("shop:basket_timeout", args=(other_basket.id,)))
-    assert resp.status_code == 404
+    # another visitor's basket's time isn't shown: the page is reloaded (showing
+    # the visitor's own basket), rather than polling an error every second
+    assert resp.content == b""
+    assert resp.headers["HX-Refresh"] == "true"
+    assert [str(m) for m in get_messages(resp.wsgi_request)] == [
+        "Your basket has changed since this page was loaded."
+    ]
 
 
 def test_basket_timeout_no_basket(client, basket):
+    # e.g. the basket has been checked out since the basket page was loaded
     resp = client.get(reverse("shop:basket_timeout", args=(basket.id,)))
-    assert resp.status_code == 404
+    assert resp.headers["HX-Refresh"] == "true"
 
 
 # Salesman API

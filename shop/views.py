@@ -1,4 +1,5 @@
 import logging
+import math
 
 from django.contrib import messages
 from django.core.exceptions import BadRequest
@@ -535,9 +536,25 @@ def basket_view(request):
             **get_basket_context(basket_data),
             **get_checkout_options_context(request, existing_basket),
             **get_discount_context(existing_basket),
+            **get_countdown_context(existing_basket),
             "hide_basket": True,
         },
     )
+
+
+def get_countdown_context(basket):
+    """
+    Context for the basket page's countdown (shop/includes/basket_countdown.html),
+    if the basket has items (and a timeout)
+    """
+    if basket is None or basket.timeout is None or not basket.items.exists():
+        return {"seconds_left": None}
+    seconds_left = max(0, math.ceil((basket.timeout - timezone.now()).total_seconds()))
+    return {
+        "seconds_left": seconds_left,
+        "time_left": f"{seconds_left // 60}m {seconds_left % 60}s",
+        "countdown_url": reverse("shop:basket_timeout", args=(basket.id,)),
+    }
 
 
 def get_discount_context(basket):
@@ -826,27 +843,49 @@ def _order_status(request, token, new=False):
     return TemplateResponse(request, "shop/order_status.html", context)
 
 
+BASKET_EXPIRED_MESSAGE = "Your basket has expired."
+BASKET_CHANGED_MESSAGE = "Your basket has changed since this page was loaded."
+
+
+def _refresh_basket_page(request, message=None):
+    """
+    Reload the basket page (htmx), so it shows the basket as it is now, with an
+    optional message
+    """
+    if message:
+        messages.error(request, message)
+    resp = HttpResponse("")
+    resp.headers["HX-Refresh"] = "true"
+    return resp
+
+
 @require_GET
 def basket_timeout(request, basket_id):
-    # Only the visitor's own basket
+    """
+    The time left before the basket's items are released, for the basket page's
+    countdown (htmx, every minute, see basket_countdown.js). If the basket has
+    expired or changed since the page was loaded, the page is reloaded instead.
+    """
     basket = get_existing_basket(request)
     if basket is None or basket.id != basket_id:
-        raise Http404
-    if basket.items.exists():
-        if basket.timeout is None:
-            # Shouldn't happen, as the timeout is set whenever items are added,
-            # but make sure the items will be released eventually
-            basket.reset_timeout()
-        time_left = basket.timeout - timezone.now()
-        if time_left.total_seconds() >= 0:
-            return HttpResponse(f"{time_left.seconds // 60}m {time_left.seconds % 60}s")
-        # expired; timeout and redirect
-        Basket.clear_expired()
-        messages.error(request, "Basket has expired")
-        redirect_url = reverse("shop:basket")
-        resp = HttpResponseRedirect(redirect_url)
-        resp.headers["HX-Redirect"] = redirect_url
-        return resp
-    return HttpResponse(
-        "<div></div><div id='basket-countdown-container' hx-swap-oob='true'></div>"
-    )
+        # e.g. the basket has been checked out or removed (perhaps in another
+        # tab), or merged into the user's basket when they logged in. (Another
+        # visitor's basket's time isn't shown.)
+        return _refresh_basket_page(request, BASKET_CHANGED_MESSAGE)
+    if not basket.items.exists():
+        # Emptied since the page was loaded: expired items are cleared (and the
+        # timeout unset) by clear_expired; otherwise e.g. emptied in another tab
+        return _refresh_basket_page(
+            request, BASKET_EXPIRED_MESSAGE if basket.timeout is None else None
+        )
+    if basket.timeout is None:
+        # Shouldn't happen, as the timeout is set whenever items are added,
+        # but make sure the items will be released eventually
+        basket.reset_timeout()
+    if basket.timeout >= timezone.now():
+        return TemplateResponse(
+            request, "shop/includes/basket_countdown.html", get_countdown_context(basket)
+        )
+    # Expired now
+    Basket.clear_expired()
+    return _refresh_basket_page(request, BASKET_EXPIRED_MESSAGE)

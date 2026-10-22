@@ -11,9 +11,10 @@
     <div class="container shop-basket">
         <div class="row">
             {% if basket.items %}
-            <div class="basket-countdown-alert" id="basket-countdown-container">Basket will timeout in <span id="countdown" hx-get={% url 'shop:basket_timeout' basket.id %} hx-trigger="every 1s"><i class="far fa-clock"></i></span></div>
+            {% if seconds_left is not None %}
+            <div class="basket-countdown-alert" id="basket-countdown-container">Basket will timeout in {% include "shop/includes/basket_countdown.html" %}</div>
             {% endif %}
-            <div id="basket_timeout" style="display:none;">{{ basket.timeout|date:"d M Y H:i:s" }}</div>
+            {% endif %}
                 {% if basket.items %}
                 <div class="col-md-12">
                     {% for product_identifier, items in basket.items.items %}
@@ -115,3 +116,8 @@
         </div>
     </div>
 {% endblock content %}
+
+{% block extra_js %}
+    {{ block.super }}
+    {% if seconds_left is not None %}<script src="{% static 'shop/js/basket_countdown.js' %}" defer></script>{% endif %}
+{% endblock extra_js %}
