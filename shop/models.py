@@ -11,8 +11,9 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.contenttypes.models import ContentType
 from django.db import models, transaction
 from django.db.models import Q
+from django.dispatch import Signal
 from django.urls import reverse
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from django.utils.text import slugify
 from django.utils.safestring import mark_safe
 from django.utils import timezone
@@ -37,6 +38,24 @@ from wagtail.contrib.settings.models import (
 from wagtail.fields import RichTextField
 from wagtail.images.models import Image
 from wagtail.models import Page, Orderable
+
+
+# DISPATCHERS
+
+# The group of users who send (or hold, for collection) some of the shop's
+# products. They see their items to send in the admin, and are emailed about new
+# orders with their items for products that are set to email them (otherwise,
+# the shop's notify recipients, who get all new orders, tell them).
+DISPATCHERS_GROUP = "Dispatchers"
+
+
+def is_dispatcher(user):
+    return user is not None and user.groups.filter(name=DISPATCHERS_GROUP).exists()
+
+
+def dispatcher_name(user):
+    return user.get_full_name() or user.get_username()
+
 
 
 # ORDERS
@@ -81,6 +100,10 @@ class Order(OrderAmountsMixin, BaseOrder):
         basket.extra["basket_id"] = basket.id
         self.name = basket.extra.pop("name", "")
         self.shipping_method = basket.shipping_method
+        if self.status == self.Status.PROCESSING and not basket.requires_shipping:
+            # A paid order with nothing to ship is complete. It's created
+            # complete (not changed to complete), so the customer gets one email.
+            self.status = self._current_status = self.Status.COMPLETED
         super().populate_from_basket(basket, request, **kwargs)
         # The discount code applied to the basket (if any) has now been used
         code = self.discount_code
@@ -90,16 +113,129 @@ class Order(OrderAmountsMixin, BaseOrder):
             )
 
     @property
-    def discount_code(self):
-        """The discount code applied to the order, or None"""
+    def discount_row(self):
+        """The order's extra row for its discount code (label, amount etc), or None"""
         for row in self.extra_rows:
             if row.get("modifier") == DISCOUNT_ROW:
-                return row["extra"].get("code")
+                return row
         return None
+
+    @property
+    def discount_code(self):
+        """The discount code applied to the order, or None"""
+        row = self.discount_row
+        return row["extra"].get("code") if row else None
+
+    # Shipping (or collection)
+
+    @property
+    def is_collected(self):
+        return self.shipping_method == SHIPPING_COLLECT
+
+    def mark_items_shipped(self, items, user):
+        """
+        Mark the order's items (those still to send) as shipped (or collected) by
+        user, update the order's status, and email the customer.
+        Returns the items marked shipped.
+        """
+        with transaction.atomic():
+            # Lock the order, so concurrent updates (e.g. two dispatchers) see
+            # each other's items
+            Order.objects.select_for_update().filter(pk=self.pk).first()
+            to_ship = list(
+                self.items.filter(
+                    pk__in=[item.pk for item in items],
+                    shipping_status=OrderItem.TO_SEND,
+                )
+            )
+            if not to_ship:
+                return []
+            now = timezone.now()
+            for item in to_ship:
+                item.shipping_status = OrderItem.SHIPPED
+                item.shipped_at = now
+                item.shipped_by = user
+                item.save(update_fields=["shipping_status", "shipped_at", "shipped_by"])
+            self.update_shipping_status()
+            items_shipped.send(sender=Order, order=self, items=to_ship)
+        return to_ship
+
+    def update_shipping_status(self):
+        """
+        Partially shipped once some (but not all) of the items that need shipping
+        have been shipped; Shipped once they all have. Only orders being processed
+        (or partly shipped) are changed.
+        """
+        if self.status not in (self.Status.PROCESSING, self.Status.PARTIALLY_SHIPPED):
+            return
+        statuses = set(
+            self.items.exclude(shipping_status=OrderItem.NO_SHIPPING).values_list(
+                "shipping_status", flat=True
+            )
+        )
+        if OrderItem.SHIPPED not in statuses:
+            return
+        new_status = (
+            self.Status.PARTIALLY_SHIPPED
+            if OrderItem.TO_SEND in statuses
+            else self.Status.SHIPPED
+        )
+        if new_status != self.status:
+            self.status = new_status
+            self.save(update_fields=["status", "date_updated"])
 
 
 class OrderItem(BaseOrderItem):
-    pass
+    """
+    An order item, with its dispatcher (copied from its product when the order
+    is placed, so reassigning the product later doesn't change past orders) and
+    shipping status.
+    """
+
+    TO_SEND = "to_send"
+    SHIPPED = "shipped"
+    NO_SHIPPING = "no_shipping"
+    SHIPPING_STATUSES = {
+        TO_SEND: "To send",
+        # Collected items (for "collect in person" orders) are marked shipped too
+        SHIPPED: "Shipped/collected",
+        NO_SHIPPING: "No shipping needed",
+    }
+
+    dispatcher = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="dispatched_order_items",
+    )
+    # A copy of the dispatcher's name, kept if the user is deleted
+    dispatcher_name = models.CharField(max_length=255, blank=True)
+    shipping_status = models.CharField(
+        max_length=20, choices=tuple(SHIPPING_STATUSES.items()), default=TO_SEND
+    )
+    shipped_at = models.DateTimeField(null=True, blank=True)
+    shipped_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+
+    def populate_from_basket_item(self, item, request):
+        super().populate_from_basket_item(item, request)
+        product = item.product.product
+        self.dispatcher = product.dispatcher
+        if product.dispatcher is not None:
+            self.dispatcher_name = dispatcher_name(product.dispatcher)
+        self.shipping_status = (
+            self.TO_SEND if product.requires_shipping else self.NO_SHIPPING
+        )
+
+    @property
+    def needs_shipping(self):
+        return self.shipping_status != self.NO_SHIPPING
 
 
 class OrderPayment(BaseOrderPayment):
@@ -602,6 +738,41 @@ class StockFieldPanel(FieldPanel):
             )
 
 
+def _list_icon(name, classname, text, colour=None):
+    """
+    A Wagtail admin icon for a list column, with text for screen readers (and as
+    a tooltip)
+    """
+    style = "width: 1em; height: 1em; vertical-align: -0.125em;"
+    if colour:
+        style += f" color: {colour};"
+    return format_html(
+        '<span title="{}"><svg class="icon icon-{} {}" aria-hidden="true" style="{}">'
+        '<use href="#icon-{}"></use></svg><span class="w-sr-only">{}</span></span>',
+        text,
+        name,
+        classname,
+        style,
+        name,
+        text,
+    )
+
+
+class DispatcherWarningPanel(HelpPanel):
+    """
+    On a product's page: a warning if its dispatcher isn't in the Dispatchers
+    group any more (shown only then)
+    """
+
+    class BoundPanel(HelpPanel.BoundPanel):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self.content = self.instance.dispatcher_warning or ""
+
+        def is_shown(self):
+            return bool(self.content)
+
+
 class VariantStockHelpPanel(HelpPanel):
     """
     On a variant's own edit page: whether the product's variants share stock
@@ -723,6 +894,20 @@ class ProductAdminForm(RelativeStockFormMixin, WagtailAdminModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._init_stock_shown()
+        dispatcher_field = self.fields.get("dispatcher")
+        if dispatcher_field is not None:
+            # Users' names, not usernames
+            dispatcher_field.label_from_instance = dispatcher_name
+        if dispatcher_field is not None and self.instance.dispatcher_id is not None:
+            # Keep the product's dispatcher as a choice even if they've been
+            # removed from the Dispatchers group (there's a warning), so saving
+            # the product doesn't remove them unless another is chosen
+            dispatcher_field.queryset = (
+                dispatcher_field.queryset
+                | dispatcher_field.queryset.model.objects.filter(
+                    pk=self.instance.dispatcher_id
+                )
+            ).distinct()
 
     def save(self, commit=True):
         # Variants made live (see ProductVariantAdminForm.save), checked before
@@ -812,6 +997,27 @@ class Product(ClusterableModel):
             "counting items in customers' baskets)."
         ),
     )
+    dispatcher = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="dispatched_products",
+        limit_choices_to={"groups__name": DISPATCHERS_GROUP},
+        help_text=(
+            "Who sends (or holds, for collection) this product: a user in the "
+            "Dispatchers group. Changing it doesn't change orders already placed."
+        ),
+    )
+    notify_dispatcher = models.BooleanField(
+        default=False,
+        verbose_name="Email the dispatcher about new orders",
+        help_text=(
+            "Email the dispatcher when an order with this product is paid. If not, "
+            "the shop's notify email recipients (who get all new orders) need to "
+            "tell them."
+        ),
+    )
     requires_shipping = models.BooleanField(
         default=True,
         verbose_name="Needs shipping",
@@ -847,6 +1053,9 @@ class Product(ClusterableModel):
         FieldPanel("index"),
         FieldPanel("live"),
         FieldPanel("requires_shipping"),
+        DispatcherWarningPanel(classname="help-block help-warning"),
+        FieldPanel("dispatcher"),
+        FieldPanel("notify_dispatcher"),
         MultiFieldPanel(
             [FieldPanel("shares_stock"), StockFieldPanel("stock")],
             heading="Shared stock",
@@ -878,6 +1087,60 @@ class Product(ClusterableModel):
 
     def __str__(self):
         return self.name
+
+    def clean(self):
+        if self.notify_dispatcher:
+            if self.dispatcher_id is None:
+                raise ValidationError(
+                    {"notify_dispatcher": "Choose a dispatcher to email."}
+                )
+            if not self.dispatcher.email:
+                raise ValidationError(
+                    {
+                        "notify_dispatcher": (
+                            f"{dispatcher_name(self.dispatcher)} has no email address."
+                        )
+                    }
+                )
+
+    @property
+    def dispatcher_warning(self):
+        """
+        A warning if the product's dispatcher isn't in the Dispatchers group any
+        more (so can't be chosen again, and can't see their items to send)
+        """
+        if self.dispatcher is not None and not is_dispatcher(self.dispatcher):
+            return (
+                f"{dispatcher_name(self.dispatcher)} isn't in the Dispatchers group "
+                "any more. Choose another dispatcher."
+            )
+        return None
+
+    def dispatcher_display(self):
+        """
+        The product's dispatcher, for the admin list, with an icon if they're
+        emailed about new orders, and a warning if they're not a dispatcher any
+        more
+        """
+        if self.dispatcher is None:
+            return ""
+        icons = []
+        if self.notify_dispatcher:
+            icons.append(
+                _list_icon("mail", "shop-dispatcher-emailed", "Emailed about new orders")
+            )
+        warning = self.dispatcher_warning
+        if warning:
+            icons.append(
+                _list_icon("warning", "shop-dispatcher-warning", warning, colour="#cd3238")
+            )
+        return format_html(
+            "{}{}",
+            dispatcher_name(self.dispatcher),
+            format_html_join("", " {}", ((icon,) for icon in icons)),
+        )
+
+    dispatcher_display.short_description = "Dispatcher"
 
     def get_variant_count(self):
         return f"{self.live_variants.count()} live ({self.variants.count()} total)"
@@ -1357,6 +1620,13 @@ class Sale(ClusterableModel):
     def save(self, *args, **kwargs):
         self.clean()
         super().save(*args, **kwargs)
+
+
+# SHIPPING
+
+# Some of an order's items have been shipped (or collected).
+# Arguments: order, items (the items just shipped)
+items_shipped = Signal()
 
 
 # DISCOUNT CODES

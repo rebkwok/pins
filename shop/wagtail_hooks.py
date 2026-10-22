@@ -1,5 +1,6 @@
 from django.contrib import admin, messages
 from django.shortcuts import redirect
+from django.urls import path
 from django.utils.translation import gettext_lazy as _
 from salesman.admin.utils import format_price
 from salesman.admin.wagtail.panels import OrderAdminPanel, ReadOnlyPanel
@@ -7,13 +8,14 @@ from salesman.admin.wagtail_hooks import OrderAdmin as SalesmanOrderAdmin
 from salesman.core.utils import get_salesman_model
 from wagtail import hooks
 from wagtail.admin.admin_url_finder import AdminURLFinder
+from wagtail.admin.viewsets.base import ViewSet
 from wagtail.admin.panels import FieldPanel, MultiFieldPanel, ObjectList, TabbedInterface
 from wagtail.admin.ui.tables import BooleanColumn
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 from wagtail_modeladmin.options import modeladmin_register
 
-from .admin_views import OrderRefundView
+from .admin_views import SHOP_STOCK_MENU_LABEL, DispatchersView, OrderRefundView
 from .models import (
     PRODUCT_VARIANT_PANELS,
     CategoryPage,
@@ -29,9 +31,6 @@ from .models import (
 
 
 Order = get_salesman_model("Order")
-
-
-SHOP_STOCK_MENU_LABEL = "Shop Stock"
 
 
 class ShopStockViewSet(SnippetViewSet):
@@ -63,6 +62,7 @@ class ProductViewSet(ShopStockViewSet):
         "name",
         "category_link",
         "index",
+        "dispatcher_display",
         BooleanColumn("live"),
         "get_variant_count",
     )
@@ -121,10 +121,27 @@ class DiscountCodeViewSet(ShopStockViewSet):
     search_fields = ("code", "description")
 
 
+class DispatchersViewSet(ViewSet):
+    """Shop Stock > Dispatchers: the users in the Dispatchers group"""
+
+    name = "shop_dispatchers"
+    menu_label = "Dispatchers"
+    icon = "group"
+
+    def get_urlpatterns(self):
+        return [path("", DispatchersView.as_view(), name="index")]
+
+
 class ProductGroup(SnippetViewSetGroup):
     menu_label = SHOP_STOCK_MENU_LABEL
     menu_icon = "pick"
-    items = (ProductViewSet, ProductVariantViewSet, SaleViewSet, DiscountCodeViewSet)
+    items = (
+        ProductViewSet,
+        ProductVariantViewSet,
+        SaleViewSet,
+        DiscountCodeViewSet,
+        DispatchersViewSet,
+    )
     menu_order = 200
 
 

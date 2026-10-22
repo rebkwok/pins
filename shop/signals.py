@@ -1,5 +1,6 @@
 # signals.py
 import logging
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.mail import EmailMessage
@@ -14,7 +15,13 @@ from salesman.core.utils import get_salesman_model
 from salesman.orders.signals import status_changed
 from salesman_stripe_connect import signals as stripe_signals
 
-from .models import ProductVariant, ShopSettings, order_items_for_variants
+from .models import (
+    OrderItem,
+    ProductVariant,
+    ShopSettings,
+    items_shipped,
+    order_items_for_variants,
+)
 
 
 BasketItem = get_salesman_model("BasketItem")
@@ -36,23 +43,23 @@ def get_email_settings():
     return notify_emails, reply_to
 
 
-def send_email(subject, message, to, reply_to):
+def _send_email_now(subject, message, to, reply_to):
     """
-    Send an email once the current transaction has committed.
-    Failures are logged rather than raised, so that a failed email can't
-    fail the request that created or updated the order (e.g. the Stripe webhook).
+    Failures are logged rather than raised, so that a failed email can't fail
+    the request that created or updated the order (e.g. the Stripe webhook).
     """
     email = EmailMessage(
         subject, message, settings.DEFAULT_FROM_EMAIL, to, reply_to=reply_to
     )
+    try:
+        email.send()
+    except Exception:
+        logger.exception("Error sending email '%s' to %s", subject, to)
 
-    def _send():
-        try:
-            email.send()
-        except Exception:
-            logger.exception("Error sending email '%s' to %s", subject, to)
 
-    transaction.on_commit(_send)
+def send_email(subject, message, to, reply_to):
+    """Send an email once the current transaction has committed"""
+    transaction.on_commit(lambda: _send_email_now(subject, message, to, reply_to))
 
 
 def order_status_url(order):
@@ -106,6 +113,102 @@ def send_account_deauthorized_notification(sender, account_id, **kwargs):
     send_email(subject, message, notify_emails, reply_to)
 
 
+def _item_dispatch_note(item):
+    """Who sends the item, for the shop's new order email"""
+    if not item.needs_shipping:
+        return "no shipping needed"
+    if item.dispatcher is None:
+        return "no dispatcher"
+    emailed = item.product is not None and item.product.product.notify_dispatcher
+    return f"{item.dispatcher_name} ({'emailed' if emailed else 'not emailed'})"
+
+
+def shop_order_message(order):
+    """
+    The shop's new order email: the order's details, with each item's dispatcher,
+    so the shop can pass on anything a dispatcher hasn't been emailed about
+    """
+    items = list(order.items.select_related("dispatcher"))
+    notes = [_item_dispatch_note(item) for item in items]
+    if order.status == order.Status.HOLD:
+        paid = "Awaiting payment"
+    elif order.amount_received >= order.total:
+        paid = "Paid"
+    else:
+        paid = "Not paid"
+    lines = [f"A new shop order '{order.ref}' has been received ({paid.lower()})."]
+    if any(note.endswith("(not emailed)") or note == "no dispatcher" for note in notes):
+        lines.append(
+            "Some items' dispatchers haven't been emailed (or there isn't one): "
+            "please pass these on."
+        )
+    lines += ["", f"Customer: {order.name} ({order.email})"]
+    lines.append(f"Shipping method: {order.get_shipping_method_display()}")
+    if order.needs_delivery:
+        lines += ["Shipping address:", order.shipping_address]
+    lines += ["", "Items:"]
+    lines += [
+        f"- {item.quantity} x {item.name}: {note}" for item, note in zip(items, notes)
+    ]
+    lines.append("")
+    discount = order.discount_row
+    if discount:
+        lines.append(
+            f"Discount code: {order.discount_code} (-£{-Decimal(discount['amount']):.2f})"
+        )
+        lines.append(f"Total: £{order.total:.2f} (including discount)")
+    else:
+        lines.append(f"Total: £{order.total:.2f}")
+    admin_url = reverse("shop_order_modeladmin_edit", args=(order.pk,))
+    lines += ["", f"View the order: https://{settings.DOMAIN}{admin_url}"]
+    return "\n".join(lines)
+
+
+def notify_dispatchers(order):
+    """
+    Once the transaction has committed (when the order's items have been
+    created), email dispatchers about their items to send (or hand over, for
+    collection), for products that are set to email the dispatcher
+    """
+
+    def _notify():
+        _, reply_to = get_email_settings()
+        items = order.items.filter(
+            shipping_status=OrderItem.TO_SEND, dispatcher__isnull=False
+        ).select_related("dispatcher")
+        by_dispatcher = {}
+        for item in items:
+            if item.product is not None and item.product.product.notify_dispatcher:
+                by_dispatcher.setdefault(item.dispatcher, []).append(item)
+        if order.is_collected:
+            to_do, subject = "hand over (for collection)", "items to hand over"
+        else:
+            to_do, subject = "send", "items to send"
+        for dispatcher, dispatcher_items in by_dispatcher.items():
+            lines = [f"Shop order '{order.ref}' has items for you to {to_do}:"]
+            lines += [f"- {item.quantity} x {item.name}" for item in dispatcher_items]
+            lines += ["", f"Customer: {order.name} ({order.email})"]
+            if order.needs_delivery:
+                lines += ["Shipping address:", order.shipping_address]
+            else:
+                lines += [f"Shipping method: {order.get_shipping_method_display()}"]
+            _send_email_now(
+                f"Shop order '{order.ref}': {subject}",
+                "\n".join(lines),
+                [dispatcher.email],
+                reply_to,
+            )
+
+    transaction.on_commit(_notify)
+
+
+@receiver(status_changed)
+def notify_dispatchers_when_paid(sender, order, new_status, old_status, **kwargs):
+    """An order that was waiting for payment (e.g. on hold) has been paid"""
+    if new_status == order.Status.PROCESSING:
+        notify_dispatchers(order)
+
+
 @receiver(status_changed)
 def send_notification(sender, order, new_status, old_status, **kwargs):
     """
@@ -146,6 +249,12 @@ def send_new_order_notifications(sender, instance, created, **kwargs):
                 "Thank you for your order! Your order will be completed when payment has been received.\n"
                 f"View the status of your order: {status_url}"
             )
+        elif instance.status == instance.Status.COMPLETED:
+            # e.g. nothing in the order needs shipping
+            message = (
+                "Thank you for your order! Your order is complete.\n"
+                f"View the status of your order: {status_url}"
+            )
         else:
             message = (
                 "Thank you for your order! Your order is being processed.\n"
@@ -155,9 +264,40 @@ def send_new_order_notifications(sender, instance, created, **kwargs):
         send_email(subject, message, [instance.email], reply_to)
 
         if notify_emails:
+            # Once the transaction has committed, when the order's items have
+            # been created
             subject = f"New shop order '{instance.ref}'"
-            message = "A new shop order has been received."
-            send_email(subject, message, notify_emails, reply_to)
+            transaction.on_commit(
+                lambda: _send_email_now(
+                    subject, shop_order_message(instance), notify_emails, reply_to
+                )
+            )
+
+        if instance.status == instance.Status.PROCESSING:
+            # Paid when it was created
+            notify_dispatchers(instance)
+
+
+@receiver(items_shipped)
+def send_items_shipped_email(sender, order, items, **kwargs):
+    """
+    Tell the customer which items have been shipped (or collected), and which
+    are still to come
+    """
+    _, reply_to = get_email_settings()
+    done = "collected" if order.is_collected else "shipped"
+    to_come = list(order.items.filter(shipping_status=OrderItem.TO_SEND))
+    if to_come:
+        subject = f"Part of order '{order.ref}' has been {done}"
+    else:
+        subject = f"Order '{order.ref}' has been {done}"
+    lines = [f"These items from your order have been {done}:"]
+    lines += [f"- {item.quantity} x {item.name}" for item in items]
+    if to_come:
+        lines += ["", f"Still to be {done}:"]
+        lines += [f"- {item.quantity} x {item.name}" for item in to_come]
+    lines += ["", f"View the status of your order: {order_status_url(order)}"]
+    send_email(subject, "\n".join(lines), [order.email], reply_to)
 
 
 def adjust_stock(variant, change):

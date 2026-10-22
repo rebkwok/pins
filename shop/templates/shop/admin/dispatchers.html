@@ -1,0 +1,46 @@
+{% extends "wagtailadmin/generic/base.html" %}
+{% load wagtailadmin_tags %}
+
+{% block main_content %}
+    <p class="help-block help-info">
+        Dispatchers are users who send (or hold, for collection) some of the shop's
+        products. Choose each product's dispatcher on the product's page.
+    </p>
+
+    {% if dispatchers %}
+        <table class="listing">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Products</th>
+                    <th><span class="w-sr-only">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dispatcher in dispatchers %}
+                    <tr>
+                        <td><a href="{% url 'wagtailusers_users:edit' dispatcher.pk %}">{{ dispatcher.get_full_name|default:dispatcher.get_username }}</a></td>
+                        <td>{{ dispatcher.email|default:"-" }}</td>
+                        <td>{{ dispatcher.product_count }}</td>
+                        <td>
+                            <form method="post">
+                                {% csrf_token %}
+                                <button type="submit" name="remove" value="{{ dispatcher.pk }}" class="button button-small button-secondary">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>There are no dispatchers yet.</p>
+    {% endif %}
+
+    <h2 class="w-h3 w-mt-8">Add a dispatcher</h2>
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {% formattedfield form.user %}
+        <button type="submit" class="button">Add</button>
+    </form>
+{% endblock %}

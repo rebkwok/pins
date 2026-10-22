@@ -139,7 +139,7 @@ def test_emails_on_order_creation_with_shop_email_setting(
     assert admin_email.to == ["admin@test.com", "another_admin@test.com"]
     assert admin_email.reply_to == ["shop@test.com"]
     assert admin_email.subject == f"New shop order '{new_order.ref}'"
-    assert admin_email.body == "A new shop order has been received."
+    assert admin_email.body.startswith(f"A new shop order '{new_order.ref}' has been received")
 
 
 @pytest.mark.parametrize(
@@ -218,11 +218,13 @@ def test_emails_not_sent_until_transaction_commits(
     with django_capture_on_commit_callbacks(execute=False) as callbacks:
         baker.make(Order, status=Order.Status.PROCESSING, email="test@test.com")
     assert len(mail.outbox) == 0
-    # one callback each for the customer and admin emails
-    assert len(callbacks) == 2
+    # one callback each for the customer and admin emails, and one to email any
+    # dispatchers (once the order's items have been created)
+    assert len(callbacks) == 3
 
     for callback in callbacks:
         callback()
+    # the order has no items, so no dispatchers are emailed
     assert len(mail.outbox) == 2
 
 

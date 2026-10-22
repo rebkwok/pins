@@ -601,6 +601,8 @@ SALESMAN_ORDER_MODEL = "shop.Order"
 SALESMAN_ORDER_ITEM_MODEL = "shop.OrderItem"
 SALESMAN_ORDER_PAYMENT_MODEL = "shop.OrderPayment"
 SALESMAN_ORDER_NOTE_MODEL = "shop.OrderNote"
+# Salesman's statuses, with "Partially shipped"
+SALESMAN_ORDER_STATUS = "shop.status.OrderStatus"
 SALESMAN_PRODUCT_TYPES = {
     "shop.ProductVariant": "shop.serializers.ProductVariantSerializer",
 }
