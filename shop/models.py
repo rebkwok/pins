@@ -42,6 +42,8 @@ from wagtail.fields import RichTextField
 from wagtail.images.models import Image
 from wagtail.models import Collection, Page, Orderable
 
+from common.users import real_users_q
+
 
 # DISPATCHERS
 
@@ -50,6 +52,11 @@ from wagtail.models import Collection, Page, Orderable
 # orders with their items for products that are set to email them (otherwise,
 # the shop's notify recipients, who get all new orders, tell them).
 DISPATCHERS_GROUP = "Dispatchers"
+
+
+def dispatcher_choices():
+    """The users who can be chosen as dispatchers (not the view-as preview users)"""
+    return Q(groups__name=DISPATCHERS_GROUP) & real_users_q()
 
 
 def is_dispatcher(user):
@@ -1158,7 +1165,7 @@ class Product(ClusterableModel):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="dispatched_products",
-        limit_choices_to={"groups__name": DISPATCHERS_GROUP},
+        limit_choices_to=dispatcher_choices,
         help_text=(
             "Who sends (or holds, for collection) this product: a user in the "
             "Dispatchers group. Changing it doesn't change orders already placed."

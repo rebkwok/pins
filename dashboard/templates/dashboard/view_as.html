@@ -1,0 +1,31 @@
+{% extends "wagtailadmin/generic/base.html" %}
+
+{% block main_content %}
+    <div class="w-mt-8">
+        <p class="help-block help-info">
+            See the admin as the members of a group see it, without logging out.
+            You stay "viewing as" the group until you click <strong>Stop</strong>
+            in the banner at the bottom of the page.
+        </p>
+        <p class="help-block help-warning">
+            Anything you do while viewing as a group is real (e.g. refunding an
+            order, or marking items as shipped), and is recorded as done by the
+            group's preview user.
+        </p>
+        {% if groups %}
+            <form method="post">
+                {% csrf_token %}
+                <ul class="view-as-groups">
+                    {% for group in groups %}
+                        <li><button type="submit" name="group" value="{{ group.pk }}" class="button button-secondary">View as {{ group.name }}</button></li>
+                    {% endfor %}
+                </ul>
+            </form>
+        {% else %}
+            <p>No groups can use the admin.</p>
+        {% endif %}
+    </div>
+    <style>
+        .view-as-groups { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 0.75rem; }
+    </style>
+{% endblock %}

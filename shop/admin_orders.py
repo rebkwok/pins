@@ -29,6 +29,8 @@ from wagtail.admin.views.generic.base import WagtailAdminTemplateMixin
 from wagtail.admin.viewsets.model import ModelViewSet
 from wagtail.permission_policies import ModelPermissionPolicy
 
+from common.users import real_users_q
+
 from .models import DISPATCHERS_GROUP, Order, OrderItem, Product, ProductVariant
 from .payment import PayByStripe
 from .templatetags.shoptags import gbp
@@ -116,6 +118,7 @@ class OrderFilterSet(WagtailFilterSet):
             User.objects.filter(
                 Q(groups__name=DISPATCHERS_GROUP) | Q(dispatched_order_items__isnull=False)
             )
+            .filter(real_users_q())
             .distinct()
             .order_by("first_name", "last_name", "username")
         )

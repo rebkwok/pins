@@ -17,6 +17,8 @@ urlpatterns = [
     path("", include('allauth.urls')),
     path("django-admin/", admin.site.urls),
     path("admin/", include(wagtailadmin_urls)),
+    # (outside the admin, as the role being viewed as may not be able to use it)
+    path("view-as/", include("dashboard.urls")),
     path("documents/", include(wagtaildocs_urls)),
     path("search/", search_views.search, name="search"),
     path("orders/", include(orders_urls)),

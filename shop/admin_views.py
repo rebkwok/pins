@@ -9,6 +9,8 @@ from django.views.generic import TemplateView
 from wagtail.admin import messages
 from wagtail.admin.views.generic.base import WagtailAdminTemplateMixin
 
+from common.users import real_users_q
+
 from .models import DISPATCHERS_GROUP, dispatcher_name
 
 User = get_user_model()
@@ -29,6 +31,7 @@ class AddDispatcherForm(forms.Form):
         self.fields["user"].queryset = (
             User.objects.filter(is_active=True)
             .exclude(groups__name=DISPATCHERS_GROUP)
+            .filter(real_users_q())
             .order_by("first_name", "last_name", "username")
         )
         self.fields["user"].label_from_instance = (
@@ -66,7 +69,7 @@ class DispatchersView(WagtailAdminTemplateMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["dispatchers"] = (
-            User.objects.filter(groups__name=DISPATCHERS_GROUP)
+            User.objects.filter(real_users_q(), groups__name=DISPATCHERS_GROUP)
             .annotate(product_count=Count("dispatched_products"))
             .order_by("first_name", "last_name", "username")
         )

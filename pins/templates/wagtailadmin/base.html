@@ -4,3 +4,24 @@
 {% block branding_logo %}
     <img src="{% static 'images/logo.png' %}" alt="PINS logo" width="100" />
 {% endblock %}
+
+{% block furniture %}
+    {{ block.super }}
+    {% if request.session.view_as %}
+        {# A superuser viewing the admin as a role (dashboard/view_as.py) #}
+        <form method="post" action="{% url 'stop_view_as' %}" class="view-as-banner" role="status">
+            {% csrf_token %}
+            <span>Viewing as <strong>{{ request.session.view_as.group }}</strong></span>
+            <button type="submit" class="button button-small">Stop</button>
+        </form>
+        <style>
+            .view-as-banner {
+                position: fixed; inset-inline-end: 1rem; bottom: 1rem; z-index: 1000;
+                display: flex; align-items: center; gap: 0.75rem;
+                padding: 0.5rem 0.75rem 0.5rem 1rem; border-radius: 2rem;
+                background: #cd3238; color: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            }
+            .view-as-banner .button { background: #fff; color: #cd3238; border-color: #fff; }
+        </style>
+    {% endif %}
+{% endblock %}

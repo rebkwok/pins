@@ -280,3 +280,35 @@ def test_editors_welcome_page_search(client, root_page):
     client.force_login(user_in("Editors"))
     content = client.get(reverse("wagtailadmin_home")).content.decode()
     assert "Search all pages" in content
+
+
+# View-as preview users (dashboard/view_as.py) aren't real dispatchers
+
+
+def test_view_as_users_not_dispatchers(client):
+    from common.users import VIEW_AS_USERNAME_PREFIX
+
+    from ..admin_views import AddDispatcherForm
+    from ..models import Product, dispatcher_choices
+
+    dispatchers = Group.objects.get(name="Dispatchers")
+    real = baker.make("auth.User", first_name="Ann")
+    preview = baker.make("auth.User", username=f"{VIEW_AS_USERNAME_PREFIX}99")
+    real.groups.add(dispatchers)
+    preview.groups.add(dispatchers)
+    from django.contrib.auth import get_user_model
+
+    choices = get_user_model().objects.filter(dispatcher_choices())
+    assert list(choices) == [real]
+    from wagtail.admin.panels import get_edit_handler
+
+    form = get_edit_handler(Product).get_form_class()()
+    assert list(form.fields["dispatcher"].queryset) == [real]
+    assert preview not in AddDispatcherForm().fields["user"].queryset
+    client.force_login(baker.make("auth.User", is_superuser=True))
+    resp = client.get(reverse("shop_dispatchers:index"))
+    assert list(resp.context["dispatchers"]) == [real]
+    resp = client.get(ORDERS_URL)
+    assert preview.pk not in [
+        user.pk for user in resp.context["filters"].filters["dispatcher"].queryset
+    ]

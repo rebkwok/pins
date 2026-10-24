@@ -1,4 +1,4 @@
-from django.urls import reverse
+from django.urls import path, reverse
 from django.utils.safestring import mark_safe
 
 from wagtail import hooks
@@ -9,6 +9,7 @@ from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet
 
 from home.models import FooterText
+from .view_as import ViewAsView
 from dogs.models import DogPage
 
 
@@ -47,6 +48,21 @@ def hide_help_menu(request, menu_items):
         request.user, ["add", "change", "publish"]
     ):
         menu_items[:] = [item for item in menu_items if item.name != "help"]
+
+
+class SuperuserMenuItem(MenuItem):
+    def is_shown(self, request):
+        return request.user.is_superuser
+
+
+@hooks.register('register_settings_menu_item')
+def register_view_as_menu_item():
+    return SuperuserMenuItem('View as a role', reverse('view_as'), icon_name='view', order=1000)
+
+
+@hooks.register('register_admin_urls')
+def register_view_as_url():
+    return [path('view-as/', ViewAsView.as_view(), name='view_as')]
 
 
 register_snippet(FooterTextViewSet)
