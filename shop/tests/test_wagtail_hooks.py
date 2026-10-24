@@ -9,7 +9,6 @@ from model_bakery import baker
 from django.urls import reverse
 from salesman.core.utils import get_salesman_model
 
-from ..models import CategoryPage
 
 pytestmark = pytest.mark.django_db
 
@@ -63,11 +62,9 @@ def test_shop_stock_breadcrumbs(
 def test_product_variants_list_order(admin_client, product):
     # products in two categories (product's is "Test Category"), created out of
     # order
-    cards = product.category_page.get_parent().add_child(
-        instance=CategoryPage(title="Cards", slug="cards")
-    )
-    mug = baker.make("shop.Product", category_page=product.category_page, name="Mug")
-    calendar = baker.make("shop.Product", category_page=cards, name="Calendar")
+    cards = baker.make("shop.Category", title="Cards", sort_order=-1)
+    mug = baker.make("shop.Product", category=product.category, name="Mug")
+    calendar = baker.make("shop.Product", category=cards, name="Calendar")
     baker.make("shop.ProductVariant", product=mug, variant_name="Large", sort_order=2)
     baker.make("shop.ProductVariant", product=product, variant_name="Small", sort_order=1)
     baker.make("shop.ProductVariant", product=calendar, variant_name="Single", sort_order=1)
@@ -85,16 +82,14 @@ def test_product_variants_list_order(admin_client, product):
 
 
 def test_products_list_order(admin_client, product):
-    # by category, then the shop page order (index), then name; two categories
-    # with the same title aren't mixed together
-    shop_page = product.category_page.get_parent()
-    cards = shop_page.add_child(instance=CategoryPage(title="Cards", slug="cards"))
-    # a duplicate title (allowed in the database, but not in the admin form)
-    cards_2 = shop_page.add_child(instance=CategoryPage(title="Cards", slug="cards-2"))
-    baker.make("shop.Product", category_page=cards_2, name="Notebook", index=1)
-    baker.make("shop.Product", category_page=cards, name="Card B", index=2)
-    baker.make("shop.Product", category_page=cards, name="Calendar", index=5)
-    baker.make("shop.Product", category_page=cards, name="Card A", index=2)
+    # by category (in the shop page order), then the shop page order (index),
+    # then name
+    cards = baker.make("shop.Category", title="Cards", sort_order=-2)
+    notebooks = baker.make("shop.Category", title="Notebooks", sort_order=-1)
+    baker.make("shop.Product", category=notebooks, name="Notebook", index=1)
+    baker.make("shop.Product", category=cards, name="Card B", index=2)
+    baker.make("shop.Product", category=cards, name="Calendar", index=5)
+    baker.make("shop.Product", category=cards, name="Card A", index=2)
     resp = admin_client.get(reverse("wagtailsnippets_shop_product:list"))
     assert [p.name for p in resp.context["object_list"]] == [
         "Card A",
@@ -104,42 +99,3 @@ def test_products_list_order(admin_client, product):
         "Test Product",
     ]
     assert "Sort item order" not in resp.content.decode()
-
-
-def category_form(shop_page, title, instance=None):
-    form_class = CategoryPage.get_edit_handler().get_form_class()
-    data = {
-        "title": title,
-        "slug": slugify(title) + "-new",
-        "body": rich_text(""),
-        "index": "1",
-        "comments-TOTAL_FORMS": "0",
-        "comments-INITIAL_FORMS": "0",
-        "comments-MIN_NUM_FORMS": "0",
-        "comments-MAX_NUM_FORMS": "1000",
-    }
-    return form_class(
-        data=data,
-        instance=instance or CategoryPage(),
-        parent_page=shop_page,
-        for_user=baker.make("auth.User", is_superuser=True),
-    )
-
-
-@pytest.mark.parametrize("title", ["Test Category", "test category"])
-def test_category_title_unique(category_page, title):
-    form = category_form(category_page.get_parent(), title)
-    assert not form.is_valid()
-    assert form.errors["title"] == [
-        f"There's already a category called '{title}' in this shop."
-    ]
-
-
-def test_category_title_unique_new_title(category_page):
-    assert category_form(category_page.get_parent(), "Clothing").is_valid()
-
-
-def test_category_title_unique_editing(category_page):
-    # a category can keep its own title
-    form = category_form(category_page.get_parent(), "Test Category", category_page)
-    assert form.is_valid(), form.errors

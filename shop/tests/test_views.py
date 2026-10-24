@@ -248,7 +248,7 @@ def test_basket_view(rf, basket, product):
     assert list(resp.context_data["basket"]["items"].keys()) == [product.identifier]
     item = resp.context_data["basket"]["items"][product.identifier][0]
     assert item["product_type"] == product.name
-    assert item["category"] == product.category_page.title
+    assert item["category"] == product.category.title
 
 
 @pytest.mark.parametrize("has_basket", [True, False])
@@ -594,13 +594,13 @@ def test_delete_basket_item_other_variants_left(rf, basket):
     assert basket.total == 15
 
 
-def test_delete_basket_item_other_products_left(rf, basket, category_page):
+def test_delete_basket_item_other_products_left(rf, basket, category):
     basket_item = basket.items.first()
     variant = basket_item.product
     product = variant.product
 
     # Make another variant for another product and add to basket
-    new_product = baker.make("shop.Product", name="Mug", category_page=category_page)
+    new_product = baker.make("shop.Product", name="Mug", category=category)
     variant1 = baker.make("shop.ProductVariant", product=new_product, price=5, stock=5)
     basket.add(variant1, quantity=1)
     basket.update(request=None)

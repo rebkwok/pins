@@ -235,7 +235,7 @@ def admin_client(client):
 
 def product_form_data(product, variants, **data):
     form = {
-        "category_page": product.category_page.id,
+        "category": product.category.id,
         "name": product.name,
         "price": str(product.price),
         "description": json.dumps({"blocks": [], "entityMap": {}}),
@@ -452,7 +452,7 @@ def test_stock_display_not_live(cards, single, pack, product):
     single.live = pack.live = False
     assert single.stock_display() == "13 (shared stock, not live)"
     assert pack.stock_display() == "2 packs (from 13 shared, not live)"
-    other = baker.make(ProductVariant, product=baker.make("shop.Product", category_page=cards.category_page), stock=10, live=False)
+    other = baker.make(ProductVariant, product=baker.make("shop.Product", category=cards.category), stock=10, live=False)
     assert other.stock_display() == "10 (not live)"
 
 

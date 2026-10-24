@@ -45,11 +45,11 @@ def shop_variants(product, dispatcher):
     product.dispatcher = dispatcher
     product.save()
     mug = baker.make("shop.ProductVariant", product=product, variant_name="Mug", price=10, stock=10)
-    card_product = baker.make("shop.Product", category_page=product.category_page, name="Card", price=2)
+    card_product = baker.make("shop.Product", category=product.category, name="Card", price=2)
     card = baker.make("shop.ProductVariant", product=card_product, price=2, stock=10)
     raffle_product = baker.make(
         "shop.Product",
-        category_page=product.category_page,
+        category=product.category,
         name="Raffle ticket",
         price=1,
         requires_shipping=False,
@@ -361,7 +361,7 @@ def test_admin_remove_dispatcher(admin_client, dispatcher):
 @pytest.mark.parametrize("products,text", [(1, "1 product still has them"), (2, "2 products still have them")])
 def test_admin_remove_dispatcher_with_products(admin_client, dispatcher, product, products, text):
     for _ in range(products):
-        baker.make("shop.Product", category_page=product.category_page, dispatcher=dispatcher)
+        baker.make("shop.Product", category=product.category, dispatcher=dispatcher)
     resp = admin_client.post(DISPATCHERS_URL, {"remove": dispatcher.pk})
     (message,) = messages_for(resp)
     assert message.startswith(f"Ann Smith isn't a dispatcher any more. {text} as dispatcher")
@@ -412,7 +412,7 @@ def test_admin_product_dispatcher_not_in_group(admin_client, dispatcher, product
     # still the product's dispatcher (a choice for this product only), so saving
     # doesn't remove them
     assert list(resp.context["form"].fields["dispatcher"].queryset) == [dispatcher]
-    other = baker.make("shop.Product", category_page=product.category_page)
+    other = baker.make("shop.Product", category=product.category)
     other_form = admin_client.get(
         reverse("wagtailsnippets_shop_product:edit", args=(other.id,))
     ).context["form"]

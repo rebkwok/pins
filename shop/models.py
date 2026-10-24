@@ -11,6 +11,8 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.contenttypes.models import ContentType
 from django.db import models, transaction
 from django.db.models import Q
+from django.db.models.functions import Lower
+from django.shortcuts import get_object_or_404
 from django.dispatch import Signal
 from django.urls import reverse
 from django.utils.html import format_html, format_html_join
@@ -27,10 +29,11 @@ from salesman.orders.models import (
 from modelcluster.forms import BaseChildFormSet
 from salesman_stripe_connect.mixins import OrderAmountsMixin, StripeBasketMixin
 from modelcluster.models import ClusterableModel, ParentalKey
-from wagtail.admin.forms import WagtailAdminModelForm, WagtailAdminPageForm
+from wagtail.admin.forms import WagtailAdminModelForm
 from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, MultiFieldPanel
 from wagtail.admin.panels.base import get_form_for_model
 from wagtail.contrib.forms.models import validate_to_address
+from wagtail.contrib.routable_page.models import RoutablePageMixin, path
 from wagtail.contrib.settings.models import (
     BaseGenericSetting,
     register_setting,
@@ -512,67 +515,129 @@ class BasketItem(BaseBasketItem):
 # PRODUCTS
 
 
-class CategoryPageForm(WagtailAdminPageForm):
+def reserved_category_slugs():
     """
-    A category's title must be unique in its shop, so customers and the shop
-    stock lists can tell the categories apart.
+    Slugs categories can't have, as their pages' addresses (/shop/<slug>/) would
+    be taken by the shop's own pages (e.g. /shop/basket/), or the shop page's
+    child pages
     """
+    from .urls import urlpatterns
+
+    slugs = {str(pattern.pattern).split("/")[0] for pattern in urlpatterns}
+    slugs.update(
+        Page.objects.child_of(shop_page).values_list("slug", flat=True)
+        if (shop_page := ShopPage.objects.live().first())
+        else []
+    )
+    return slugs
+
+
+class Category(models.Model):
+    """
+    A category of products, with its own page on the shop (served by the shop
+    page, see ShopPage.category_view)
+    """
+
+    title = models.CharField(
+        max_length=255, help_text="Shown on the shop page, and as the category's page title."
+    )
+    slug = models.SlugField(
+        max_length=255,
+        unique=True,
+        blank=True,
+        verbose_name="Web address",
+        help_text=(
+            "The end of the category page's web address, e.g. 'clothing' for "
+            "/shop/clothing/. Made from the title if left blank."
+        ),
+    )
+    description = RichTextField(
+        blank=True, help_text="Optional text shown at the top of the category's page."
+    )
+    # The order on the shop page (categories are reordered in the Categories list)
+    sort_order = models.IntegerField(null=True, blank=True, editable=False)
+
+    panels = [FieldPanel("title"), FieldPanel("slug"), FieldPanel("description")]
+
+    class Meta:
+        ordering = ["sort_order", "title"]
+        verbose_name_plural = "categories"
+        constraints = [
+            models.UniqueConstraint(Lower("title"), name="unique_category_title")
+        ]
+
+    def __str__(self):
+        return self.title
 
     def clean(self):
-        cleaned_data = super().clean()
-        title = cleaned_data.get("title")
-        if title and self.parent_page is not None:
-            others = (
-                CategoryPage.objects.child_of(self.parent_page)
-                .filter(title__iexact=title)
-                .exclude(pk=self.instance.pk)
+        super().clean()
+        if not self.title:
+            return
+        others = Category.objects.exclude(pk=self.pk)
+        # Unique titles, so customers and the shop stock lists can tell the
+        # categories apart
+        if others.filter(title__iexact=self.title).exists():
+            raise ValidationError(
+                {"title": f"There's already a category called '{self.title}'."}
             )
-            if others.exists():
-                self.add_error(
-                    "title", f"There's already a category called '{title}' in this shop."
-                )
-        return cleaned_data
+        slug_from_title = not self.slug
+        self.slug = self.slug or slugify(self.title)
+        # (the slug field may not be on the form, e.g. when creating a category
+        # from a product's category chooser)
+        field = "title" if slug_from_title else "slug"
+        if self.slug in reserved_category_slugs():
+            raise ValidationError(
+                {field: f"The web address '{self.slug}' is used by another shop page."}
+            )
+        if others.filter(slug=self.slug).exists():
+            raise ValidationError(
+                {field: f"Another category already has the web address '{self.slug}'."}
+            )
 
-
-class CategoryPage(Page):
-    base_form_class = CategoryPageForm
-
-    body = RichTextField(
-        verbose_name="Page body",
-        blank=True,
-        help_text="Optional text to describe the category",
-    )
-    index = models.PositiveIntegerField(
-        default=100, help_text="Used for ordering categories on the shop page"
-    )
-
-    content_panels = Page.content_panels + [
-        FieldPanel("body"),
-        FieldPanel("index"),
-    ]
-
-    parent_page_types = ["ShopPage"]
-    subpage_types = ["home.StandardPage"]
+    def save(self, *args, **kwargs):
+        self.slug = self.slug or slugify(self.title)
+        if self.sort_order is None:
+            # New categories go last
+            last = Category.objects.aggregate(last=models.Max("sort_order"))["last"]
+            self.sort_order = 0 if last is None else last + 1
+        super().save(*args, **kwargs)
 
     def get_product_count(self):
-        return f"{self.live_products.count()} live ({self.page_products.count()} total)"
+        return f"{self.live_products.count()} live ({self.products.count()} total)"
 
-    get_product_count.short_description = "# products"
+    get_product_count.short_description = "Products"
 
     @property
     def live_products(self):
         # products are live if they are set to live AND have at least one live variants
         return (
-            self.page_products.filter(
-                live=True, variants__isnull=False, variants__live=True
-            )
+            self.products.filter(live=True, variants__isnull=False, variants__live=True)
             .order_by("index")
             .distinct()
         )
 
-    class Meta:
-        verbose_name = "Category"
-        verbose_name_plural = "Categories"
+    def get_url(self, request=None):
+        """The category's page on the shop (None if there's no live shop page)"""
+        shop_page = ShopPage.objects.live().first()
+        if shop_page is None:
+            return None
+        return shop_page.get_url(request) + shop_page.reverse_subpage(
+            "category", kwargs={"slug": self.slug}
+        )
+
+    @property
+    def url(self):
+        return self.get_url()
+
+    def url_display(self):
+        """The category's page, for the admin list"""
+        url = self.url
+        return format_html('<a href="{}">{}</a>', url, url) if url else "-"
+
+    url_display.short_description = "Page"
+
+    def get_absolute_url(self):
+        return self.get_url()
 
 
 def _items_for_variants(item_model, variant_ids):
@@ -1052,7 +1117,9 @@ class Product(ClusterableModel):
 
     base_form_class = ProductAdminForm
 
-    category_page = ParentalKey(CategoryPage, related_name="page_products")
+    category = models.ForeignKey(
+        Category, on_delete=models.PROTECT, related_name="products"
+    )
 
     name = models.CharField(max_length=255)
 
@@ -1125,7 +1192,7 @@ class Product(ClusterableModel):
             and colour. Each product must have at least one variant in order to be available for sale.
             """
         ),
-        FieldPanel("category_page"),
+        FieldPanel("category"),
         FieldPanel("name"),
         InlinePanel(
             "product_images",
@@ -1252,13 +1319,13 @@ class Product(ClusterableModel):
 
     @property
     def identifier(self):
-        return slugify(f"{self.category_page.title}-{self.name}")
+        return slugify(f"{self.category.title}-{self.name}")
 
     def category_link(self):
         return format_html(
             '<a href="{}">{}</a>',
-            reverse("wagtailadmin_pages:edit", args=(self.category_page.id,)),
-            self.category_page.title,
+            reverse("wagtailsnippets_shop_category:edit", args=(self.category_id,)),
+            self.category.title,
         )
 
     category_link.short_description = "Category"
@@ -1489,7 +1556,7 @@ class ProductVariant(Orderable):
         return self.product.category_link()
 
     category_link.short_description = "Category"
-    category_link.admin_order_field = "product__category_page__title"
+    category_link.admin_order_field = "product__category__title"
 
     def get_sale_item(self):
         """
@@ -1507,7 +1574,7 @@ class ProductVariant(Orderable):
                     return None
                 return sale_products.first()
             sale_categories = current_sale.sale_categories.filter(
-                category__id=self.product.category_page.id
+                category_id=self.product.category_id
             )
             if sale_categories.exists():
                 return sale_categories.first()
@@ -1532,7 +1599,7 @@ class ProductVariant(Orderable):
         return str(self.id)
 
 
-class ShopPage(Page):
+class ShopPage(RoutablePageMixin, Page):
     introduction = models.TextField(help_text="Text to describe the page", blank=True)
     image = models.ForeignKey(
         "wagtailimages.Image",
@@ -1551,13 +1618,23 @@ class ShopPage(Page):
     ]
 
     parent_page_types = ["home.HomePage"]
-    subpage_types = ["home.FormPage", "home.StandardPage", "CategoryPage"]
+    subpage_types = ["home.FormPage", "home.StandardPage"]
 
     def categories(self):
-        return CategoryPage.objects.child_of(self).live().order_by("index")
+        return Category.objects.all()
 
     def children(self):
         return self.categories()
+
+    @path("<slug:slug>/", name="category")
+    def category_view(self, request, slug):
+        """A category's page (its products)"""
+        category = get_object_or_404(Category, slug=slug)
+        return self.render(
+            request,
+            template="shop/category_page.html",
+            context_overrides={"category": category},
+        )
 
 
 @register_setting
@@ -1589,7 +1666,7 @@ class SaleCategory(models.Model):
     """
 
     sale = ParentalKey("Sale", related_name="sale_categories")
-    category = models.ForeignKey("CategoryPage", on_delete=models.CASCADE)
+    category = models.ForeignKey(Category, on_delete=models.CASCADE)
     discount = models.PositiveIntegerField(
         default=10, validators=[MaxValueValidator(100)]
     )

@@ -25,7 +25,7 @@ def entry(product):
     """A competition entry (£5), which doesn't need shipping"""
     entry_product = baker.make(
         "shop.Product",
-        category_page=product.category_page,
+        category=product.category,
         name="Competition entry",
         price=5,
         requires_shipping=False,

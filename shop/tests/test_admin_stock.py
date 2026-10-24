@@ -148,7 +148,7 @@ def edit_product_url(product):
 def product_form_data(product, stock, stock_shown):
     variant = product.variants.get()
     return {
-        "category_page": product.category_page.id,
+        "category": product.category.id,
         "name": product.name,
         "price": str(product.price),
         "description": json.dumps({"blocks": [], "entityMap": {}}),
@@ -361,7 +361,7 @@ def product_form(product, variants, delete=()):
     optional id, variant_name, colour and size
     """
     data = {
-        "category_page": product.category_page.id,
+        "category": product.category.id,
         "name": product.name,
         "price": str(product.price),
         "description": json.dumps({"blocks": [], "entityMap": {}}),

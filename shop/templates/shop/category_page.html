@@ -2,30 +2,28 @@
 {% load wagtailcore_tags wagtailimages_tags %}
 
 
+{% block title %}{{ category.title }}{% endblock %}
+
 {% block content %}
-    {% include "shop/includes/header-hero.html" %}
+    {% include "shop/includes/header-hero.html" with title=category.title %}
 
     <div class="container category-detail">
-        <div class="row">            
-
+        <div class="row">
             <div class="col-md-12">
-                    {% for childpage in page.get_children %}
-                        <i class="fas fa-grip-lines-vertical wm-pink"></i> <a href="{% pageurl childpage %}">
-                            {{ childpage.title }}
-                        </a>
-                    {% endfor %}
-                    {% if page.body %}
-                        <p class="category-detail__body">
-                            {{ page.body|richtext }}
-                        </p>
+                    {% if category.description %}
+                        <div class="category-detail__body">
+                            {{ category.description|richtext }}
+                        </div>
                     {% endif %}
                 <div class="container product-listing-card__container pt-2">
                     <div class="product-listing-card__grid">
-                        {% for product in page.live_products %}
+                        {% for product in category.live_products %}
                             <div>
                                 <h2>{{ product.name }}</h2>
                                 {% include "shop/includes/product-listing-card.html" %}
                             </div>
+                        {% empty %}
+                            <p>There's nothing in this category at the moment.</p>
                         {% endfor %}
                     </div>
                 </div>

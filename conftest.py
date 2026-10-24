@@ -24,7 +24,7 @@ from home.models import (
 from salesman.core.utils import get_salesman_model
 
 from shop.models import SaleCategory, SaleProduct
-from shop.tests.factories import CategoryPageFactory, ShopPageFactory
+from shop.tests.factories import ShopPageFactory
 
 Basket = get_salesman_model("Basket")
 
@@ -185,14 +185,15 @@ def shop_page(home_page):
 
 
 @pytest.fixture
-def category_page(shop_page):
-    yield CategoryPageFactory(parent=shop_page, title="Test Category")
+def category(shop_page):
+    # (category pages are served by the shop page)
+    yield baker.make("shop.Category", title="Test Category", slug="test-category")
 
 
 @pytest.fixture
-def product(category_page):
+def product(category):
     yield baker.make(
-        "shop.Product", name="Test Product", category_page=category_page, price=12
+        "shop.Product", name="Test Product", category=category, price=12
     )
 
 
@@ -226,6 +227,6 @@ def sale_with_items(product):
         start_date=datetime(2022, 1, 1, tzinfo=UTC),
         end_date=datetime(2022, 1, 2, tzinfo=UTC),
     )
-    SaleCategory.objects.create(category=product.category_page, discount=10, sale=sale)
+    SaleCategory.objects.create(category=product.category, discount=10, sale=sale)
     SaleProduct.objects.create(product=product, discount=20, sale=sale)
     yield sale

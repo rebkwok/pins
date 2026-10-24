@@ -14,7 +14,7 @@ from wagtail.images.models import Image
 from wagtail.models import Collection, Site
 
 from shop.models import (
-    CategoryPage,
+    Category,
     Product,
     ProductImage,
     ProductVariant,
@@ -162,7 +162,7 @@ class Command(BaseCommand):
         with transaction.atomic():
             shop_page = self.get_shop_page()
             for index, category_data in enumerate(SHOP_DATA):
-                category = self.get_category(shop_page, category_data, index)
+                category = self.get_category(category_data, index)
                 for product_data in category_data["products"]:
                     self.create_product(category, product_data)
             if sale:
@@ -196,29 +196,27 @@ class Command(BaseCommand):
         self.created.append("shop page 'Shop'")
         return shop_page
 
-    def get_category(self, shop_page, data, index):
+    def get_category(self, data, index):
         # An existing category with the slug or title (e.g. one created in the
         # admin with a different slug)
-        category = (
-            CategoryPage.objects.child_of(shop_page)
-            .filter(Q(slug=data["slug"]) | Q(title__iexact=data["title"]))
-            .first()
-        )
+        category = Category.objects.filter(
+            Q(slug=data["slug"]) | Q(title__iexact=data["title"])
+        ).first()
         if category is not None:
             self.skipped.append(f"category '{category.title}'")
             return category
-        category = shop_page.add_child(
-            instance=CategoryPage(title=data["title"], slug=data["slug"], index=index)
+        category = Category.objects.create(
+            title=data["title"], slug=data["slug"], sort_order=index
         )
         self.created.append(f"category '{category.title}'")
         return category
 
     def create_product(self, category, data):
-        if Product.objects.filter(category_page=category, name=data["name"]).exists():
+        if Product.objects.filter(category=category, name=data["name"]).exists():
             self.skipped.append(f"product '{data['name']}'")
             return
         product = Product.objects.create(
-            category_page=category,
+            category=category,
             name=data["name"],
             price=Decimal(data["price"]),
             description=f"<p>{data['description']}</p>",
@@ -273,7 +271,7 @@ class Command(BaseCommand):
             self.skipped.append("sale (a sale already exists for these dates)")
             return
         product = Product.objects.filter(
-            category_page__slug=SALE_CATEGORY, name=SALE_PRODUCT
+            category__slug=SALE_CATEGORY, name=SALE_PRODUCT
         ).first()
         if product is None:
             self.skipped.append(f"sale ('{SALE_PRODUCT}' not found)")

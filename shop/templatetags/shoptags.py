@@ -4,7 +4,7 @@ from decimal import Decimal
 from django import template
 from wagtail.models import Page
 
-from shop.models import ShopPage, CategoryPage
+from shop.models import ShopPage
 
 
 register = template.Library()
@@ -12,43 +12,51 @@ register = template.Library()
 
 @register.inclusion_tag("shop/tags/shop_breadcrumbs.html", takes_context=True)
 def shop_breadcrumbs(context):
+    """
+    The breadcrumbs for shop pages, as [{"url", "label"}] (the last one is the
+    current page, without a url)
+    """
     path_to_current_page = {
         "order": "Order Status",
         "basket": "Basket",
         "checkout": "Checkout",
     }
 
-    self = context.get("self")
-    this_page = None
+    page = context.get("self")
     current_page = None
-
     match = re.match(r"^/shop/(?P<current_page>\w+)/.*", context.request.path)
     if match:
         current_page = match.groups("current_page")[0]
 
-    if (self is None or self.depth <= 2) and current_page != "product":
-        # When on the home page, displaying breadcrumbs is irrelevant.
-        # skip this for products so we can add in the category
-        ancestors = ()
-    else:
-        # is it a product or other shop page
-        if current_page in path_to_current_page or current_page == "product":
-            self = ShopPage.objects.latest("id")
-            this_page = path_to_current_page.get(current_page, context["product"].name)
+    def page_items(page):
+        # The page and its ancestors, from Home
+        return [
+            {"url": ancestor.get_url(context.request), "label": "Home" if index == 0 else ancestor.title}
+            for index, ancestor in enumerate(
+                Page.objects.ancestor_of(page, inclusive=True).filter(depth__gt=1)
+            )
+        ]
 
-        ancestors = list(
-            Page.objects.ancestor_of(self, inclusive=True).filter(depth__gt=1)
-        )
+    items = []
+    if current_page in path_to_current_page or current_page == "product":
+        # A shop view (not a page), under the shop page
+        items = page_items(ShopPage.objects.latest("id"))
         if current_page == "product":
-            ancestors.append(context["product"].category_page)
+            category = context["product"].category
+            items.append({"url": category.get_url(context.request), "label": category.title})
+            items.append({"url": None, "label": context["product"].name})
+        else:
+            items.append({"url": None, "label": path_to_current_page[current_page]})
+    elif page is not None and page.depth > 2:
+        # (When on the home page, displaying breadcrumbs is irrelevant)
+        items = page_items(page)
+        if context.get("category"):
+            # A category page, served by the shop page
+            items.append({"url": None, "label": context["category"].title})
+        else:
+            items[-1]["url"] = None
 
-    context_data = {
-        "ancestors": ancestors,
-        "request": context.request,
-        "this_page": this_page,
-    }
-
-    return context_data
+    return {"items": items, "request": context.request}
 
 
 @register.filter

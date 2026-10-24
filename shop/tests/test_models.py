@@ -16,15 +16,16 @@ from wagtail.admin.panels import get_edit_handler
 
 from salesman.core.utils import get_salesman_model
 
-from .factories import PRODUCT_FORM_DEFAULTS, CategoryPageFactory, ShopPageFactory
+from .factories import PRODUCT_FORM_DEFAULTS, ShopPageFactory
 from ..models import (
     CarouselImage,
-    CategoryPage,
+    Category,
     Product,
     ProductImage,
     Sale,
     SaleCategory,
     SaleProduct,
+    ShopPage,
 )
 
 pytestmark = pytest.mark.django_db
@@ -32,16 +33,14 @@ pytestmark = pytest.mark.django_db
 Basket = get_salesman_model("Basket")
 
 
-def test_category(category_page):
-    assert category_page.get_product_count() == "0 live (0 total)"
-    assert list(category_page.live_products) == []
+def test_category(category):
+    assert category.get_product_count() == "0 live (0 total)"
+    assert list(category.live_products) == []
 
 
-def test_shop_page(shop_page, category_page):
-    assert category_page.live
-    # not live category
-    CategoryPageFactory(parent=shop_page, title="Test Category 1", live=False)
-    assert shop_page.children().count() == 1
+def test_shop_page(shop_page, category):
+    other = baker.make("shop.Category", title="Another")
+    assert list(shop_page.children()) == [category, other]
 
 
 def test_product(product):
@@ -140,13 +139,13 @@ def test_product_variant_str_with_sale(
     assert variant.name_and_price() == expected_name_and_price
 
 
-def test_live_products(category_page, product):
+def test_live_products(category, product):
     # product is live
     assert product.live
     # but has no variants yet
     assert not product.variants.exists()
     # so category live product count is still 0
-    assert category_page.live_products.count() == 0
+    assert category.live_products.count() == 0
 
     # make a not-live variant
     variant = baker.make(
@@ -156,7 +155,7 @@ def test_live_products(category_page, product):
         price=10,
         live=False,
     )
-    assert category_page.live_products.count() == 0
+    assert category.live_products.count() == 0
     assert product.variants.exists()
     assert product.live_variants.count() == 0
 
@@ -164,7 +163,7 @@ def test_live_products(category_page, product):
     variant.live = True
     variant.save()
     assert product.live_variants.count() == 1
-    assert category_page.live_products.count() == 1
+    assert category.live_products.count() == 1
 
 
 def test_product_out_of_stock(product):
@@ -347,14 +346,14 @@ def test_get_sale_item_for_product_variant(freezer, sale_with_items):
     product_inheriting_discount = baker.make(
         "shop.Product",
         name="Another Product",
-        category_page=product.category_page,
+        category=product.category,
         price=12,
     )
     # make another product without its own SaleProduct discount; this is excluded from the sale
     product_excluded_from_sale = baker.make(
         "shop.Product",
         name="Non-sale Product",
-        category_page=product.category_page,
+        category=product.category,
         price=12,
     )
     SaleProduct.objects.create(
@@ -514,8 +513,8 @@ def test_product_variant_unique_per_product(product, fields):
             duplicate.save()
 
 
-def test_product_variant_same_options_on_other_products(product, category_page):
-    other_product = baker.make("shop.Product", category_page=category_page)
+def test_product_variant_same_options_on_other_products(product, category):
+    other_product = baker.make("shop.Product", category=category)
     fields = {"variant_name": "Men's", "colour": "Black", "size": "M"}
     baker.make("shop.ProductVariant", product=product, **fields)
     variant = baker.prepare("shop.ProductVariant", product=other_product, **fields)
@@ -527,7 +526,7 @@ def test_product_admin_form_rejects_duplicate_variants(product):
     # Duplicate variants added in the product's admin form (InlinePanel)
     form_class = get_edit_handler(Product).get_form_class()
     data = {
-        "category_page": product.category_page.id,
+        "category": product.category.id,
         "name": "Mug",
         "price": "10",
         "description": json.dumps({"blocks": [], "entityMap": {}}),
@@ -551,7 +550,7 @@ def test_product_admin_form_rejects_duplicate_variants(product):
                 f"variants-{i}-ORDER": str(i + 1),
             }
         )
-    form = form_class(data, instance=Product(category_page=product.category_page))
+    form = form_class(data, instance=Product(category=product.category))
     assert not form.is_valid()
     variants_formset = form.formsets["variants"]
     assert variants_formset.non_form_errors() == [
@@ -565,7 +564,7 @@ def test_product_admin_form_rejects_duplicate_variants(product):
 
     # the same form with different variants is valid
     data["variants-1-variant_name"] = "Small"
-    form = form_class(data, instance=Product(category_page=product.category_page))
+    form = form_class(data, instance=Product(category=product.category))
     assert form.is_valid(), form.errors
 
 
@@ -651,21 +650,16 @@ def test_sale_clean_missing_dates():
 # Shop and category pages
 
 
-def test_shop_page_categories_only_its_own(shop_page, category_page, home_page):
-    other_shop = ShopPageFactory(parent=home_page, title="Other shop", slug="other")
-    CategoryPageFactory(parent=other_shop, title="Other category")
-    assert list(shop_page.categories()) == [category_page]
-
-
-def test_category_page_cannot_have_category_children(category_page):
-    assert not CategoryPage.can_create_at(category_page)
+def test_shop_page_has_no_category_pages():
+    # categories are served by the shop page, not added as pages
+    assert ShopPage.subpage_types == ["home.FormPage", "home.StandardPage"]
 
 
 def test_category_link_escapes_title(product):
-    product.category_page.title = "Mugs & <cups>"
-    product.category_page.save()
+    product.category.title = "Mugs & <cups>"
+    product.category.save()
     link = product.category_link()
-    edit_url = reverse("wagtailadmin_pages:edit", args=(product.category_page.id,))
+    edit_url = reverse("wagtailsnippets_shop_category:edit", args=(product.category.id,))
     assert f'href="{edit_url}"' in link
     assert "Mugs &amp; &lt;cups&gt;" in link
     variant = baker.make("shop.ProductVariant", product=product)

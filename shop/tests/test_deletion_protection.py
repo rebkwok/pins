@@ -142,26 +142,49 @@ def test_admin_delete_product_snippet(admin_client, variant):
     assert Product.objects.filter(id=product.id).exists()
 
 
-def test_admin_delete_category_page(admin_client, variant):
-    category_page = variant.product.category_page
-    url = reverse("wagtailadmin_pages:delete", args=(category_page.id,))
+def test_admin_delete_category_with_products(admin_client, variant):
+    category = variant.product.category
+    url = reverse("wagtailsnippets_shop_category:delete", args=(category.id,))
     resp = admin_client.post(url)
-    assert resp.status_code == 302
-    assert messages_for(resp) == [MESSAGE]
-    assert type(category_page).objects.filter(id=category_page.id).exists()
+    assert resp.url == reverse("wagtailsnippets_shop_category:edit", args=(category.id,))
+    assert messages_for(resp) == [
+        "Test Category can't be deleted: move its products to another category, "
+        "or delete them, first."
+    ]
+    assert type(category).objects.filter(id=category.id).exists()
+
+
+def test_admin_delete_categories_with_products(admin_client, variant):
+    # (bulk delete)
+    category = variant.product.category
+    other = baker.make("shop.Category", title="Mugs")
+    baker.make("shop.Product", category=other)
+    url = reverse("wagtail_bulk_action", args=("shop", "category", "delete"))
+    resp = admin_client.post(f"{url}?id={category.id}&id={other.id}")
+    assert resp.url == reverse("wagtailsnippets_shop_category:list")
+    assert messages_for(resp) == [
+        "Test Category, Mugs can't be deleted: move their products to another "
+        "category, or delete them, first."
+    ]
+
+
+def test_admin_delete_empty_category(admin_client, category):
+    url = reverse("wagtailsnippets_shop_category:delete", args=(category.id,))
+    admin_client.post(url)
+    assert not type(category).objects.filter(id=category.id).exists()
 
 
 def test_admin_delete_shop_page(admin_client, variant, shop_page):
+    # products aren't under the shop page, so they aren't deleted with it
     url = reverse("wagtailadmin_pages:delete", args=(shop_page.id,))
-    resp = admin_client.post(url)
-    assert resp.status_code == 302
-    assert messages_for(resp) == [MESSAGE]
-    assert type(shop_page).objects.filter(id=shop_page.id).exists()
+    admin_client.post(url)
+    assert not type(shop_page).objects.filter(id=shop_page.id).exists()
+    assert type(variant).objects.filter(id=variant.id).exists()
 
 
 def product_form_data(product, delete):
     data = {
-        "category_page": product.category_page.id,
+        "category": product.category.id,
         "name": product.name,
         "price": str(product.price),
         "description": json.dumps({"blocks": [], "entityMap": {}}),
@@ -228,10 +251,10 @@ def test_delete_product_with_ordered_variant(ordered_variant):
     assert Product.objects.filter(id=product.id).exists()
 
 
-def test_delete_product_with_no_ordered_variants(ordered_variant, category_page):
+def test_delete_product_with_no_ordered_variants(ordered_variant, category):
     # A product whose variants haven't been ordered (or added to baskets) can be
     # deleted, along with its variants
-    product = baker.make("shop.Product", category_page=category_page)
+    product = baker.make("shop.Product", category=category)
     variant = baker.make("shop.ProductVariant", product=product)
     product.delete()
     assert not ProductVariant.objects.filter(id=variant.id).exists()
@@ -276,20 +299,12 @@ def test_admin_delete_product_with_ordered_variant(admin_client, ordered_variant
     assert Product.objects.filter(id=product.id).exists()
 
 
-def test_admin_delete_product_with_no_ordered_variants(admin_client, category_page):
-    product = baker.make("shop.Product", category_page=category_page)
+def test_admin_delete_product_with_no_ordered_variants(admin_client, category):
+    product = baker.make("shop.Product", category=category)
     baker.make("shop.ProductVariant", product=product)
     url = reverse("wagtailsnippets_shop_product:delete", args=(product.id,))
     admin_client.post(url)
     assert not Product.objects.filter(id=product.id).exists()
-
-
-def test_admin_delete_category_page_with_ordered_variant(admin_client, ordered_variant):
-    category_page = ordered_variant.product.category_page
-    url = reverse("wagtailadmin_pages:delete", args=(category_page.id,))
-    resp = admin_client.post(url)
-    assert messages_for(resp) == [ORDERED_MESSAGE]
-    assert type(category_page).objects.filter(id=category_page.id).exists()
 
 
 def test_product_form_remove_ordered_variant(ordered_variant):

@@ -186,7 +186,7 @@ def test_product_card_buttons_include_own_fields(rf, product, variant):
     # The +/- buttons must send this product's variant and quantity, not those of
     # other products on the page
     other_product = baker.make(
-        "shop.Product", name="Other", category_page=product.category_page
+        "shop.Product", name="Other", category=product.category
     )
     baker.make("shop.ProductVariant", product=other_product, price=10, stock=5)
     html = render_to_string(

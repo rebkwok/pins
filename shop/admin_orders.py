@@ -91,7 +91,7 @@ class OrderFilterSet(WagtailFilterSet):
     )
     product = django_filters.ModelChoiceFilter(
         label="Product",
-        queryset=Product.objects.order_by("category_page__title", "name"),
+        queryset=Product.objects.order_by("category__sort_order", "category__title", "name"),
         method="filter_product",
         empty_label="Any product",
     )

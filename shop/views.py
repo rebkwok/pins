@@ -172,7 +172,7 @@ def get_basket_context(basket_data):
     for item_data in basket_data.get("items", []):
         product = ProductVariant.objects.get(id=item_data["product_id"]).product
         item_data["product_type"] = product.name
-        item_data["category"] = product.category_page.title
+        item_data["category"] = product.category.title
         items_by_product.setdefault(product.identifier, []).append(item_data)
     basket_data["items"] = items_by_product
     return {"basket": basket_data, "basket_quantity": basket_quantity}

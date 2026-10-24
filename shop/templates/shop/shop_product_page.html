@@ -1,7 +1,7 @@
 {% extends "shop/base.html" %}
 {% load wagtailcore_tags wagtailimages_tags %}
 
-{% block title %}{{ product.category_page.title }} - {{ product.name }}{% endblock %}
+{% block title %}{{ product.category.title }} - {{ product.name }}{% endblock %}
 
 {% block content %}
     {% include "shop/includes/header-hero.html" with title=product.name %}

@@ -1,19 +1,21 @@
 from django.contrib import messages
 from django.shortcuts import redirect
-from django.urls import path
+from django.template.defaultfilters import pluralize
+from django.urls import path, reverse
 from wagtail import hooks
 from wagtail.admin.admin_url_finder import AdminURLFinder
 from wagtail.admin.viewsets.base import ViewSet
 from wagtail.admin.panels import FieldPanel
 from wagtail.admin.ui.tables import BooleanColumn
 from wagtail.snippets.models import register_snippet
+from wagtail.snippets.views.chooser import SnippetChooserViewSet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
 from .admin_orders import OrderViewSet
 from .admin_views import SHOP_STOCK_MENU_LABEL, DispatchersView
 from .models import (
     PRODUCT_VARIANT_PANELS,
-    CategoryPage,
+    Category,
     DiscountCode,
     Product,
     ProductVariant,
@@ -39,14 +41,31 @@ class ShopStockViewSet(SnippetViewSet):
 
 
 # The default order of the shop stock lists (unless a column is sorted): by
-# category (by id too, so categories with the same title aren't mixed together),
-# then product, in their shop page order
+# category, then product, in their shop page order
 PRODUCT_ORDERING = (
-    "category_page__title",
-    "category_page_id",
+    "category__sort_order",
+    "category__title",
     "index",
     "name",
 )
+
+
+class CategoryChooserViewSet(SnippetChooserViewSet):
+    # A "Create" tab in the chooser (e.g. the product's category), so a
+    # category can be added without leaving the product. (Just the title: the
+    # description's rich text editor doesn't work in the chooser; it can be
+    # added on the category's own page.)
+    form_fields = ["title"]
+    create_action_label = "Add a category"
+
+
+class CategoryViewSet(ShopStockViewSet):
+    model = Category
+    icon = "folder-open-inverse"
+    # Dragged into their order on the shop page
+    sort_order_field = "sort_order"
+    list_display = ("title", "get_product_count", "url_display")
+    chooser_viewset_class = CategoryChooserViewSet
 
 
 class ProductViewSet(ShopStockViewSet):
@@ -59,10 +78,10 @@ class ProductViewSet(ShopStockViewSet):
         BooleanColumn("live"),
         "get_variant_count",
     )
-    list_filter = ("category_page",)
+    list_filter = ("category",)
 
     def get_queryset(self, request):
-        return Product.objects.select_related("category_page").order_by(
+        return Product.objects.select_related("category").order_by(
             *PRODUCT_ORDERING
         )
 
@@ -90,7 +109,7 @@ class ProductVariantViewSet(ShopStockViewSet):
     def get_queryset(self, request):
         # Each product's variants are listed together, in the product's order
         return ProductVariant.objects.select_related(
-            "product__category_page"
+            "product__category"
         ).order_by(
             *(f"product__{field}" for field in PRODUCT_ORDERING),
             "sort_order",
@@ -129,6 +148,7 @@ class ProductGroup(SnippetViewSetGroup):
     menu_label = SHOP_STOCK_MENU_LABEL
     menu_icon = "pick"
     items = (
+        CategoryViewSet,
         ProductViewSet,
         ProductVariantViewSet,
         SaleViewSet,
@@ -183,11 +203,25 @@ def protect_variants(request, instances):
         return _protected_variants_response(request, variants, instances[0])
 
 
-@hooks.register("before_delete_page")
-def protect_category_variants(request, page):
-    # Deleting a shop or category page deletes its categories' products
-    categories = CategoryPage.objects.descendant_of(page, inclusive=True)
-    variants = ProductVariant.objects.filter(product__category_page__in=categories)
-    if variants.exists():
-        return _protected_variants_response(request, variants, page)
+@hooks.register("before_delete_snippet")
+def protect_categories(request, instances):
+    """Categories with products can't be deleted"""
+    with_products = [
+        instance
+        for instance in instances
+        if isinstance(instance, Category) and instance.products.exists()
+    ]
+    if with_products:
+        messages.error(
+            request,
+            f"{', '.join(str(category) for category in with_products)} can't be "
+            "deleted: move "
+            f"{pluralize(len(with_products), 'its,their')} products to another "
+            "category, or delete them, first.",
+        )
+        return redirect(
+            AdminURLFinder(request.user).get_edit_url(with_products[0])
+            if len(with_products) == 1
+            else reverse("wagtailsnippets_shop_category:list")
+        )
 

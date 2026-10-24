@@ -9,8 +9,7 @@ from django.core.management import CommandError, call_command
 from wagtail.images.models import Image
 from wagtail.models import Collection, Page, Site
 
-from ..models import CategoryPage, Product, ProductVariant, Sale, ShopPage
-from .factories import CategoryPageFactory
+from ..models import Category, Product, ProductVariant, Sale, ShopPage
 
 from salesman.core.utils import get_salesman_model
 
@@ -57,8 +56,7 @@ def test_seed_shop(seed_settings):
     output = seed()
     shop_page = ShopPage.objects.get()
     assert shop_page.get_parent() == Site.objects.get(is_default_site=True).root_page
-    categories = CategoryPage.objects.child_of(shop_page)
-    assert [c.title for c in categories.order_by("index")] == [
+    assert [c.title for c in Category.objects.all()] == [
         "Calendars & Cards",
         "Clothing",
         "Mugs & Gifts",
@@ -94,7 +92,7 @@ def test_seed_shop_twice(seed_settings):
     seed()
     output = seed()
     assert ShopPage.objects.count() == 1
-    assert CategoryPage.objects.count() == 3
+    assert Category.objects.count() == 3
     assert Product.objects.count() == 7
     assert ProductVariant.objects.count() == 13
     assert Image.objects.count() == 7
@@ -104,12 +102,10 @@ def test_seed_shop_twice(seed_settings):
 
 def test_seed_shop_doesnt_change_existing(seed_settings, product):
     # an existing shop page, category and product
-    shop_page = product.category_page.get_parent().specific
+    shop_page = ShopPage.objects.get()
     # an existing product with the same name as one of the seed products
-    clothing = CategoryPageFactory(parent=shop_page, title="My clothing", slug="clothing")
-    tshirt = baker.make(
-        "shop.Product", category_page=clothing, name="PINS T-shirt", price=99
-    )
+    clothing = baker.make("shop.Category", title="My clothing", slug="clothing")
+    tshirt = baker.make("shop.Product", category=clothing, name="PINS T-shirt", price=99)
 
     output = seed()
 
@@ -117,7 +113,7 @@ def test_seed_shop_doesnt_change_existing(seed_settings, product):
     assert "shop page 'Test page'" in output
     product.refresh_from_db()
     assert product.name == "Test Product"
-    assert product.category_page.title == "Test Category"
+    assert product.category.title == "Test Category"
     clothing.refresh_from_db()
     assert clothing.title == "My clothing"
     tshirt.refresh_from_db()
@@ -126,16 +122,16 @@ def test_seed_shop_doesnt_change_existing(seed_settings, product):
     assert "product 'PINS T-shirt'" in output.split("Skipped")[1]
     # the other seed products are added to the existing shop
     assert Product.objects.count() == 8
-    assert CategoryPage.objects.child_of(shop_page).count() == 4
+    assert Category.objects.count() == 4
 
 
 def test_seed_shop_existing_category_title(seed_settings, shop_page):
     # a category with a seed category's title, but a different slug, is used
     # rather than creating another with the same title
-    clothing = CategoryPageFactory(parent=shop_page, title="clothing", slug="clothes")
+    clothing = baker.make("shop.Category", title="clothing", slug="clothes")
     output = seed()
-    assert CategoryPage.objects.filter(title__iexact="clothing").get() == clothing
-    assert Product.objects.get(name="PINS T-shirt").category_page == clothing
+    assert Category.objects.filter(title__iexact="clothing").get() == clothing
+    assert Product.objects.get(name="PINS T-shirt").category == clothing
     assert "category 'clothing'" in output.split("Skipped")[1]
 
 

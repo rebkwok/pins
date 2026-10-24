@@ -18,7 +18,7 @@
                 {% for category in page.categories %}
                     {% if category.live_products %}
                         <h3>
-                            <a href="{% pageurl category %}">{{ category.title }}</a>
+                            <a href="{{ category.url }}">{{ category.title }}</a>
                         </h3>
                         <div class="container product-listing-card__container pt-2">
                             <div class="product-listing-card__grid">

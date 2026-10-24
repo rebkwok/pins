@@ -16,7 +16,7 @@ import wagtail_factories
 from wagtail.models import Site
 
 from ..models import Sale, SaleProduct
-from .factories import CategoryPageFactory, ShopPageFactory
+from .factories import ShopPageFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -63,12 +63,10 @@ def shop_pages(home_page):
     # Serve the home page from the default site, so pages can be requested
     Site.objects.filter(is_default_site=True).update(root_page=home_page)
     shop_page = ShopPageFactory(parent=home_page, title="Shop", slug="shop")
-    category_page = CategoryPageFactory(
-        parent=shop_page, title="Category", slug="category"
-    )
+    category = baker.make("shop.Category", title="Category", slug="category")
     products = []
     for name in ["Mug", "T-shirt"]:
-        product = baker.make("shop.Product", name=name, category_page=category_page)
+        product = baker.make("shop.Product", name=name, category=category)
         baker.make("shop.ProductVariant", product=product, price=10, stock=5)
         products.append(product)
     yield products
