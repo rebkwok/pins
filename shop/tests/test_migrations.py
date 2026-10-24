@@ -172,6 +172,8 @@ def test_shop_groups_migration(migrations):
     root = Collection.objects.filter(depth=1).first() or Collection.objects.create(
         name="Root", path="0001", depth=1, numchild=0
     )
+    # (and the Shop collection may be left from migrating back past 0017)
+    Collection.objects.filter(depth__gt=1).delete()
     events = Collection.objects.create(
         name="Events", path=root.path + "0001", depth=2, numchild=0
     )

@@ -312,3 +312,71 @@ def test_view_as_users_not_dispatchers(client):
     assert preview.pk not in [
         user.pk for user in resp.context["filters"].filters["dispatcher"].queryset
     ]
+
+
+# Searching
+
+
+@pytest.mark.parametrize(
+    "url_name,query,found,not_found",
+    [
+        ("wagtailsnippets_shop_product:list", "Mugs", "Mug", "Card"),
+        ("wagtailsnippets_shop_product:list", "card", "Card", "Mug"),
+        ("wagtailsnippets_shop_productvariant:list", "blue", "Mug - Blue", "Card"),
+        ("wagtailsnippets_shop_category:list", "mug", "Mugs", "Cards"),
+        ("wagtailsnippets_shop_sale:list", "summer", "Summer sale", "Winter sale"),
+    ],
+)
+def test_shop_lists_search(client, url_name, query, found, not_found):
+    mugs = baker.make("shop.Category", title="Mugs")
+    cards = baker.make("shop.Category", title="Cards")
+    mug = baker.make("shop.Product", name="Mug", category=mugs)
+    baker.make("shop.ProductVariant", product=mug, variant_name="Blue")
+    card = baker.make("shop.Product", name="Card", category=cards)
+    baker.make("shop.ProductVariant", product=card, variant_name="Single")
+    baker.make("shop.Sale", name="Summer sale")
+    baker.make("shop.Sale", name="Winter sale")
+    client.force_login(user_in("Shop admins"))
+    resp = client.get(reverse(url_name), {"q": query})
+    # (e.g. a sale is shown with its dates)
+    shown = " | ".join(str(item) for item in resp.context["object_list"])
+    assert found in shown
+    assert not_found not in shown
+
+
+def sidebar_search_url(client, user):
+    client.force_login(user)
+    content = client.get(ORDERS_URL).content.decode()
+    props = json.loads(
+        re.search(
+            r'<script id="wagtail-sidebar-props" type="application/json">(.*?)</script>',
+            content,
+            re.S,
+        ).group(1)
+    )
+    (search,) = [m for m in props["modules"] if m["_type"].endswith("SearchModule")]
+    return search["_args"][0]
+
+
+def test_sidebar_search(client):
+    # shop admins search products, orders only users orders, and page editors
+    # (and superusers) pages
+    assert sidebar_search_url(client, user_in("Shop admins")) == reverse(
+        "wagtailsnippets_shop_product:list"
+    )
+    assert sidebar_search_url(client, user_in("Orders only")) == ORDERS_URL
+    assert sidebar_search_url(
+        client, baker.make("auth.User", is_superuser=True)
+    ) == reverse("wagtailadmin_pages:search")
+
+
+def test_search_other_areas(client):
+    # a product search offers the same search in orders and images
+    client.force_login(user_in("Shop admins"))
+    content = client.get(
+        reverse("wagtailsnippets_shop_product:list_results"), {"q": "mug"}
+    ).content.decode()
+    assert f'href="{ORDERS_URL}?q=mug"' in content
+    assert f'href="{reverse("wagtailimages:index")}?q=mug"' in content
+    content = client.get(reverse("shop_orders:index_results"), {"q": "mug"}).content.decode()
+    assert f'href="{reverse("wagtailsnippets_shop_product:list")}?q=mug"' in content

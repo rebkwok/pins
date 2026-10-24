@@ -9,16 +9,20 @@ from wagtail.admin.panels import FieldPanel
 from wagtail.admin.ui.tables import BooleanColumn
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.chooser import SnippetChooserViewSet
+from wagtail.admin.search import SearchArea
+from wagtail.permission_policies import ModelPermissionPolicy
+from wagtail.snippets.views.snippets import IndexView as SnippetIndexView
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
 from common.admin_menu import PermissionMenuItem
 
-from .admin_orders import OrderViewSet
+from .admin_orders import OrderPermissionPolicy, OrderViewSet
 from .admin_views import SHOP_STOCK_MENU_LABEL, DispatchersView
 from .models import (
     PRODUCT_VARIANT_PANELS,
     Category,
     DiscountCode,
+    Order,
     Product,
     ProductVariant,
     Sale,
@@ -67,7 +71,14 @@ class CategoryViewSet(ShopStockViewSet):
     # Dragged into their order on the shop page
     sort_order_field = "sort_order"
     list_display = ("title", "get_product_count", "url_display")
+    search_fields = ("title",)
     chooser_viewset_class = CategoryChooserViewSet
+
+
+class ProductIndexView(SnippetIndexView):
+    # Searches from the sidebar start here (see register_products_search_area),
+    # so offer the same search in the other areas (e.g. orders)
+    show_other_searches = True
 
 
 class ProductViewSet(ShopStockViewSet):
@@ -81,6 +92,8 @@ class ProductViewSet(ShopStockViewSet):
         "get_variant_count",
     )
     list_filter = ("category",)
+    search_fields = ("name", "category__title")
+    index_view_class = ProductIndexView
 
     def get_queryset(self, request):
         return Product.objects.select_related("category").order_by(
@@ -107,6 +120,7 @@ class ProductVariantViewSet(ShopStockViewSet):
         BooleanColumn("live"),
     )
     list_filter = ("product",)
+    search_fields = ("product__name", "variant_name", "colour", "size")
 
     def get_queryset(self, request):
         # Each product's variants are listed together, in the product's order
@@ -125,6 +139,7 @@ class SaleViewSet(ShopStockViewSet):
         "start_date",
         "end_date",
     )
+    search_fields = ("name",)
 
 
 class DiscountCodeViewSet(ShopStockViewSet):
@@ -203,6 +218,47 @@ class ProductGroup(SnippetViewSetGroup):
 
 
 register_snippet(ProductGroup)
+
+
+class PermissionSearchArea(SearchArea):
+    """An admin search area for users with any of the actions' permissions"""
+
+    def __init__(self, *args, permission_policy, actions, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.permission_policy = permission_policy
+        self.actions = actions
+
+    def is_shown(self, request):
+        return self.permission_policy.user_has_any_permission(request.user, self.actions)
+
+
+# Shop staff can't search pages, so the sidebar's search (the first search area
+# they can use) searches products (or orders), rather than images. Pages
+# (order 100) are still first for page editors.
+
+
+@hooks.register("register_admin_search_area")
+def register_products_search_area():
+    return PermissionSearchArea(
+        "Products",
+        reverse("wagtailsnippets_shop_product:list"),
+        icon_name="pick",
+        order=150,
+        permission_policy=ModelPermissionPolicy(Product),
+        actions=["add", "change", "delete", "view"],
+    )
+
+
+@hooks.register("register_admin_search_area")
+def register_orders_search_area():
+    return PermissionSearchArea(
+        "Orders",
+        reverse("shop_orders:index"),
+        icon_name="list-ul",
+        order=160,
+        permission_policy=OrderPermissionPolicy(Order),
+        actions=["change"],
+    )
 
 
 @hooks.register("register_admin_viewset")

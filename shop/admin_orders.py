@@ -186,6 +186,9 @@ def customer_display(order):
 
 
 class OrderIndexView(IndexView):
+    # (e.g. a search from the sidebar can be run in the other areas, e.g. products)
+    show_other_searches = True
+
     # Dates in CSV files as e.g. "2026-10-24 14:05" (Excel files have dates)
     custom_field_preprocess = {
         field: {
@@ -195,6 +198,17 @@ class OrderIndexView(IndexView):
         }
         for field in ["order.date_created", "shipped_at"]
     }
+
+    def search_queryset(self, queryset):
+        # The order's reference, customer and email, or its items' names (e.g.
+        # orders that included a hoodie)
+        if not self.search_query:
+            return queryset
+        # (items' names are in their product data)
+        items = OrderItem.objects.filter(product_data__name__icontains=self.search_query)
+        return super().search_queryset(queryset) | queryset.filter(
+            id__in=items.values("order_id")
+        )
 
     def get_base_queryset(self):
         # display_status uses the payments
@@ -510,6 +524,7 @@ class OrderViewSet(ModelViewSet):
         Column("status", label="Status", accessor="display_status"),
     ]
     filterset_class = OrderFilterSet
+    # (and the orders' items, e.g. "hoodie": see OrderIndexView.search_queryset)
     search_fields = ["ref", "name", "email"]
     ordering = ["-date_created"]
     list_per_page = 50

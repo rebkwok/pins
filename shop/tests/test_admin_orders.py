@@ -130,6 +130,28 @@ def test_orders_list_search(admin_client, shop_variants):
     assert listed(admin_client.get(INDEX_URL, {"q": "c@test.com"})) == {order, other}
 
 
+def test_orders_list_search_items(admin_client, shop_variants):
+    # e.g. orders that included hoodies
+    mug, card, raffle = shop_variants
+    with_mug = make_order([mug, card])
+    make_order([card])
+    resp = admin_client.get(INDEX_URL, {"q": "mug"})
+    # (listed once)
+    assert list(resp.context["object_list"]) == [with_mug]
+    two_mugs = make_order([mug])
+    baker.make(
+        "shop.OrderItem",
+        order=two_mugs,
+        product_data={"name": "Another mug"},
+        quantity=1,
+        unit_price=1,
+        subtotal=1,
+        total=1,
+    )
+    resp = admin_client.get(INDEX_URL, {"q": "mug"})
+    assert list(resp.context["object_list"]) == [two_mugs, with_mug]
+
+
 def test_orders_list_newest_first(admin_client, shop_variants):
     orders = [make_order(shop_variants) for _ in range(3)]
     resp = admin_client.get(INDEX_URL)
