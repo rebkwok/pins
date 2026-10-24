@@ -17,6 +17,7 @@
                     <th>Name</th>
                     <th>Email</th>
                     <th>Products</th>
+                    <th><span class="w-sr-only">Items to send</span></th>
                     {% if can_manage %}<th><span class="w-sr-only">Actions</span></th>{% endif %}
                 </tr>
             </thead>
@@ -38,6 +39,7 @@
                                 -
                             {% endfor %}
                         </td>
+                        <td><a href="{% url 'shop_dispatch:index' %}?dispatcher={{ dispatcher.pk }}">See their items to send</a></td>
                         {% if can_manage %}
                             <td>
                                 <form method="post">

@@ -21,6 +21,7 @@ from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
 from common.admin_menu import PermissionMenuItem
 
+from .admin_dispatch import DispatchViewSet
 from .admin_orders import OrderPermissionPolicy, OrderViewSet
 from .admin_views import (
     SHOP_SETUP_MENU_LABEL,
@@ -375,6 +376,11 @@ def register_order_viewset():
     return OrderViewSet()
 
 
+@hooks.register("register_admin_viewset")
+def register_dispatch_viewset():
+    return DispatchViewSet()
+
+
 def _protected_variants_response(request, variants, obj):
     """
     If any of the variants have been ordered or are in customers' baskets, show a
@@ -398,6 +404,9 @@ def remind_to_check_stock(request, instance):
     """
     for reminder in getattr(instance, "stock_reminders", []):
         messages.warning(request, reminder)
+    # e.g. a product's items still to send moved to its new dispatcher
+    for message in getattr(instance, "admin_messages", []):
+        messages.info(request, message)
 
 
 @hooks.register("before_delete_snippet")

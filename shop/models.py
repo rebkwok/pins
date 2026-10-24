@@ -13,6 +13,7 @@ from django.db import models, transaction
 from django.db.models import Q
 from django.db.models.functions import Lower
 from django.shortcuts import get_object_or_404
+from django.template.defaultfilters import pluralize
 from django.dispatch import Signal
 from django.urls import reverse
 from django.utils.html import format_html, format_html_join
@@ -1294,7 +1295,8 @@ class Product(ClusterableModel):
         limit_choices_to=dispatcher_choices,
         help_text=(
             "Who sends (or holds, for collection) this product: a user in the "
-            "Dispatchers group. Changing it doesn't change orders already placed."
+            "Dispatchers group. Changing it moves the product's items still to "
+            "send in existing orders to the new dispatcher."
         ),
     )
     notify_dispatcher = models.BooleanField(
@@ -1389,7 +1391,40 @@ class Product(ClusterableModel):
                 .aggregate(last=models.Max("sort_order"))["last"]
             )
             self.sort_order = 0 if last is None else last + 1
+        old_dispatcher = (
+            Product.objects.filter(pk=self.pk).values_list("dispatcher_id", flat=True).first()
+            if self.pk
+            else None
+        )
         super().save(*args, **kwargs)
+        if self.pk and old_dispatcher != self.dispatcher_id:
+            self.reassign_items_to_send()
+
+    def reassign_items_to_send(self):
+        """
+        The product's dispatcher has changed: its items still to send (or hand
+        over) in orders go to the new dispatcher. (Items already sent, or that
+        won't be sent, keep the dispatcher who had them.) Sets admin_messages,
+        for the admin to show.
+        """
+        items = order_items_for_variants(list(self.variants.values_list("id", flat=True))).filter(
+            shipping_status=OrderItem.TO_SEND
+        )
+        order_count = items.values("order_id").distinct().count()
+        count = items.update(
+            dispatcher=self.dispatcher,
+            dispatcher_name=dispatcher_name(self.dispatcher) if self.dispatcher else "",
+        )
+        if count:
+            to = (
+                f"now have {dispatcher_name(self.dispatcher)} as their dispatcher"
+                if self.dispatcher
+                else "now have no dispatcher"
+            )
+            self.admin_messages = [
+                f"{count} item{pluralize(count)} still to send, in {order_count} "
+                f"order{pluralize(order_count)}, {to}."
+            ]
 
     def clean(self):
         if self.notify_dispatcher:

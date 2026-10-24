@@ -26,6 +26,7 @@ from wagtail.admin.ui.components import Component
 from wagtail.admin.ui.tables import BaseColumn, Column, TitleColumn
 from wagtail.admin.views.generic import IndexView
 from wagtail.admin.views.generic.base import WagtailAdminTemplateMixin
+from wagtail.admin.views.mixins import SpreadsheetExportMixin
 from wagtail.admin.viewsets.model import ModelViewSet
 from wagtail.permission_policies import ModelPermissionPolicy
 
@@ -185,7 +186,57 @@ def customer_display(order):
     )
 
 
-class OrderIndexView(IndexView):
+class OrderItemsExportMixin(SpreadsheetExportMixin):
+    """
+    A spreadsheet of order items (one row per item), with each order's rows
+    shaded in turn in Excel (e.g. the orders list's download, and dispatchers')
+    """
+
+    # Each order's rows (one per item) are shaded in turn, so the orders can be
+    # told apart: the first order's rows grey, the next's white, and so on. All
+    # the cells have borders, and the headings are bold.
+    ORDER_SHADING = "D9D9D9"
+    BORDER_COLOUR = "A6A6A6"
+    export_sheet_title = "Orders"
+
+    def write_xlsx(self, queryset, output):
+        # (queryset: order items, in their orders' order)
+        from openpyxl import Workbook
+        from openpyxl.cell import WriteOnlyCell
+        from openpyxl.styles import Border, Font, PatternFill, Side
+        from wagtail.admin.views.mixins import ExcelDateFormatter
+
+        workbook = Workbook(write_only=True, iso_dates=True)
+        worksheet = workbook.create_sheet(title=self.export_sheet_title)
+        side = Side(style="thin", color=self.BORDER_COLOUR)
+        border = Border(left=side, right=side, top=side, bottom=side)
+        headings = []
+        for field in self.list_export:
+            cell = WriteOnlyCell(worksheet, self.get_heading(queryset, field))
+            cell.font = Font(bold=True)
+            cell.border = border
+            headings.append(cell)
+        worksheet.append(headings)
+        date_format = ExcelDateFormatter().get()
+        shading = PatternFill("solid", fgColor=self.ORDER_SHADING)
+        order_id, shaded = None, False
+        for item in queryset:
+            if item.order_id != order_id:
+                order_id, shaded = item.order_id, not shaded
+            cells = list(
+                self.generate_xlsx_row(
+                    worksheet, self.to_row_dict(item), date_format=date_format
+                )
+            )
+            for cell in cells:
+                cell.border = border
+                if shaded:
+                    cell.fill = shading
+            worksheet.append(cells)
+        workbook.save(output)
+
+
+class OrderIndexView(OrderItemsExportMixin, IndexView):
     # (e.g. a search from the sidebar can be run in the other areas, e.g. products)
     show_other_searches = True
 
@@ -249,46 +300,6 @@ class OrderIndexView(IndexView):
             items = items.filter(_variant_items(filters["product"]))
         return super().as_spreadsheet(items, spreadsheet_format)
 
-    # Each order's rows (one per item) are shaded in turn, so the orders can be
-    # told apart: the first order's rows grey, the next's white, and so on. All
-    # the cells have borders, and the headings are bold.
-    ORDER_SHADING = "D9D9D9"
-    BORDER_COLOUR = "A6A6A6"
-
-    def write_xlsx(self, queryset, output):
-        from openpyxl import Workbook
-        from openpyxl.cell import WriteOnlyCell
-        from openpyxl.styles import Border, Font, PatternFill, Side
-        from wagtail.admin.views.mixins import ExcelDateFormatter
-
-        workbook = Workbook(write_only=True, iso_dates=True)
-        worksheet = workbook.create_sheet(title="Orders")
-        side = Side(style="thin", color=self.BORDER_COLOUR)
-        border = Border(left=side, right=side, top=side, bottom=side)
-        headings = []
-        for field in self.list_export:
-            cell = WriteOnlyCell(worksheet, self.get_heading(queryset, field))
-            cell.font = Font(bold=True)
-            cell.border = border
-            headings.append(cell)
-        worksheet.append(headings)
-        date_format = ExcelDateFormatter().get()
-        shading = PatternFill("solid", fgColor=self.ORDER_SHADING)
-        order_id, shaded = None, False
-        for item in queryset:
-            if item.order_id != order_id:
-                order_id, shaded = item.order_id, not shaded
-            cells = list(
-                self.generate_xlsx_row(
-                    worksheet, self.to_row_dict(item), date_format=date_format
-                )
-            )
-            for cell in cells:
-                cell.border = border
-                if shaded:
-                    cell.fill = shading
-            worksheet.append(cells)
-        workbook.save(output)
 
     def get_heading(self, queryset, field):
         return self.export_headings[field]

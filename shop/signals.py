@@ -199,6 +199,11 @@ def notify_dispatchers(order):
                 lines += ["Shipping address:", order.shipping_address]
             else:
                 lines += [f"Shipping method: {order.get_shipping_method_display()}"]
+            lines += [
+                "",
+                "Mark the items as sent once you've sent them: "
+                f"https://{settings.DOMAIN}{reverse('shop_dispatch:index')}",
+            ]
             _send_email_now(
                 f"Shop order '{order.ref}': {subject}",
                 "\n".join(lines),

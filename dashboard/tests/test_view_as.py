@@ -32,10 +32,11 @@ def group(name):
 
 def test_view_as_groups():
     # groups that can use the admin (the shop's, and Wagtail's Editors and
-    # Moderators), not e.g. Dispatchers (no admin access yet)
+    # Moderators), not groups that can't
+    Group.objects.create(name="No admin")
     names = [g.name for g in view_as_groups()]
-    assert {"Shop admins", "Orders only", "Editors"} <= set(names)
-    assert "Dispatchers" not in names
+    assert {"Shop admins", "Orders only", "Dispatchers", "Editors"} <= set(names)
+    assert "No admin" not in names
     assert names == sorted(names)
 
 
@@ -95,7 +96,8 @@ def test_view_as_orders_only_starts_at_orders(client, superuser):
 
 
 def test_view_as_other_group_not_allowed(client, superuser):
-    resp = client.post(VIEW_AS_URL, {"group": group("Dispatchers").pk})
+    no_admin = Group.objects.create(name="No admin")
+    resp = client.post(VIEW_AS_URL, {"group": no_admin.pk})
     assert resp.status_code == 404
     assert get_user(client) == superuser
 

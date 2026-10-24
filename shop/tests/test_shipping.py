@@ -88,12 +88,10 @@ def test_order_items_dispatcher_and_status(shop_variants, dispatcher):
     assert item_for(order, raffle).shipping_status == OrderItem.NO_SHIPPING
     assert not item_for(order, raffle).needs_shipping
     assert item_for(order, mug).needs_shipping
-    # reassigning the product later doesn't change the order
-    mug.product.dispatcher = make_dispatcher("Bob", "bob@test.com")
-    mug.product.save()
-    assert item_for(order, mug).dispatcher == dispatcher
     assert item_for(order, mug).dispatcher_name == "Ann Smith"
     assert item_for(order, card).dispatcher_name == ""
+    # (reassigning the product moves its items still to send: see
+    # test_change_dispatcher_moves_items_to_send)
 
 
 def test_shipping_status_label():
@@ -472,7 +470,10 @@ def test_dispatcher_emailed_about_paid_order(
         "Customer: Cat (c@test.com)\n"
         "Shipping address:\n"
         "1 Road\n"
-        "Town"
+        "Town\n"
+        "\n"
+        "Mark the items as sent once you've sent them: "
+        "https://podencosinneed.org/admin/shop/dispatch/"
     )
 
 
@@ -483,7 +484,8 @@ def test_dispatcher_emailed_about_collection(
     (email,) = emails_to("ann@test.com")
     assert email.subject == f"Shop order '{order.ref}': items to hand over"
     assert "has items for you to hand over (for collection):" in email.body
-    assert email.body.endswith("Shipping method: Collect in person")
+    assert "Shipping method: Collect in person\n" in email.body
+    assert email.body.endswith("https://podencosinneed.org/admin/shop/dispatch/")
 
 
 def test_dispatcher_not_emailed(shop_variants, dispatcher, django_capture_on_commit_callbacks):
@@ -617,3 +619,73 @@ def test_shop_new_order_email_awaiting_payment(
     # Ann isn't emailed about this product
     assert "- 2 x Test Product - Mug: Ann Smith (not emailed)" in body
     assert "please pass these on" in body
+
+
+# Changing a product's dispatcher
+
+
+def test_change_dispatcher_moves_items_to_send(shop_variants, dispatcher):
+    mug, card, raffle = shop_variants
+    product = mug.product
+    to_send = make_order([mug, card])
+    also_to_send = make_order([mug])
+    sent = make_order([mug])
+    sent.mark_items_shipped(sent.items.all(), dispatcher)
+    not_sent = make_order([mug])
+    not_sent.mark_items_not_sent(not_sent.items.all(), dispatcher)
+    bob = make_dispatcher("Bob", "bob@test.com")
+
+    product.dispatcher = bob
+    product.save()
+    # items still to send move to Bob; sent (or won't be sent) items stay Ann's
+    assert item_for(to_send, mug).dispatcher == bob
+    assert item_for(to_send, mug).dispatcher_name == "Bob Smith"
+    assert item_for(also_to_send, mug).dispatcher == bob
+    assert item_for(sent, mug).dispatcher == dispatcher
+    assert item_for(not_sent, mug).dispatcher == dispatcher
+    # (other products' items aren't changed)
+    assert item_for(to_send, card).dispatcher is None
+    assert product.admin_messages == [
+        "2 items still to send, in 2 orders, now have Bob Smith as their dispatcher."
+    ]
+
+
+def test_remove_dispatcher_from_product(shop_variants, dispatcher):
+    mug, card, raffle = shop_variants
+    order = make_order([mug])
+    product = mug.product
+    product.dispatcher = None
+    product.save()
+    item = item_for(order, mug)
+    assert (item.dispatcher, item.dispatcher_name) == (None, "")
+    assert product.admin_messages == ["1 item still to send, in 1 order, now have no dispatcher."]
+
+
+def test_same_dispatcher_or_no_items(shop_variants, dispatcher):
+    mug, card, raffle = shop_variants
+    product = mug.product
+    make_order([mug])
+    product.name = "Big mug"
+    product.save()
+    assert not hasattr(product, "admin_messages")
+    # a new dispatcher, but nothing to send
+    card.product.dispatcher = dispatcher
+    card.product.save()
+    assert not hasattr(card.product, "admin_messages")
+
+
+def test_change_dispatcher_in_admin(admin_client, shop_variants, dispatcher):
+    from .test_admin_stock import product_form_data
+
+    mug, card, raffle = shop_variants
+    order = make_order([mug])
+    bob = make_dispatcher("Bob", "bob@test.com")
+    mug.refresh_from_db()
+    data = product_form_data(mug.product, stock=mug.stock, stock_shown=mug.stock)
+    data["dispatcher"] = bob.pk
+    resp = admin_client.post(
+        reverse("wagtailsnippets_shop_product:edit", args=(mug.product.pk,)), data
+    )
+    assert resp.status_code == 302
+    assert item_for(order, mug).dispatcher == bob
+    assert "1 item still to send, in 1 order, now have Bob Smith as their dispatcher." in messages_for(resp)
