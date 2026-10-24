@@ -319,3 +319,394 @@
   background-color: var(--bs-btn-hover-bg);
   color: var(--bs-btn-hover-color);
 }
+
+
+/* #shop ---- Product cards and grid (shop and category pages) ---- */
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px 16px;
+  padding: 16px 0 40px;
+}
+
+@media (min-width: 768px) {
+  .shop-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 40px 32px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .shop-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.shop-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shop-card__image {
+  display: block;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: #f8f7d8;
+}
+
+.shop-card__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform ease 0.2s;
+}
+
+.shop-card:hover .shop-card__image img {
+  transform: scale(1.03);
+}
+
+.shop-no-photo {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  width: 100%;
+  background: #f8f7d8;
+}
+
+.shop-card__image .shop-no-photo img,
+.shop-no-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0.3;
+}
+
+.shop-no-photo span {
+  position: absolute;
+  margin: 0 8px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #333;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.shop-card__name {
+  font-size: 1.15rem;
+  margin: 4px 0 0;
+  line-height: 1.3;
+}
+
+.shop-card__name a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.shop-card__name a:hover {
+  text-decoration: underline;
+}
+
+.shop-card__price {
+  margin: 0;
+}
+
+.shop-card__price s {
+  color: var(--grey);
+  margin-right: 4px;
+}
+
+.shop-card__stock {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #a5520a;
+}
+
+.shop-card__stock--out {
+  color: darkred;
+}
+
+.shop-card .shop-form,
+.shop-product .shop-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shop-card__buy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.shop-card__buy .input-group.quantity {
+  width: auto;
+  flex-wrap: nowrap;
+}
+
+.shop-card__buy .input-group.quantity .btn {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.shop-card__buy .form-control.quantity {
+  width: 56px;
+  min-height: 44px;
+  text-align: center;
+}
+
+.shop-form .shop-card__buy input[type='submit'].basket-btn {
+  flex: 1 1 auto;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 16px;
+  border-radius: 4px;
+}
+
+/* the product's own page */
+.shop-product {
+  padding-top: 24px;
+  padding-bottom: 48px;
+}
+
+.shop-product .shop-card__price {
+  font-size: 1.4rem;
+  margin-bottom: 8px;
+}
+
+.shop-product__description {
+  margin-top: 24px;
+}
+
+/* #shop ---- Search, filters and categories ---- */
+.shop-filters {
+  margin: 16px 0;
+}
+
+.shop-filters__search {
+  display: flex;
+  gap: 8px;
+  max-width: 560px;
+}
+
+.shop-filters__search input[type='search'] {
+  min-height: 44px;
+}
+
+.shop-filters__search .btn {
+  min-height: 44px;
+  color: var(--white);
+  background-color: var(--pins);
+  border: none;
+  padding: 0 16px;
+}
+
+.shop-filters__more {
+  margin-top: 8px;
+}
+
+/* (not the advent calendar's styles for summary, in main-v1.3.css) */
+.shop-filters__more summary,
+.shop-filters__more[open] summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  height: auto;
+  width: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--pins);
+}
+
+/* an arrow, turning down when open */
+.shop-filters__more summary::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-left: 10px;
+  border-right: 2px solid currentcolor;
+  border-bottom: 2px solid currentcolor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+
+.shop-filters__more[open] summary::after {
+  transform: rotate(45deg);
+  margin-top: -4px;
+}
+
+.shop-filters__more summary::-webkit-details-marker {
+  display: none;
+}
+
+.shop-filters__options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  padding: 8px 0;
+}
+
+.shop-filters__options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shop-filters__options select {
+  width: auto;
+}
+
+.shop-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 16px;
+}
+
+.shop-categories a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--pins);
+  border-radius: 22px;
+  color: var(--pins);
+  text-decoration: none;
+}
+
+.shop-categories a[aria-current='true'] {
+  background-color: var(--pins);
+  color: var(--white);
+}
+
+.shop-category__title {
+  margin-top: 24px;
+}
+
+.shop-category__title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.shop-detail__empty {
+  margin: 24px 0 48px;
+  font-size: 1.1rem;
+}
+
+/* Products with a choice of options: on phones, "Choose options" (their page)
+   rather than a drop-down that doesn't fit */
+/* (more specific than Bootstrap's .btn) */
+.shop-card .shop-card__choose {
+  display: none;
+}
+
+@media (max-width: 767.98px) {
+  .shop-card--options .shop-form {
+    display: none;
+  }
+
+  .shop-card--options .shop-card__choose {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    color: var(--white);
+    background-color: var(--pins);
+    border: none;
+  }
+}
+
+
+/* The cards' buttons: one style ("Add to basket" and "Choose options"), at
+   the bottom of each card, so they line up across a row */
+.shop-card .shop-form,
+.shop-card .shop-card__choose {
+  margin-top: auto;
+}
+
+.shop-card .shop-form input[type='submit'].basket-btn,
+.shop-card .shop-card__choose,
+.shop-product .shop-form input[type='submit'].basket-btn {
+  min-height: 44px;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 0 16px;
+  border-radius: 4px;
+}
+
+.shop-results {
+  margin: 8px 0 0;
+}
+
+/* (the "Added!" message's place, after the form: no gap while it's empty, so
+   the buttons line up with "Choose options") */
+.shop-card > div:empty {
+  display: none;
+}
+
+/* Phones: the category buttons on one line, scrolling sideways */
+@media (max-width: 767.98px) {
+  .shop-categories {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 6px;
+    margin: 4px 0 8px;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .shop-categories::-webkit-scrollbar {
+    display: none;
+  }
+
+  .shop-categories a {
+    flex: none;
+    min-height: 36px;
+    padding: 0 12px;
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+}
+
+/* The "Added!" message (or a problem adding), over the bottom of the card's
+   image */
+.shop-card__media {
+  position: relative;
+}
+
+.shop-card__media [id^='added_'] {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
+  margin: 0 !important;
+  padding: 6px 8px;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 0.9rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  color: #0f5132;
+  background: #d1e7dd;
+}
+
+.shop-card__media .alert-danger[id^='added_'] {
+  color: #842029;
+  background: #f8d7da;
+}
+
+.shop-card__media [id^='added_'] a {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.shop-card__media [id^='added_']:empty {
+  display: none;
+}

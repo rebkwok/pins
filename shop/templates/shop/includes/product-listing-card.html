@@ -1,95 +1,25 @@
-{% load wagtailcore_tags wagtailimages_tags static %}
-
-<div>
-    <div class="mb-4">
-    {% with images=product.images %}
-    {% if images %}
-        <div id="shop-carousel-{{ product.id }}" class="carousel slide shop-carousel{% if detail_page %} shop-carousel--detail{% endif %}"{% if images|length > 1 %} data-bs-ride="carousel"{% endif %}>
-            {% if images|length > 1 %}
-                <div class="carousel-indicators">
-                    {% for im in images %}
-                        <button type="button" data-bs-target="#shop-carousel-{{ product.id }}" data-bs-slide-to="{{ forloop.counter0 }}" aria-label="Image {{ forloop.counter }}"{% if forloop.first %} class="active" aria-current="true"{% endif %}></button>
-                    {% endfor %}
-                </div>
-            {% endif %}
-            <div class="carousel-inner">
-                {% for item in images %}
-                <div class="carousel-item{% if forloop.first %} active{% endif %}">
-                    {% if detail_page %}
-                        <a href="{{ item.image.file.url }}">
-                            <figure class="product-listing-card__image">
-                                {% image item.image fill-300x300-c100 loading="lazy" class="d-block" alt=item.alt %}
-                            </figure>
-                        </a>
-                    {% else %}
-                        <a href="{% url 'shop:product_detail' product.id %}">
-                            <figure class="product-listing-card__image">
-                                {% image item.image fill-180x180-c100 loading="lazy" class="d-block w-180" alt=item.alt %}
-                            </figure>
-                        </a>
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    {% else %}
-        {% if not detail_page %}<a href="{% url 'shop:product_detail' product.id %}">{% endif %}
-        <figure class="product-listing-card__image">
-            <img src={% static 'images/logo.png' %} height="180" width="180" loading="lazy">
-            <div class="layer"></div>
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">No photo available</div>
-        </figure>
-        {% if not detail_page %}</a>{% endif %}
-    {% endif %}
-    {% endwith %}
-</div>
-
-<form class="shop-form" action="" method="POST">
-    {% csrf_token %}
-    <div class="form-group">
-        <div id="id_select_variant_wrapper_{{ product.id }}">
-            {% include "shop/includes/select_variant_field.html" %}
-        </div>
+{% load wagtailimages_tags static %}
+{# A product on the shop or a category page. On phones, products with a choice of options link to their page to choose ("Choose options"), as a drop-down doesn't fit #}
+{% with has_choice=product.live_variants|length|default:0 %}
+<article class="shop-card{% if has_choice > 1 and not product.out_of_stock %} shop-card--options{% endif %}">
+    <div class="shop-card__media">
+        <a href="{% url 'shop:product_detail' product.id %}" class="shop-card__image" tabindex="-1" aria-hidden="true">
+            {% with image=product.images.0 %}
+                {% if image %}
+                    {% image image.image fill-400x400-c100 loading="lazy" alt="" %}
+                {% else %}
+                    {% include "shop/includes/no_photo.html" %}
+                {% endif %}
+            {% endwith %}
+        </a>
+        {# "Added!" or a problem: over the image, so the row doesn't change height #}
+        <div id="added_{{ product.id }}" role="status"></div>
     </div>
-    
-    {% if not product.out_of_stock %}
-    <div id="change_quantity_wrapper_{{ product.id }}" class="input-group quantity mb-3">
-        <div class="input-group-prepend">
-            <span 
-                class="input-group-text"
-                hx-trigger="click"
-                hx-target="#id_quantity_wrapper_{{ product.id }}"
-                hx-get="{% url 'shop:decrease_quantity' product.id %}"
-                hx-include="[id='id_quantity_{{ product.id }}'],[id='id_product_{{ product.id }}']" 
-            >-</span>
-        </div>
-        <span id="id_quantity_wrapper_{{ product.id }}">
-            {% include "shop/includes/quantity_field.html" with product_id=product.id value=1 %}
-        </span>
-        <div class="input-group-append">
-            <span 
-                class="input-group-text"
-                hx-trigger="click"
-                hx-target="#id_quantity_wrapper_{{ product.id }}"
-                hx-get="{% url 'shop:increase_quantity' product.id %}"
-                hx-include="[id='id_quantity_{{ product.id }}'],[id='id_product_{{ product.id }}']"  
-            >+</span>
-        </div>
-        <div class="input-group">
-        <input type="submit" 
-            class="btn basket-btn mt-2"
-            value="Add to basket"
-            hx-post="{% url 'shop:add_to_basket' product.id %}"
-            hx-trigger="click"
-            hx-target="#basket-icon"
-        >  
-        </div>
-    </div>
+    <h3 class="shop-card__name"><a href="{% url 'shop:product_detail' product.id %}">{{ product.name }}</a></h3>
+    {% include "shop/includes/product_price.html" %}
+    {% include "shop/includes/product_form.html" %}
+    {% if has_choice > 1 and not product.out_of_stock %}
+        <a href="{% url 'shop:product_detail' product.id %}" class="btn basket-btn shop-card__choose">Choose options</a>
     {% endif %}
-    <input type="hidden" name="product_type" value="shop.ProductVariant">
-
-            
-</form>
-<div id="added_{{ product.id }}"></div>
-
-</div>
+</article>
+{% endwith %}

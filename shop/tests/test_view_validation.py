@@ -161,7 +161,8 @@ def test_add_to_basket_not_live_other_variants_available(client, product, varian
     content = assert_item_unavailable(resp, product, controls_hidden=False)
     # variant options are updated
     assert f"<div id='id_select_variant_wrapper_{product.id}' hx-swap-oob='true'>" in content
-    assert f'<option value="{other_variant.id}">' in content
+    # (now the only live variant: no drop-down)
+    assert f'id="id_product_{product.id}" value="{other_variant.id}"' in content
     assert f'value="{variant.id}"' not in content
 
 
@@ -175,7 +176,7 @@ def test_change_quantity_not_live(client, product, variant, view, not_live):
     # On the shop page, the product card is updated and quantity reset to 1
     resp = client.get(url, {"product_id": variant.id, "quantity": 2})
     content = assert_item_unavailable(resp, product)
-    assert f'id="id_quantity_{product.id}" name="quantity" type="number" value=1' in content
+    assert f'id="id_quantity_{product.id}" name="quantity" value="1"' in content
     # On the basket page, the quantity can still be changed
     resp = client.get(url, {"product_id": variant.id, "quantity": 2, "ref": "basket"})
     assert resp.status_code == 200

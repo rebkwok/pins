@@ -1,0 +1,10 @@
+{% load shoptags %}
+{% with summary=product.price_summary %}
+    {% if summary %}
+        <p class="shop-card__price">
+            {% if summary.varies %}From {% endif %}
+            {% if summary.was %}<s aria-label="Was {{ summary.was|gbp }}">{{ summary.was|gbp }}</s>{% endif %}
+            <strong>{{ summary.price|gbp }}</strong>
+        </p>
+    {% endif %}
+{% endwith %}

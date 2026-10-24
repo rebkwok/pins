@@ -1,19 +1,23 @@
+{% load shoptags %}
+{# The variant to add to the basket: a drop-down if there's a choice. (Updated by htmx after adding to the basket, see views.add_to_basket.) #}
 {% if product.out_of_stock %}
-    <div class="text-danger">Out of stock</div>
+    <p class="shop-card__stock shop-card__stock--out">Out of stock</p>
 {% else %}
-    <select
-        {% comment %} name must be product id for api call - actual product_variant id {% endcomment %}
-        name="product_id" 
-        required="" 
-        id="id_product_{{ product.id }}"
-        class="form-control"
-    >
-        {% for variant in product.live_variants %}
-            {% if variant.available > 0 %}
-                <option value="{{ variant.id }}">{{ variant.name_and_price }} ({{ variant.available }} in stock)</option>
-            {% else %}
-                <option disabled=disabled value="{{ variant.id }}">{{ variant.name_and_price }} (out of stock)</option>
-            {% endif %}
-        {% endfor %}
-    </select>
+    {% with variants=product.live_variants %}
+        {% if variants|length == 1 %}
+            {% with variant=variants.0 %}
+                <input type="hidden" name="product_id" id="id_product_{{ product.id }}" value="{{ variant.id }}">
+                {% with note=variant.stock_note %}{% if note %}<p class="shop-card__stock">{{ note }}</p>{% endif %}{% endwith %}
+            {% endwith %}
+        {% else %}
+            <label class="visually-hidden" for="id_product_{{ product.id }}">Option</label>
+            <select name="product_id" required id="id_product_{{ product.id }}" class="form-select shop-card__variant">
+                {% for variant in variants %}
+                    <option value="{{ variant.id }}"{% if variant.available <= 0 %} disabled{% endif %}>
+                        {{ variant.variant_full_name|default:product.name }}{% if product.price_summary.varies %} – {{ variant.current_price|gbp }}{% endif %}{% with note=variant.stock_note %}{% if note %} ({{ note|lower }}){% endif %}{% endwith %}
+                    </option>
+                {% endfor %}
+            </select>
+        {% endif %}
+    {% endwith %}
 {% endif %}

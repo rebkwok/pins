@@ -1,37 +1,78 @@
 {% extends "shop/base.html" %}
-{% load wagtailcore_tags wagtailimages_tags %}
+{% load wagtailcore_tags shoptags %}
 
 {% block content %}
     {% include "shop/includes/header-hero.html" with shop=True %}
 
     <div class="container shop-detail">
-        <div class="row">
-            <div class="col-md-12">
-                    {% if page.introduction %}
-                        <p class="shop-detail__introduction">
-                            {{ page.introduction }}
-                        </p>
-                    {% endif %}
+        {% if page.introduction %}
+            <p class="shop-detail__introduction">{{ page.introduction }}</p>
+        {% endif %}
+        {{ page.body|richtext }}
 
-                        {{ page.body|richtext }}
-                    
-                {% for category in page.categories %}
-                    {% if category.live_products %}
-                        <h3>
-                            <a href="{{ category.url }}">{{ category.title }}</a>
-                        </h3>
-                        <div class="container product-listing-card__container pt-2">
-                            <div class="product-listing-card__grid">
-                                {% for product in category.live_products %}
-                                    <div>
-                                        {% include "shop/includes/product-listing-card.html" %}
-                                    </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    {% endif %}
+        <form method="get" class="shop-filters" role="search" aria-label="Search the shop">
+            {% if category_slug %}<input type="hidden" name="category" value="{{ category_slug }}">{% endif %}
+            <div class="shop-filters__search">
+                <label class="visually-hidden" for="shop-search">Search the shop</label>
+                <input type="search" id="shop-search" name="q" value="{{ query }}" placeholder="Search the shop" class="form-control">
+                <button type="submit" class="btn basket-btn">Search</button>
+            </div>
+            <details class="shop-filters__more"{% if in_stock or on_sale or sort %} open{% endif %}>
+                <summary>Filter and sort</summary>
+                <div class="shop-filters__options">
+                    <label><input type="checkbox" name="in_stock" value="1"{% if in_stock %} checked{% endif %}> In stock only</label>
+                    <label><input type="checkbox" name="on_sale" value="1"{% if on_sale %} checked{% endif %}> On sale</label>
+                    <label>Sort
+                        <select name="sort" class="form-select">
+                            {% for value, label in sorts %}
+                                <option value="{{ value }}"{% if value == sort %} selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <button type="submit" class="btn btn-outline-secondary">Apply</button>
+                </div>
+            </details>
+        </form>
+
+        {% if filter_categories|length > 1 %}
+            <nav class="shop-categories" aria-label="Categories">
+                <a href="{% shop_filter_url category='' %}"{% if not category_slug %} aria-current="true"{% endif %}>All</a>
+                {% for category in filter_categories %}
+                    <a href="{% shop_filter_url category=category.slug %}"{% if category.slug == category_slug %} aria-current="true"{% endif %}>{{ category.title }}</a>
+                {% endfor %}
+            </nav>
+        {% endif %}
+
+        {% if filtering %}
+            {# what's shown, and a way back to everything #}
+            <p class="shop-results">
+                {% if products %}
+                    {{ products|length }} of {{ total }} product{{ total|pluralize }} shown.
+                {% else %}
+                    No products match.
+                {% endif %}
+                <a href="{{ page.url }}">Clear the search and filters</a>
+            </p>
+        {% endif %}
+
+        {% if not products %}
+        {% elif product_groups %}
+            {% for category, category_products in product_groups %}
+                <section class="shop-category">
+                    <h2 class="shop-category__title"><a href="{{ category.url }}">{{ category.title }}</a></h2>
+                    <div class="shop-grid">
+                        {% for product in category_products %}
+                            {% include "shop/includes/product-listing-card.html" %}
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endfor %}
+        {% else %}
+            <div class="shop-grid">
+                {% for product in products %}
+                    {% include "shop/includes/product-listing-card.html" %}
                 {% endfor %}
             </div>
-        </div>
+        {% endif %}
     </div>
 {% endblock content %}

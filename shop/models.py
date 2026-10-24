@@ -1,4 +1,5 @@
 from datetime import timedelta
+from itertools import groupby
 from typing import NamedTuple
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -16,6 +17,7 @@ from django.shortcuts import get_object_or_404
 from django.template.defaultfilters import pluralize
 from django.dispatch import Signal
 from django.urls import reverse
+from django.utils.functional import cached_property
 from django.utils.html import format_html, format_html_join
 from django.utils.text import slugify
 from django.utils.safestring import mark_safe
@@ -1489,6 +1491,32 @@ class Product(ClusterableModel):
     def live_variants(self):
         return self.variants.filter(live=True)
 
+    @cached_property
+    def is_on_sale(self):
+        """Whether any of the product's live variants is on sale"""
+        return any(variant.get_sale_item() for variant in self.live_variants)
+
+    @cached_property
+    def price_summary(self):
+        """
+        The product's price for the shop: its live variants' lowest price (with
+        any sale discount), whether variants' prices differ ("From £12.00"), and
+        the price before the sale discount, if the lowest price is discounted.
+        None if there are no live variants.
+        """
+        prices = [
+            (variant.get_discounted_price() or variant.base_price, variant.base_price)
+            for variant in self.live_variants
+        ]
+        if not prices:
+            return None
+        price, was = min(prices)
+        return PriceSummary(
+            price=price,
+            was=was if was != price else None,
+            varies=len({current for current, _ in prices}) > 1,
+        )
+
     def out_of_stock(self):
         """
         Nothing from this product can be added to the basket: no live variant has
@@ -1553,6 +1581,20 @@ def file_in_shop_collection(image):
     if image is not None and image.collection.is_root():
         image.collection = get_shop_collection()
         image.save(update_fields=["collection"])
+
+
+class PriceSummary(NamedTuple):
+    """A product's price, for the shop (see Product.price_summary)"""
+
+    price: Decimal
+    # the price before a sale discount
+    was: Decimal | None
+    # whether the variants' prices differ ("From £...")
+    varies: bool
+
+
+# Stock at or below this is shown as "Only 3 left" in the shop
+LOW_STOCK = 5
 
 
 class CarouselImage(NamedTuple):
@@ -1743,6 +1785,20 @@ class ProductVariant(Orderable):
     def get_price(self, request):
         return self.base_price
 
+    @property
+    def current_price(self):
+        """The variant's price now, with any sale discount"""
+        return self.get_discounted_price() or self.base_price
+
+    def stock_note(self):
+        """For the shop: "Out of stock", or "Only 3 left" if stock is low"""
+        available = self.available
+        if available <= 0:
+            return "Out of stock"
+        if available <= LOW_STOCK:
+            return f"Only {available} left"
+        return ""
+
     def name_and_price(self):
         discounted_price = self.get_discounted_price()
         if discounted_price:
@@ -1826,6 +1882,87 @@ class ShopPage(RoutablePageMixin, Page):
 
     def children(self):
         return self.categories()
+
+    SORTS = {
+        "": "Featured",
+        "price": "Price, low to high",
+        "-price": "Price, high to low",
+        "name": "Name",
+    }
+
+    def get_context(self, request, *args, **kwargs):
+        """
+        The shop's products, searched, filtered and sorted from the address:
+        ?q= (search), ?category=<slug>, ?in_stock=1, ?on_sale=1,
+        ?sort= (price, -price or name; featured if blank). Featured products are
+        grouped by category, in the shop's order; sorted products are listed
+        together.
+        """
+        context = super().get_context(request, *args, **kwargs)
+        params = request.GET
+        query = params.get("q", "").strip()
+        category_slug = params.get("category", "")
+        in_stock = params.get("in_stock") == "1"
+        on_sale = params.get("on_sale") == "1"
+        sort = params.get("sort", "")
+        if sort not in self.SORTS:
+            sort = ""
+
+        products = (
+            Product.objects.filter(live=True, variants__live=True)
+            .distinct()
+            .select_related("category")
+            .order_by("category__sort_order", "category__title", "sort_order", "name")
+        )
+        total = products.count()
+        if query:
+            products = products.filter(
+                Q(name__icontains=query)
+                | Q(description__icontains=query)
+                | Q(category__title__icontains=query)
+            )
+        if category_slug:
+            products = products.filter(category__slug=category_slug)
+        products = list(products)
+        if in_stock:
+            products = [product for product in products if not product.out_of_stock()]
+        if on_sale:
+            products = [product for product in products if product.is_on_sale]
+        if sort in ("price", "-price"):
+            products.sort(
+                key=lambda product: product.price_summary.price,
+                reverse=sort == "-price",
+            )
+        elif sort == "name":
+            products.sort(key=lambda product: product.name.lower())
+
+        context.update(
+            query=query,
+            category_slug=category_slug,
+            in_stock=in_stock,
+            on_sale=on_sale,
+            sort=sort,
+            total=total,
+            sorts=self.SORTS.items(),
+            filtering=bool(query or category_slug or in_stock or on_sale or sort),
+            # (the categories with live products, for the category buttons)
+            filter_categories=[
+                category for category in self.categories() if category.live_products.exists()
+            ],
+            products=products,
+            # featured: grouped by category
+            product_groups=(
+                [
+                    (category, list(category_products))
+                    for category, category_products in groupby(
+                        products, key=lambda product: product.category
+                    )
+                ]
+                if not sort
+                else None
+            ),
+        )
+        return context
 
     @path("<slug:slug>/", name="category")
     def category_view(self, request, slug):

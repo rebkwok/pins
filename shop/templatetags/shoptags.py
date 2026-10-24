@@ -67,3 +67,19 @@ def gbp(value):
     value = Decimal(value)
     sign = "-" if value < 0 else ""
     return f"{sign}£{abs(value):,.2f}"
+
+
+@register.simple_tag(takes_context=True)
+def shop_filter_url(context, **params):
+    """
+    The current page's address with the shop's search/filter params changed (a
+    blank value removes the param), e.g. {% shop_filter_url category="mugs" %}
+    """
+    query = context["request"].GET.copy()
+    for key, value in params.items():
+        if value in ("", None):
+            query.pop(key, None)
+        else:
+            query[key] = value
+    encoded = query.urlencode()
+    return f"?{encoded}" if encoded else "?"

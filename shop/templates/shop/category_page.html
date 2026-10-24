@@ -15,18 +15,13 @@
                             {{ category.description|richtext }}
                         </div>
                     {% endif %}
-                <div class="container product-listing-card__container pt-2">
-                    <div class="product-listing-card__grid">
+                <div class="shop-grid">
                         {% for product in category.live_products %}
-                            <div>
-                                <h2>{{ product.name }}</h2>
-                                {% include "shop/includes/product-listing-card.html" %}
-                            </div>
+                            {% include "shop/includes/product-listing-card.html" %}
                         {% empty %}
                             <p>There's nothing in this category at the moment.</p>
                         {% endfor %}
                     </div>
-                </div>
             </div>
         </div>
     </div>

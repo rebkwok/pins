@@ -138,60 +138,51 @@ def add_images(product, count):
         )
 
 
-@pytest.mark.parametrize("page", ["shop", "category", "product"])
-def test_product_card_carousels(client, shop_pages, page):
+@pytest.mark.parametrize("page", ["shop", "category"])
+def test_product_cards_first_image(client, shop_pages, page):
+    # listing pages: each product's first image, linking to its page (no
+    # carousels)
     for product in shop_pages:
         add_images(product, 2)
     parser = get_page(client, page, shop_pages)
-    products = shop_pages if page != "product" else shop_pages[:1]
+    assert parser.carousels == []
+    assert parser.indicators == []
+    for product in shop_pages:
+        detail_url = reverse("shop:product_detail", args=(product.id,))
+        # (the image, the name, and "Choose options", for products with a
+        # choice of options)
+        assert parser.image_links.count(detail_url) == 3
+    assert parser.nested_links == 0
 
-    # one carousel per product, with a unique id, using Bootstrap 5 attributes
-    assert [carousel["id"] for carousel in parser.carousels] == [
-        f"shop-carousel-{product.id}" for product in products
-    ]
-    for carousel in parser.carousels:
-        assert carousel["data-bs-ride"] == "carousel"
+
+def test_product_page_carousel(client, shop_pages):
+    product = shop_pages[0]
+    add_images(product, 2)
+    parser = get_page(client, "product", shop_pages)
+    # one carousel, using Bootstrap 5 attributes
+    (carousel,) = parser.carousels
+    assert carousel["id"] == f"shop-carousel-{product.id}"
+    assert carousel["data-bs-ride"] == "carousel"
+    assert "shop-carousel--detail" in carousel["class"]
     assert not parser.attr_names & {"data-ride", "data-target", "data-slide-to"}
-
-    # each product's indicators control its own carousel
-    for product in products:
-        targets = [
-            (indicator["data-bs-target"], indicator["data-bs-slide-to"])
-            for indicator in parser.indicators
-            if indicator["data-bs-target"] == f"#shop-carousel-{product.id}"
-        ]
-        assert targets == [(f"#shop-carousel-{product.id}", "0"), (f"#shop-carousel-{product.id}", "1")]
-    assert len(parser.indicators) == 2 * len(products)
-
-    # indicators aren't inside links (clicking them would follow the link), and
-    # links aren't nested
+    assert [
+        (indicator["data-bs-target"], indicator["data-bs-slide-to"])
+        for indicator in parser.indicators
+    ] == [(f"#shop-carousel-{product.id}", "0"), (f"#shop-carousel-{product.id}", "1")]
+    # images link to the image files; indicators aren't inside links
+    for image in product.images:
+        assert parser.image_links.count(image.image.file.url) == 1
     assert parser.indicators_in_links == 0
     assert parser.nested_links == 0
 
 
-def test_product_card_carousel_links(client, shop_pages):
-    product = shop_pages[0]
-    add_images(product, 2)
-    # listing pages: images link to the product page
-    parser = get_page(client, "category", shop_pages)
-    detail_url = reverse("shop:product_detail", args=(product.id,))
-    assert parser.image_links.count(detail_url) == 2
-    # product page: images link to the image files, in a larger carousel
-    parser = get_page(client, "product", shop_pages)
-    for image in product.images:
-        assert parser.image_links.count(image.image.file.url) == 1
-    assert detail_url not in parser.image_links
-    assert "shop-carousel--detail" in parser.carousels[0]["class"]
-
-
-def test_product_card_single_image(client, shop_pages):
+def test_product_page_single_image(client, shop_pages):
     add_images(shop_pages[0], 1)
-    parser = get_page(client, "category", shop_pages)
+    parser = get_page(client, "product", shop_pages)
     (carousel,) = parser.carousels
     # no indicators or auto-play for a single image
     assert "data-bs-ride" not in carousel
     assert parser.indicators == []
-
 
 
 def test_product_card_alt_text(client, shop_pages):
@@ -201,13 +192,16 @@ def test_product_card_alt_text(client, shop_pages):
     baker.make(
         "shop.ProductImage", product=product, image=wagtail_factories.ImageFactory(title="Side")
     )
-    for url in [reverse("shop:product_detail", args=(product.id,)), "/shop/category/"]:
-        content = client.get(url).content.decode()
-        assert 'alt="Mug front"' in content
-        # an image without alt text uses its title
-        assert 'alt="Side"' in content
-        # the alt text isn't shown as a caption
-        assert ">Mug front<" not in content
+    content = client.get(reverse("shop:product_detail", args=(product.id,))).content.decode()
+    assert 'alt="Mug front"' in content
+    # an image without alt text uses its title
+    assert 'alt="Side"' in content
+    # the alt text isn't shown as a caption
+    assert ">Mug front<" not in content
+    # on listing pages, the image is decorative: the product's name follows it
+    content = client.get("/shop/category/").content.decode()
+    assert 'alt="Mug front"' not in content
+    assert '<a href="/shop/product/' in content
 
 
 # Sale banner

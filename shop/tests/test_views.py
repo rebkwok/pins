@@ -155,7 +155,7 @@ def test_increase_quantity_can_increase(rf, basket, product):
 
     response = increase_quantity(request, product.id)
     assert response.headers["HX-Trigger"] == "quantity-changed"
-    assert "value=2" in response.content.decode()
+    assert 'value="2"' in response.content.decode()
 
 
 def test_increase_quantity_cannot_increase(rf, basket, product):
@@ -174,7 +174,7 @@ def test_increase_quantity_cannot_increase(rf, basket, product):
 
     response = increase_quantity(request, product.id)
     assert "HX-Trigger" not in response.headers
-    assert "value=2" in response.content.decode()
+    assert 'value="2"' in response.content.decode()
 
 
 def test_increase_quantity_from_basket(rf, basket, product):
@@ -193,7 +193,7 @@ def test_increase_quantity_from_basket(rf, basket, product):
 
     response = increase_quantity(request, product.id)
     assert response.headers["HX-Trigger"] == "quantity-changed"
-    assert "value=2" in response.content.decode()
+    assert 'value="2"' in response.content.decode()
 
 
 @pytest.mark.parametrize("current_quantity,expected", [(1, 1), (2, 1), (3, 2)])
@@ -212,7 +212,7 @@ def test_decrease_quantity(rf, basket, product, current_quantity, expected):
 
     response = decrease_quantity(request, product.id)
     assert response.headers["HX-Trigger"] == "quantity-changed"
-    assert f"value={expected}" in response.content.decode()
+    assert f'value="{expected}"' in response.content.decode()
 
 
 def test_basket_view(rf, basket, product):
@@ -333,10 +333,12 @@ def test_add_to_basket(rf, product):
     assert f"<a href='{reverse('shop:basket')}'>Go to basket</a>" in content
     # quantity reset to 1
     assert (
-        f'id="id_quantity_{product.id}" name="quantity" type="number" value=1'
+        f'id="id_quantity_{product.id}" name="quantity" value="1"'
         in content
     )
-    assert f'<option value="{variant.id}">Small - £10.00 (1 in stock)</option>'
+    # (the product's only variant: no drop-down)
+    assert f'name="product_id" id="id_product_{product.id}" value="{variant.id}"' in content
+    assert "Only 1 left" in content
 
 
 def test_add_to_basket_out_of_stock(rf, basket, product):
@@ -364,14 +366,12 @@ def test_add_to_basket_out_of_stock(rf, basket, product):
 
     # variant 1 out of stock; another variant still in stock, so quantity and +/- buttons still shown
     assert (
-        f'id="id_quantity_{product.id}" name="quantity" type="number" value=1'
+        f'id="id_quantity_{product.id}" name="quantity" value="1"'
         in content
     )
-    assert (
-        f'<option disabled=disabled value="{variant1.id}">Small - £10.00 (out of stock)</option>'
-        in content
-    )
-    assert f'<option value="{variant2.id}">Medium - £10.00 (2 in stock)</option>'
+    options = " ".join(content.split())
+    assert f'<option value="{variant1.id}" disabled> Small (out of stock) </option>' in options
+    assert f'<option value="{variant2.id}"> Medium (only 2 left) </option>' in options
 
     # add to basket so variant2 now also out of stock
     request = rf.post(
@@ -390,10 +390,10 @@ def test_add_to_basket_out_of_stock(rf, basket, product):
 
     # so quantity and +/- buttons hidden
     assert (
-        f'id="id_quantity_{product.id}" name="quantity" type="number" value=1'
+        f'id="id_quantity_{product.id}" name="quantity" value="1"'
         not in content
     )
-    assert '<div class="text-danger">Out of stock</div>' in content
+    assert '<p class="shop-card__stock shop-card__stock--out">Out of stock</p>' in content
 
 
 def test_add_to_basket_without_product_type(rf, product):

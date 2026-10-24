@@ -147,17 +147,23 @@ def basket_session(request, basket=None):
 
 
 def test_dropdown(client, cards, single, pack):
-    content = client.get(reverse("shop:product_detail", args=(cards.id,))).content.decode()
-    assert "Single - £2.00 (13 in stock)" in content
-    assert "Pack of 5 - £8.00 (2 in stock)" in content
+    content = " ".join(
+        client.get(reverse("shop:product_detail", args=(cards.id,))).content.decode().split()
+    )
+    # the prices differ, so are shown; stock only if it's low (2 packs of 5 left)
+    assert "From <strong>£2.00</strong>" in content
+    assert "> Single – £2.00 </option>" in content
+    assert "> Pack of 5 – £8.00 (only 2 left) </option>" in content
 
 
 def test_dropdown_pack_out_of_stock(client, cards, single, pack):
     cards.stock = 4
     cards.save()
-    content = client.get(reverse("shop:product_detail", args=(cards.id,))).content.decode()
-    assert "(4 in stock)" in content
-    assert "Pack of 5 - £8.00 (out of stock)" in content
+    content = " ".join(
+        client.get(reverse("shop:product_detail", args=(cards.id,))).content.decode().split()
+    )
+    assert "Single – £2.00 (only 4 left)" in content
+    assert "disabled> Pack of 5 – £8.00 (out of stock) </option>" in content
 
 
 def post_add(rf, cards, variant, quantity, basket=None):
@@ -173,7 +179,7 @@ def test_add_packs(rf, cards, single, pack):
     assert "Added!" in content
     assert stock(cards) == 3
     # the dropdown is updated: no packs left, 3 singles
-    assert "(3 in stock)" in content
+    assert "(only 3 left)" in content
     assert "(out of stock)" in content
 
 
