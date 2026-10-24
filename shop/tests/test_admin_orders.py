@@ -363,6 +363,32 @@ def test_orders_list_selection_paginated(admin_client, shop_variants, settings):
     assert "to download all 51 (on every page)." in " ".join(content.split())
 
 
+def test_orders_export_xlsx_orders_shaded(admin_client, shop_variants):
+    # each order's rows are shaded in turn (grey, none, grey...)
+    mug, card, raffle = shop_variants
+    for _ in range(3):
+        paid_order([mug, card])
+    resp = admin_client.get(INDEX_URL, {"export": "xlsx"})
+    sheet = load_workbook(io.BytesIO(b"".join(resp.streaming_content))).active
+    fills = [
+        row[0].fill.fgColor.rgb if row[0].fill.fill_type else None
+        for row in sheet.iter_rows(min_row=2)
+    ]
+    grey = "00D9D9D9"
+    assert fills == [grey, grey, None, None, grey, grey]
+    # every cell in the row, not just the first
+    assert {cell.fill.fill_type for cell in next(sheet.iter_rows(min_row=2))} == {"solid"}
+    # bold headings (not shaded), and borders on every cell
+    assert sheet["A1"].fill.fill_type is None
+    assert all(cell.font.bold for cell in sheet[1])
+    assert not sheet["A2"].font.bold
+    assert {
+        (cell.border.left.style, cell.border.bottom.style)
+        for row in sheet.iter_rows()
+        for cell in row
+    } == {("thin", "thin")}
+
+
 def test_orders_export_xlsx(admin_client, shop_variants):
     order = paid_order(shop_variants)
     resp = admin_client.get(INDEX_URL, {"export": "xlsx"})
