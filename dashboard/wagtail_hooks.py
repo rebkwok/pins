@@ -3,6 +3,7 @@ from django.utils.safestring import mark_safe
 
 from wagtail import hooks
 from wagtail.admin.menu import MenuItem
+from wagtail.permission_policies.pages import PagePermissionPolicy
 
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet
@@ -36,6 +37,16 @@ class CollectionMenuItem(MenuItem):
 @hooks.register('register_admin_menu_item')
 def register_collections_menu_item():
   return CollectionMenuItem('Collections', reverse('wagtailadmin_collections:index'), icon_name='folder-inverse', order=200)
+
+
+@hooks.register('construct_main_menu')
+def hide_help_menu(request, menu_items):
+    # Wagtail's help (what's new, the editor guide) is about editing pages, so
+    # it's only for users who can edit pages, not e.g. shop admins
+    if not PagePermissionPolicy().user_has_any_permission(
+        request.user, ["add", "change", "publish"]
+    ):
+        menu_items[:] = [item for item in menu_items if item.name != "help"]
 
 
 register_snippet(FooterTextViewSet)

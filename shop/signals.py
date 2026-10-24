@@ -17,8 +17,10 @@ from salesman_stripe_connect import signals as stripe_signals
 
 from .models import (
     OrderItem,
+    ProductImage,
     ProductVariant,
     ShopSettings,
+    file_in_shop_collection,
     items_shipped,
     order_items_for_variants,
 )
@@ -237,6 +239,16 @@ def send_notification(sender, order, new_status, old_status, **kwargs):
             )
 
         send_email(subject, message, [order.email], reply_to)
+
+
+@receiver(post_save, sender=ProductImage)
+@receiver(post_save, sender=ProductVariant)
+def file_shop_images(sender, instance, **kwargs):
+    """
+    Product and variant images go in the Shop collection, so shop admins (who
+    can only see that collection) can see and choose them
+    """
+    file_in_shop_collection(instance.image)
 
 
 @receiver(post_save, sender=Order)

@@ -21,6 +21,7 @@ from shop.models import (
     Sale,
     SaleProduct,
     ShopPage,
+    get_shop_collection,
 )
 
 IMAGE_COLLECTION = "Shop seed images"
@@ -262,7 +263,7 @@ class Command(BaseCommand):
     def get_collection(self):
         collection = Collection.objects.filter(name=IMAGE_COLLECTION).first()
         if collection is None:
-            collection = Collection.get_first_root_node().add_child(name=IMAGE_COLLECTION)
+            collection = get_shop_collection().add_child(name=IMAGE_COLLECTION)
         return collection
 
     def create_sale(self):

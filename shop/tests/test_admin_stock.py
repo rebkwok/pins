@@ -503,3 +503,35 @@ def test_variant_edit_only_variant_blank(admin_client, product):
     assert resp.status_code == 302
     variant.refresh_from_db()
     assert variant.variant_name == ""
+
+
+# The Shop image collection
+
+
+def test_shop_images_filed_in_shop_collection(product):
+    from wagtail.images.models import Image
+    from wagtail.models import Collection
+
+    from ..models import ProductImage, get_shop_collection
+
+    root = Collection.get_first_root_node()
+    events = root.add_child(name="Events")
+    unfiled, filed, variant_image = (
+        baker.make(Image, collection=root),
+        baker.make(Image, collection=events),
+        baker.make(Image, collection=root),
+    )
+    ProductImage.objects.create(product=product, image=unfiled)
+    ProductImage.objects.create(product=product, image=filed)
+    baker.make("shop.ProductVariant", product=product, variant_name="A", image=variant_image)
+    baker.make("shop.ProductVariant", product=product, variant_name="B", image=None)
+    shop = get_shop_collection()
+    assert shop.get_parent() == root
+    for image in (unfiled, filed, variant_image):
+        image.refresh_from_db()
+    # images in the root collection are filed in Shop; others are left alone
+    assert unfiled.collection == shop
+    assert variant_image.collection == shop
+    assert filed.collection == events
+    # (the collection isn't created twice)
+    assert get_shop_collection() == shop

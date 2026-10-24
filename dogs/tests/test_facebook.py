@@ -718,3 +718,18 @@ class TestFacebookTokenManager:
             assert status == "rate_limited"
             albums_obj.refresh_from_db()
             assert albums_obj.is_rate_limited
+
+
+# The admin menu item
+
+
+@pytest.mark.parametrize("pending,classname", [(True, "facebook-changes-pending"), (False, "")])
+def test_facebook_changes_menu_item(rf, pending, classname):
+    from dogs.wagtail_hooks import register_facebook_changes_menu_item
+
+    item = register_facebook_changes_menu_item()
+    changes = {"added": {"1": "Album"} if pending else {}}
+    # the dot is worked out for each request (the menu item is only created once)
+    with patch.object(FacebookAlbums, "pending_changes", return_value=changes):
+        component = item.render_component(rf.get("/admin/"))
+    assert component.classname == classname

@@ -258,6 +258,7 @@ class Auction(Page):
 
     class Meta:
         ordering = ("-close_at",)
+        permissions = [("manage_auctions", "Can manage auctions")]
 
     def is_open(self):
         return self.open_at <= timezone.now()

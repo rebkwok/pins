@@ -49,8 +49,11 @@ class DispatchersView(WagtailAdminTemplateMixin, TemplateView):
     page_title = "Dispatchers"
     header_icon = "group"
 
+    # (changing a user's groups needs permission to change users)
+    permission = "auth.change_user"
+
     def dispatch(self, request, *args, **kwargs):
-        if not request.user.has_perm("auth.change_user"):
+        if not request.user.has_perm(self.permission):
             raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)
 

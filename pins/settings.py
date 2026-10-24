@@ -144,6 +144,7 @@ MIDDLEWARE = [
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
     "allauth.account.middleware.AccountMiddleware",
     "shop.middleware.clear_expired_baskets_middleware",
+    "dashboard.middleware.admin_start_page_middleware",
 ]
 
 # Auth stuff

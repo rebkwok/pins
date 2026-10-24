@@ -40,7 +40,7 @@ from wagtail.contrib.settings.models import (
 )
 from wagtail.fields import RichTextField
 from wagtail.images.models import Image
-from wagtail.models import Page, Orderable
+from wagtail.models import Collection, Page, Orderable
 
 
 # DISPATCHERS
@@ -1348,6 +1348,28 @@ class Product(ClusterableModel):
 
     def get_absolute_url(self):
         return reverse("shop:product_detail", kwargs={"pk": self.pk})
+
+
+# The image collection that the shop's images are filed in (created by migration
+# 0017); shop admins can only see the images in it
+SHOP_COLLECTION = "Shop"
+
+
+def get_shop_collection():
+    """The Shop collection (under the root collection), created if necessary"""
+    root = Collection.get_first_root_node()
+    collection = root.get_children().filter(name=SHOP_COLLECTION).first()
+    return collection or root.add_child(name=SHOP_COLLECTION)
+
+
+def file_in_shop_collection(image):
+    """
+    File an image used by the shop in the Shop collection, if it's in the root
+    collection (images filed in other collections are left where they are)
+    """
+    if image is not None and image.collection.is_root():
+        image.collection = get_shop_collection()
+        image.save(update_fields=["collection"])
 
 
 class CarouselImage(NamedTuple):

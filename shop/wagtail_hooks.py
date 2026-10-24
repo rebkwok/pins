@@ -11,6 +11,8 @@ from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.chooser import SnippetChooserViewSet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
+from common.admin_menu import PermissionMenuItem
+
 from .admin_orders import OrderViewSet
 from .admin_views import SHOP_STOCK_MENU_LABEL, DispatchersView
 from .models import (
@@ -133,6 +135,11 @@ class DiscountCodeViewSet(ShopStockViewSet):
     search_fields = ("code", "description")
 
 
+class DispatchersMenuItem(PermissionMenuItem):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, permission=DispatchersView.permission, **kwargs)
+
+
 class DispatchersViewSet(ViewSet):
     """Shop Stock > Dispatchers: the users in the Dispatchers group"""
 
@@ -140,8 +147,44 @@ class DispatchersViewSet(ViewSet):
     menu_label = "Dispatchers"
     icon = "group"
 
+    @property
+    def menu_item_class(self):
+        # Only for users who can change users' groups (site admins), like the
+        # page itself
+        return DispatchersMenuItem
+
     def get_urlpatterns(self):
         return [path("", DispatchersView.as_view(), name="index")]
+
+
+class ShopSettingsMenuItem(PermissionMenuItem):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, permission="shop.change_shopsettings", **kwargs)
+
+
+class ShopSettingsViewSet(ViewSet):
+    """
+    Shop Stock > Shop settings: a link to the shop settings (a Wagtail setting,
+    removed from the Settings menu so they're with the rest of the shop)
+    """
+
+    name = "shop_settings"
+    menu_label = "Shop settings"
+    icon = "cogs"
+    menu_item_class = ShopSettingsMenuItem
+
+    @property
+    def menu_url(self):
+        return reverse("wagtailsettings:edit", args=("shop", "shopsettings"))
+
+    def get_urlpatterns(self):
+        return []
+
+
+@hooks.register("construct_settings_menu")
+def hide_shop_settings(request, menu_items):
+    # (in the Shop Stock menu instead)
+    menu_items[:] = [item for item in menu_items if item.name != "shop-settings"]
 
 
 class ProductGroup(SnippetViewSetGroup):
@@ -153,6 +196,7 @@ class ProductGroup(SnippetViewSetGroup):
         ProductVariantViewSet,
         SaleViewSet,
         DiscountCodeViewSet,
+        ShopSettingsViewSet,
         DispatchersViewSet,
     )
     menu_order = 200

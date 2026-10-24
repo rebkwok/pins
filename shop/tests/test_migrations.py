@@ -161,3 +161,55 @@ def test_categories_migration_category_page_with_children(migrations):
         migrations(LATEST)
     apps = migrations([("shop", "0013_item_not_sent_status")])
     apps.get_model("wagtailcore", "Page").objects.filter(depth__gt=1).delete()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_shop_groups_migration(migrations):
+    apps = migrations([("shop", "0016_delete_categorypage")])
+    Collection = apps.get_model("wagtailcore", "Collection")
+    Image = apps.get_model("wagtailimages", "Image")
+    # (the root collection may have been flushed by other tests)
+    root = Collection.objects.filter(depth=1).first() or Collection.objects.create(
+        name="Root", path="0001", depth=1, numchild=0
+    )
+    events = Collection.objects.create(
+        name="Events", path=root.path + "0001", depth=2, numchild=0
+    )
+    Collection.objects.filter(pk=root.pk).update(numchild=1)
+
+    def image(title, collection):
+        return Image.objects.create(
+            title=title, file=f"{title}.jpg", width=10, height=10, collection=collection
+        )
+
+    product_image, variant_image = image("mug", root), image("mug-blue", root)
+    filed, unused = image("event", events), image("dog", root)
+    category = apps.get_model("shop", "Category").objects.create(title="Mugs", slug="mugs")
+    product = apps.get_model("shop", "Product").objects.create(
+        category=category, name="Mug", price=10
+    )
+    ProductImage = apps.get_model("shop", "ProductImage")
+    ProductImage.objects.create(product=product, image=product_image, sort_order=0)
+    ProductImage.objects.create(product=product, image=filed, sort_order=1)
+    apps.get_model("shop", "ProductVariant").objects.create(
+        product=product, variant_name="Blue", image=variant_image, sort_order=0
+    )
+
+    apps = migrations(LATEST + [("shop", "0017_shop_groups")])
+    Collection = apps.get_model("wagtailcore", "Collection")
+    Image = apps.get_model("wagtailimages", "Image")
+    shop = Collection.objects.get(name="Shop")
+    assert (shop.depth, shop.path) == (2, root.path + "0002")
+    assert Collection.objects.get(pk=root.pk).numchild == 2
+    # the shop's images in the root collection are moved; others aren't
+    assert Image.objects.get(pk=product_image.pk).collection_id == shop.pk
+    assert Image.objects.get(pk=variant_image.pk).collection_id == shop.pk
+    assert Image.objects.get(pk=filed.pk).collection_id == events.pk
+    assert Image.objects.get(pk=unused.pk).collection_id == root.pk
+    # shop admins' image permissions are in the Shop collection
+    group = apps.get_model("auth", "Group").objects.get(name="Shop admins")
+    assert set(
+        apps.get_model("wagtailcore", "GroupCollectionPermission")
+        .objects.filter(group=group)
+        .values_list("collection_id", flat=True)
+    ) == {shop.pk}

@@ -244,6 +244,10 @@ class RateLimitedPanel(Panel):
         
 
 class FacebookAlbums(models.Model):
+    class Meta:
+        verbose_name_plural = "Facebook albums"
+        permissions = [("review_facebook_changes", "Can review Facebook changes")]
+
 
     # dict representing current state of albums for page
     # {
