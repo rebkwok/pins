@@ -269,7 +269,10 @@ def test_dispute_emails(shop_settings, order, signal, subject, django_capture_on
     (email,) = mail.outbox
     assert email.to == ["admin@test.com", "another_admin@test.com"]
     assert email.subject == subject.format(ref=order.ref)
-    assert email.body == "Dispute message"
+    assert email.body == (
+        "Dispute message\n\n"
+        f"View the order: https://podencosinneed.org/admin/shop/orders/{order.pk}/"
+    )
 
 
 def test_dispute_emails_no_notify_addresses(order, django_capture_on_commit_callbacks):

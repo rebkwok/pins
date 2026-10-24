@@ -1,0 +1,25 @@
+{% extends "wagtailadmin/generic/base.html" %}
+{% load wagtailadmin_tags %}
+
+{% block main_content %}
+    <div class="w-mt-8">
+    <h2 class="w-h2">{{ action_label }}</h2>
+    {% if not allowed %}
+        <p>{{ not_allowed_message }}</p>
+        <a href="{{ order_url }}" class="button button-secondary">Go back</a>
+    {% else %}
+        {% if view.new_status == "COMPLETED" %}
+            <p>Mark order <strong>{{ order.ref }}</strong> as completed?</p>
+            <p><strong>The customer will be emailed</strong> to say their order is complete.</p>
+        {% else %}
+            <p>Cancel order <strong>{{ order.ref }}</strong>?</p>
+            <p>The customer won't be emailed. Cancelling doesn't change stock: if these items are going back into stock, update their stock in Shop Stock.</p>
+        {% endif %}
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" class="button">Yes, {{ action_label|lower }}</button>
+            <a href="{{ order_url }}" class="button button-secondary">No, go back</a>
+        </form>
+    {% endif %}
+    </div>
+{% endblock %}

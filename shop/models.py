@@ -132,46 +132,64 @@ class Order(OrderAmountsMixin, BaseOrder):
     def is_collected(self):
         return self.shipping_method == SHIPPING_COLLECT
 
+    def _set_items_status(self, items, status, user):
+        """
+        Set the shipping status of the order's items (those still to send), and
+        update the order's status. Returns the items changed.
+        """
+        # Lock the order, so concurrent updates (e.g. two dispatchers) see each
+        # other's items
+        Order.objects.select_for_update().filter(pk=self.pk).first()
+        to_change = list(
+            self.items.filter(
+                pk__in=[item.pk for item in items],
+                shipping_status=OrderItem.TO_SEND,
+            )
+        )
+        now = timezone.now()
+        for item in to_change:
+            item.shipping_status = status
+            item.shipped_at = now
+            item.shipped_by = user
+            item.save(update_fields=["shipping_status", "shipped_at", "shipped_by"])
+        if to_change:
+            self.update_shipping_status()
+        return to_change
+
+    @transaction.atomic
     def mark_items_shipped(self, items, user):
         """
         Mark the order's items (those still to send) as shipped (or collected) by
         user, update the order's status, and email the customer.
         Returns the items marked shipped.
         """
-        with transaction.atomic():
-            # Lock the order, so concurrent updates (e.g. two dispatchers) see
-            # each other's items
-            Order.objects.select_for_update().filter(pk=self.pk).first()
-            to_ship = list(
-                self.items.filter(
-                    pk__in=[item.pk for item in items],
-                    shipping_status=OrderItem.TO_SEND,
-                )
-            )
-            if not to_ship:
-                return []
-            now = timezone.now()
-            for item in to_ship:
-                item.shipping_status = OrderItem.SHIPPED
-                item.shipped_at = now
-                item.shipped_by = user
-                item.save(update_fields=["shipping_status", "shipped_at", "shipped_by"])
-            self.update_shipping_status()
-            items_shipped.send(sender=Order, order=self, items=to_ship)
-        return to_ship
+        shipped = self._set_items_status(items, OrderItem.SHIPPED, user)
+        if shipped:
+            items_shipped.send(sender=Order, order=self, items=shipped)
+        return shipped
+
+    @transaction.atomic
+    def mark_items_not_sent(self, items, user):
+        """
+        Mark the order's items (those still to send) as won't be sent (e.g. out of
+        stock), and update the order's status. The customer isn't emailed (they
+        need to be told, and refunded, separately).
+        Returns the items changed.
+        """
+        return self._set_items_status(items, OrderItem.NOT_SENT, user)
 
     def update_shipping_status(self):
         """
         Partially shipped once some (but not all) of the items that need shipping
-        have been shipped; Shipped once they all have. Only orders being processed
-        (or partly shipped) are changed.
+        have been shipped; Shipped once they all have (ignoring items that won't
+        be sent). Only orders being processed (or partly shipped) are changed.
         """
         if self.status not in (self.Status.PROCESSING, self.Status.PARTIALLY_SHIPPED):
             return
         statuses = set(
-            self.items.exclude(shipping_status=OrderItem.NO_SHIPPING).values_list(
-                "shipping_status", flat=True
-            )
+            self.items.exclude(
+                shipping_status__in=[OrderItem.NO_SHIPPING, OrderItem.NOT_SENT]
+            ).values_list("shipping_status", flat=True)
         )
         if OrderItem.SHIPPED not in statuses:
             return
@@ -184,6 +202,62 @@ class Order(OrderAmountsMixin, BaseOrder):
             self.status = new_status
             self.save(update_fields=["status", "date_updated"])
 
+    @property
+    def items_to_send(self):
+        return self.items.filter(shipping_status=OrderItem.TO_SEND)
+
+    @property
+    def can_ship_items(self):
+        """Whether items can be marked shipped (the order has been paid)"""
+        return self.status in (
+            self.Status.PROCESSING,
+            self.Status.PARTIALLY_SHIPPED,
+            self.Status.SHIPPED,
+            self.Status.COMPLETED,
+        )
+
+    def can_change_status(self, status):
+        return status in self.Status.get_transitions().get(self.status, [])
+
+    @property
+    def can_complete(self):
+        """
+        Whether the order can be marked completed: once everything that needs
+        shipping (or collecting) has been
+        """
+        return (
+            self.can_change_status(self.Status.COMPLETED)
+            and not self.items_to_send.exists()
+        )
+
+    @property
+    def display_status(self):
+        """The order's status in plain words, for shop admins"""
+        Status = self.Status
+        shipped = "Collected" if self.is_collected else "Shipped"
+        if self.status in (Status.NEW, Status.CREATED, Status.HOLD):
+            label = "Awaiting payment"
+        elif self.status == Status.FAILED:
+            label = "Payment failed"
+        elif self.status == Status.PROCESSING:
+            if not self.is_paid:
+                label = "Processing"
+            elif not self.items_to_send.exists():
+                # e.g. none of its items will be sent
+                label = "Paid – nothing to send"
+            else:
+                label = f"Paid – ready to {'collect' if self.is_collected else 'ship'}"
+        elif self.status == Status.PARTIALLY_SHIPPED:
+            label = f"Partly {shipped.lower()}"
+        elif self.status == Status.SHIPPED:
+            label = shipped
+        else:
+            # Completed, cancelled, refunded
+            label = self.status_display
+        if self.refund_status == "Partially refunded":
+            label += " (partly refunded)"
+        return label
+
 
 class OrderItem(BaseOrderItem):
     """
@@ -195,11 +269,14 @@ class OrderItem(BaseOrderItem):
     TO_SEND = "to_send"
     SHIPPED = "shipped"
     NO_SHIPPING = "no_shipping"
+    # e.g. out of stock (refunded separately)
+    NOT_SENT = "not_sent"
     SHIPPING_STATUSES = {
-        TO_SEND: "To send",
+        TO_SEND: "Ready to send",
         # Collected items (for "collect in person" orders) are marked shipped too
         SHIPPED: "Shipped/collected",
         NO_SHIPPING: "No shipping needed",
+        NOT_SENT: "Won't be sent",
     }
 
     dispatcher = models.ForeignKey(
@@ -214,6 +291,7 @@ class OrderItem(BaseOrderItem):
     shipping_status = models.CharField(
         max_length=20, choices=tuple(SHIPPING_STATUSES.items()), default=TO_SEND
     )
+    # When, and by whom, the item was marked shipped/collected (or won't be sent)
     shipped_at = models.DateTimeField(null=True, blank=True)
     shipped_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

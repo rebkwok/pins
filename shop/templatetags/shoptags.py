@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal
 
 from django import template
 from wagtail.models import Page
@@ -48,3 +49,13 @@ def shop_breadcrumbs(context):
     }
 
     return context_data
+
+
+@register.filter
+def gbp(value):
+    """An amount in pounds, e.g. £5.00, or -£5.00 for negative amounts"""
+    if value in (None, ""):
+        return ""
+    value = Decimal(value)
+    sign = "-" if value < 0 else ""
+    return f"{sign}£{abs(value):,.2f}"

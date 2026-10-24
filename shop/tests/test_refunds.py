@@ -17,7 +17,6 @@ from django.urls import reverse
 from salesman.core.utils import get_salesman_model
 
 from ..payment import PayByStripe
-from ..wagtail_hooks import OrderAdmin
 from .factories import STRIPE_ACCOUNT
 
 pytestmark = pytest.mark.django_db
@@ -59,7 +58,7 @@ def refunds_list(*refunds):
 
 
 def refund_url(order):
-    return OrderAdmin().url_helper.get_action_url("refund", order.pk)
+    return reverse("shop_orders:refund", args=(order.pk,))
 
 
 def messages_for(resp):
@@ -75,10 +74,14 @@ def test_refund_page(admin_client, paid_order):
     assert resp.status_code == 200
     content = resp.content.decode()
     assert "<strong>£20.00</strong> will be refunded" in content
-    assert "To refund only part of an order, use the Stripe dashboard." in content
+    assert (
+        "To refund only part of an order, ask a Stripe admin to refund it in the "
+        "Stripe dashboard."
+    ) in " ".join(content.split())
     assert "Refunding doesn't change stock." in content
     assert "2 x Test Product - Small" in content
-    assert 'value="Yes, refund this order"' in content
+    assert "Yes, refund this order" in content
+    assert "the customer will be emailed" in content
 
 
 def test_refund_order(admin_client, paid_order, requests_mock, django_capture_on_commit_callbacks):
@@ -119,7 +122,7 @@ def test_refund_order_after_partial_refund(admin_client, paid_order, requests_mo
     PayByStripe.record_refund(paid_order, "re_partial", Decimal("5.00"))
     content = admin_client.get(refund_url(paid_order)).content.decode()
     assert "<strong>£15.00</strong> will be refunded" in content
-    assert "less\n        £5.00 already refunded" in content
+    assert "less £5.00 already refunded" in " ".join(content.split())
 
     requests_mock.post(REFUNDS_URL, json=refund_json(amount=1500))
     admin_client.post(refund_url(paid_order))

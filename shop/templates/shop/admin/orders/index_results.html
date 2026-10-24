@@ -1,0 +1,13 @@
+{% extends "wagtailadmin/generic/index_results.html" %}
+
+{% block results %}
+    {# The download button is in the header (download_button.html, order_export.js) #}
+    <p class="help nice-padding shop-orders-download-help" data-order-download data-total="{{ items_count }}">
+        Tick the orders to download, or tick the box at the top of the list to
+        download all {{ items_count }}{% if page_obj.paginator.num_pages > 1 %} (on every page){% endif %}.
+    </p>
+    <style>
+        .shop-orders-download-help { margin: 1rem 0 0.5rem; }
+    </style>
+    {{ block.super }}
+{% endblock %}

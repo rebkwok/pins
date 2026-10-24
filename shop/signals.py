@@ -62,6 +62,11 @@ def send_email(subject, message, to, reply_to):
     transaction.on_commit(lambda: _send_email_now(subject, message, to, reply_to))
 
 
+def order_admin_url(order):
+    """The order's page in the orders admin, for emails to the shop"""
+    return f"https://{settings.DOMAIN}{reverse('shop_orders:edit', args=(order.pk,))}"
+
+
 def order_status_url(order):
     return f'https://{settings.DOMAIN}{reverse("shop:order_status", args=(order.token,))}'
 
@@ -94,6 +99,7 @@ def send_dispute_notification(sender, order, message, signal, **kwargs):
         subject = f"Payment for shop order '{order.ref}' has been disputed"
     else:
         subject = f"Dispute for shop order '{order.ref}' closed"
+    message += f"\n\nView the order: {order_admin_url(order)}"
     send_email(subject, message, notify_emails, reply_to)
 
 
@@ -159,8 +165,7 @@ def shop_order_message(order):
         lines.append(f"Total: £{order.total:.2f} (including discount)")
     else:
         lines.append(f"Total: £{order.total:.2f}")
-    admin_url = reverse("shop_order_modeladmin_edit", args=(order.pk,))
-    lines += ["", f"View the order: https://{settings.DOMAIN}{admin_url}"]
+    lines += ["", f"View the order: {order_admin_url(order)}"]
     return "\n".join(lines)
 
 

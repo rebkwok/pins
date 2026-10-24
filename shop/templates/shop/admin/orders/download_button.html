@@ -1,0 +1,19 @@
+{% load wagtailadmin_tags %}
+{# Download the ticked orders (see order_export.js) #}
+<div class="shop-orders-download">
+    {% fragment as button %}
+        <button type="button" class="button bicolor button--icon button-small" data-order-export="xlsx" disabled>{% icon name="download" wrapped=1 %}<span data-order-export-label="Excel">Download (Excel)</span></button>
+    {% endfragment %}
+    {% dropdown_button button=button toggle_icon="arrow-down" %}
+        <button type="button" class="button bicolor button--icon button-small" data-order-export="csv" disabled>{% icon name="download" wrapped=1 %}<span data-order-export-label="CSV">Download (CSV)</span></button>
+    {% enddropdown_button %}
+</div>
+<style>
+    /* Phones: just the icon in the header (the label is still read out) */
+    @media (max-width: 49.99em) {
+        .shop-orders-download [data-order-export="xlsx"] [data-order-export-label] {
+            position: absolute; width: 1px; height: 1px; overflow: hidden;
+            clip: rect(0 0 0 0); white-space: nowrap;
+        }
+    }
+</style>

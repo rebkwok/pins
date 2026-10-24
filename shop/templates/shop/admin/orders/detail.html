@@ -1,0 +1,207 @@
+{% extends "wagtailadmin/generic/base.html" %}
+{% load wagtailadmin_tags shoptags %}
+
+{% block main_content %}
+    <div class="shop-order">
+        <p class="shop-order__summary">
+            <strong class="shop-order__status">{{ order.display_status }}</strong>
+            <span>Placed {{ order.date_created|date:"j M Y, H:i" }}</span>
+            <span>Total {{ order.total|gbp }}</span>
+        </p>
+
+        {% if can_complete or complete_after_shipping or can_cancel or can_refund %}
+            <div class="shop-order__actions">
+                {% if can_complete %}
+                    <a href="{% url 'shop_orders:complete' order.pk %}" class="button button-secondary">Mark as completed</a>
+                {% elif complete_after_shipping %}
+                    <button type="button" class="button button-secondary" disabled aria-describedby="complete-help">Mark as completed</button>
+                {% endif %}
+                {% if can_cancel %}
+                    <a href="{% url 'shop_orders:cancel' order.pk %}" class="button button-secondary">Cancel order</a>
+                {% endif %}
+                {% if can_refund %}
+                    <a href="{% url 'shop_orders:refund' order.pk %}" class="button button-secondary">Refund</a>
+                {% endif %}
+            </div>
+            {% if complete_after_shipping %}
+                <p class="help" id="complete-help">The order can be marked completed once all its items have been marked {% if order.is_collected %}collected{% else %}shipped{% endif %}.</p>
+            {% endif %}
+        {% endif %}
+
+        <section class="shop-order__section">
+            <h2 class="w-h3">Customer</h2>
+            <dl class="shop-order__details">
+                <dt>Name</dt>
+                <dd>{{ order.name|default:"-" }}</dd>
+                <dt>Email</dt>
+                <dd><a href="mailto:{{ order.email }}">{{ order.email }}</a></dd>
+                <dt>Shipping</dt>
+                <dd>{{ order.get_shipping_method_display }}</dd>
+                {% if order.needs_delivery %}
+                    <dt>Address</dt>
+                    <dd>{{ order.shipping_address|linebreaksbr|default:"-" }}</dd>
+                {% endif %}
+            </dl>
+        </section>
+
+        <section class="shop-order__section">
+            <h2 class="w-h3">Items</h2>
+            <form method="post" action="{% url 'shop_orders:ship' order.pk %}">
+                {% csrf_token %}
+                <table class="listing shop-order__table">
+                    <thead>
+                        <tr>
+                            {% if can_ship %}<th><span class="w-sr-only">Select</span></th>{% endif %}
+                            <th>Item</th>
+                            <th>Quantity</th>
+                            <th>Price</th>
+                            <th>Dispatcher</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                            <tr>
+                                {% if can_ship %}
+                                    <td>
+                                        {% if item.shipping_status == "to_send" %}
+                                            <input type="checkbox" name="items" value="{{ item.pk }}" id="item-{{ item.pk }}" aria-label="Select {{ item.name }}">
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                                <td data-label="Item">
+                                    {% if can_ship and item.shipping_status == "to_send" %}
+                                        <label for="item-{{ item.pk }}">{{ item.name }}</label>
+                                    {% else %}
+                                        {{ item.name }}
+                                    {% endif %}
+                                    {% for row in item.extra_rows %}
+                                        <br><small>{{ row.label }}: {{ row.amount|gbp }}</small>
+                                    {% endfor %}
+                                </td>
+                                <td data-label="Quantity">{{ item.quantity }}</td>
+                                <td data-label="Price">{{ item.total|gbp }}</td>
+                                <td data-label="Dispatcher">{{ item.dispatcher_name|default:"-" }}</td>
+                                <td data-label="Status">
+                                    {% if item.shipping_status == "shipped" %}
+                                        {% if order.is_collected %}Collected{% else %}Shipped{% endif %}
+                                        {{ item.shipped_at|date:"j M Y" }}{% if item.shipped_by %}<br><small>by {{ item.shipped_by.get_full_name|default:item.shipped_by.get_username }}</small>{% endif %}
+                                    {% elif item.shipping_status == "not_sent" %}
+                                        Won't be sent
+                                        {% if item.shipped_by %}<br><small>{{ item.shipped_at|date:"j M Y" }}, by {{ item.shipped_by.get_full_name|default:item.shipped_by.get_username }}</small>{% endif %}
+                                    {% elif item.shipping_status == "to_send" %}
+                                        <strong>{% if order.is_collected %}Ready to collect{% else %}Ready to send{% endif %}</strong>
+                                    {% else %}
+                                        No shipping needed
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                {% if can_ship %}
+                    <div class="shop-order__ship">
+                        <button type="submit" name="action" value="ship" class="button">Mark selected items as {% if order.is_collected %}collected{% else %}shipped{% endif %}</button>
+                        <button type="submit" name="action" value="not_sent" class="button button-secondary">Mark selected items as won't be sent</button>
+                        <p class="help">
+                            When items are marked {% if order.is_collected %}collected{% else %}shipped{% endif %}, the customer is emailed an update.
+                            Mark items as won't be sent if they can't or won't be sent (e.g. out of stock or no longer wanted): the customer isn't emailed, so contact them, and refund the items if necessary. An entire order can be refunded from this page; to refund part of an order, ask a Stripe admin.
+                        </p>
+                    </div>
+                {% elif order.items_to_send.exists %}
+                    <p class="help">Items can be marked shipped once the order has been paid.</p>
+                {% endif %}
+            </form>
+        </section>
+
+        <section class="shop-order__section">
+            <h2 class="w-h3">Totals</h2>
+            <dl class="shop-order__details shop-order__totals">
+                <dt>Items</dt>
+                <dd>{{ order.subtotal|gbp }}</dd>
+                {% for row in order.extra_rows %}
+                    <dt>{{ row.label }}{% if row.extra.code %} {{ row.extra.code }}{% endif %}</dt>
+                    <dd>{{ row.amount|gbp }}</dd>
+                {% endfor %}
+                <dt><strong>Total</strong></dt>
+                <dd><strong>{{ order.total|gbp }}</strong></dd>
+                <dt>Paid</dt>
+                <dd>{{ order.amount_received|gbp }}</dd>
+                {% if order.amount_refunded %}
+                    <dt>Refunded</dt>
+                    <dd>{{ order.amount_refunded|gbp }} ({{ order.refund_status|lower }})</dd>
+                {% endif %}
+                {% if order.amount_outstanding %}
+                    <dt>Still to pay</dt>
+                    <dd>{{ order.amount_outstanding|gbp }}</dd>
+                {% endif %}
+            </dl>
+        </section>
+
+        <section class="shop-order__section">
+            <h2 class="w-h3">Payments</h2>
+            {% if payments %}
+                <table class="listing shop-order__table">
+                    <thead>
+                        <tr><th>Date</th><th>Amount</th><th>Method</th><th>Reference</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for payment in payments %}
+                            <tr>
+                                <td data-label="Date">{{ payment.date_created|date:"j M Y, H:i" }}</td>
+                                <td data-label="Amount">{% if payment.amount < 0 %}Refund {% endif %}{{ payment.amount|gbp }}</td>
+                                <td data-label="Method">{{ payment.get_payment_method.label|default:payment.payment_method|default:"-" }}</td>
+                                <td data-label="Reference"><small>{{ payment.transaction_id }}</small></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>No payments yet.</p>
+            {% endif %}
+        </section>
+
+        <section class="shop-order__section">
+            <h2 class="w-h3">Notes</h2>
+            {% for note in notes %}
+                <div class="shop-order__note">
+                    <p><small>{{ note.date_created|date:"j M Y, H:i" }}</small></p>
+                    <p>{{ note.message|linebreaksbr }}</p>
+                </div>
+            {% empty %}
+                <p>No notes.</p>
+            {% endfor %}
+            <form method="post" class="shop-order__note-form">
+                {% csrf_token %}
+                {% formattedfield note_form.message %}
+                <button type="submit" class="button button-secondary">Add note</button>
+            </form>
+        </section>
+    </div>
+{% endblock %}
+
+{% block extra_css %}
+    {{ block.super }}
+    <style>
+        .shop-order__summary { margin-top: 2rem; display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; font-size: 1.1em; }
+        .shop-order__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0; }
+        .shop-order__section { margin-top: 2.5rem; max-width: 60rem; }
+        .shop-order__details { display: grid; grid-template-columns: max-content 1fr; gap: 0.4rem 1.5rem; }
+        .shop-order__details dt { font-weight: 600; }
+        .shop-order__details dd { margin: 0; }
+        .shop-order__totals dd { text-align: right; max-width: 10rem; }
+        .shop-order__ship { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 1rem; }
+        .shop-order__ship .help { flex-basis: 100%; }
+        .shop-order__note { border-inline-start: 3px solid var(--w-color-border-furniture); padding-inline-start: 1rem; margin-bottom: 1rem; }
+        .shop-order__note p { margin: 0.2rem 0; }
+        .shop-order__note-form { margin-top: 1.5rem; max-width: 40rem; }
+        /* Phones: each table row as a card */
+        @media (max-width: 50em) {
+            .shop-order__table thead { display: none; }
+            .shop-order__table tr { display: block; padding: 0.75rem 0; border-bottom: 1px solid var(--w-color-border-furniture); }
+            .shop-order__table td { display: flex; gap: 1rem; padding: 0.15rem 0; border: 0; }
+            .shop-order__table td[data-label]::before { content: attr(data-label); font-weight: 600; min-width: 6.5rem; }
+        }
+    </style>
+{% endblock %}

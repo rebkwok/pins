@@ -580,7 +580,7 @@ def test_shop_new_order_email(
         "\n"
         f"Total: £{order.total:.2f}\n"
         "\n"
-        f"View the order: https://podencosinneed.org/admin/shop/order/edit/{order.pk}/"
+        f"View the order: https://podencosinneed.org/admin/shop/orders/{order.pk}/"
     )
 
 

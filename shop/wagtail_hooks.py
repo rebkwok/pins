@@ -1,21 +1,16 @@
-from django.contrib import admin, messages
+from django.contrib import messages
 from django.shortcuts import redirect
 from django.urls import path
-from django.utils.translation import gettext_lazy as _
-from salesman.admin.utils import format_price
-from salesman.admin.wagtail.panels import OrderAdminPanel, ReadOnlyPanel
-from salesman.admin.wagtail_hooks import OrderAdmin as SalesmanOrderAdmin
-from salesman.core.utils import get_salesman_model
 from wagtail import hooks
 from wagtail.admin.admin_url_finder import AdminURLFinder
 from wagtail.admin.viewsets.base import ViewSet
-from wagtail.admin.panels import FieldPanel, MultiFieldPanel, ObjectList, TabbedInterface
+from wagtail.admin.panels import FieldPanel
 from wagtail.admin.ui.tables import BooleanColumn
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
-from wagtail_modeladmin.options import modeladmin_register
 
-from .admin_views import SHOP_STOCK_MENU_LABEL, DispatchersView, OrderRefundView
+from .admin_orders import OrderViewSet
+from .admin_views import SHOP_STOCK_MENU_LABEL, DispatchersView
 from .models import (
     PRODUCT_VARIANT_PANELS,
     CategoryPage,
@@ -29,8 +24,6 @@ from .models import (
     protected_variants_message,
 )
 
-
-Order = get_salesman_model("Order")
 
 
 class ShopStockViewSet(SnippetViewSet):
@@ -145,141 +138,12 @@ class ProductGroup(SnippetViewSetGroup):
     menu_order = 200
 
 
-def _with_name_and_shipping_method(contact_panel):
-    """
-    A copy of salesman's order Contact panel, with the order name and shipping
-    method added after the customer and email
-    """
-    children = list(contact_panel.children)
-    children[2:2] = [
-        ReadOnlyPanel("name"),
-        ReadOnlyPanel(
-            "shipping_method",
-            # Show the label (e.g. "Collect in person") rather than the value
-            formatter=lambda value, order, request: order.get_shipping_method_display(),
-        ),
-    ]
-    return MultiFieldPanel(children, heading=contact_panel.heading)
-
-
-def _with_refunds(panel, attr):
-    """
-    A copy of one of salesman's order panels, with the refunds panel added
-    after the panel for attr
-    """
-    children = list(panel.children)
-    index = [getattr(child, "attr", None) for child in children].index(attr) + 1
-    children.insert(index, OrderAdminPanel("refunds_display"))
-    return MultiFieldPanel(children, heading=panel.heading)
-
-
-def _order_panel(index, panel):
-    if index == 1:
-        # Status
-        return _with_refunds(panel, "is_paid")
-    if index == 2:
-        # Contact
-        return _with_name_and_shipping_method(panel)
-    if index == 3:
-        # Totals
-        return _with_refunds(panel, "amount_paid_display")
-    return panel
-
-
-class OrderRefundsFilter(admin.SimpleListFilter):
-    title = _("Refunds")
-    parameter_name = "refunds"
-
-    def lookups(self, request, model_admin):
-        return [
-            ("partial", _("Partially refunded")),
-            ("full", _("Fully refunded")),
-            ("none", _("Not refunded")),
-        ]
-
-    def queryset(self, request, queryset):
-        status = {
-            "partial": "Partially refunded",
-            "full": "Fully refunded",
-            "none": "",
-        }.get(self.value())
-        if status is None:
-            return None
-        # The order admin's queryset prefetches the payments
-        return queryset.filter(
-            id__in=[order.id for order in queryset if order.refund_status == status]
-        )
-
-
-class OrderAdmin(SalesmanOrderAdmin):
-    """
-    Salesman's order admin, with the order name and shipping method added.
-    These build new lists and panels, rather than changing salesman's.
-    """
-
-    # After email, and after status
-    list_display = [
-        *SalesmanOrderAdmin.list_display[:2],
-        "name",
-        SalesmanOrderAdmin.list_display[2],
-        "shipping_method",
-        *SalesmanOrderAdmin.list_display[3:5],
-        "refunds_list_display",
-        *SalesmanOrderAdmin.list_display[5:],
-    ]
-    list_filter = [
-        *SalesmanOrderAdmin.list_filter[:2],
-        OrderRefundsFilter,
-        *SalesmanOrderAdmin.list_filter[2:],
-    ]
-    search_fields = [*SalesmanOrderAdmin.search_fields, "name"]
-
-    # Salesman's default_edit_handler is built from its default panels, so this
-    # replaces it (salesman's get_edit_handler uses edit_handler if it's set)
-    default_panels = [
-        _order_panel(index, panel)
-        for index, panel in enumerate(SalesmanOrderAdmin.default_panels)
-    ]
-    edit_handler = TabbedInterface(
-        [
-            ObjectList(default_panels, heading=_("Summary")),
-            ObjectList(SalesmanOrderAdmin.default_items_panels, heading=_("Items")),
-            ObjectList(
-                SalesmanOrderAdmin.default_payments_panels, heading=_("Payments")
-            ),
-            ObjectList(SalesmanOrderAdmin.default_notes_panels, heading=_("Notes")),
-        ]
-    )
-    # Refunds the order without salesman's orders API
-    refund_view_class = OrderRefundView
-
-    def amount_paid_display(self, obj):
-        # Refunds are shown separately
-        return format_price(obj.amount_received, order=obj, request=self.request)
-
-    amount_paid_display.short_description = _("Amount paid")
-
-    def refunds_display(self, obj):
-        if not obj.amount_refunded:
-            return "-"
-        amount = format_price(obj.amount_refunded, order=obj, request=self.request)
-        return f"{amount} ({obj.refund_status.lower()})"
-
-    refunds_display.short_description = _("Refunded")
-
-    def refunds_list_display(self, obj):
-        return obj.refund_status
-
-    refunds_list_display.short_description = _("Refunds")
-
-    def get_queryset(self, request):
-        # The refunds column uses the payments
-        return super().get_queryset(request).prefetch_related("payments")
-    menu_order = 250
-
-
 register_snippet(ProductGroup)
-modeladmin_register(OrderAdmin)
+
+
+@hooks.register("register_admin_viewset")
+def register_order_viewset():
+    return OrderViewSet()
 
 
 def _protected_variants_response(request, variants, obj):
