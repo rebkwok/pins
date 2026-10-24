@@ -1,6 +1,5 @@
 from decimal import Decimal
 
-from django.conf import settings
 from salesman.basket.modifiers import BasketModifier
 
 from .models import (
@@ -9,12 +8,13 @@ from .models import (
     DISCOUNT_ROW,
     MIN_CARD_PAYMENT,
     Sale,
+    ShopSettings,
 )
 
 
 class ShippingCostModifier(BasketModifier):
     """
-    Add flat shipping cost (settings.SHOP_SHIPPING_COST) to baskets that are
+    Add the flat shipping cost (in the shop settings) to baskets that are
     delivered.
     """
 
@@ -22,9 +22,9 @@ class ShippingCostModifier(BasketModifier):
 
     def process_basket(self, basket, request):
         if basket.needs_delivery and basket.count:
-            self.add_extra_row(
-                basket, request, label="Shipping", amount=settings.SHOP_SHIPPING_COST
-            )
+            # (cached on the request, if there is one)
+            shipping_cost = ShopSettings.load(request_or_site=request).shipping_cost
+            self.add_extra_row(basket, request, label="Shipping", amount=shipping_cost)
 
 
 class SaleModifier(BasketModifier):

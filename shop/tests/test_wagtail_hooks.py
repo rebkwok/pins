@@ -31,15 +31,15 @@ def breadcrumbs(content):
 
 
 @pytest.mark.parametrize(
-    "model,label,new_label",
+    "model,menu,label,new_label",
     [
-        ("product", "Products", "New: Product"),
-        ("productvariant", "Product variants", "New: Product variant"),
-        ("sale", "Sales", "New: Sale"),
+        ("product", "Shop stock", "Products", "New: Product"),
+        ("productvariant", "Shop stock", "Product variants", "New: Product variant"),
+        ("sale", "Shop setup", "Sales", "New: Sale"),
     ],
 )
-def test_shop_stock_breadcrumbs(
-    admin_client, product, sale_with_items, model, label, new_label
+def test_shop_breadcrumbs(
+    admin_client, product, sale_with_items, model, menu, label, new_label
 ):
     instance = {
         "product": product,
@@ -47,16 +47,27 @@ def test_shop_stock_breadcrumbs(
         "sale": sale_with_items,
     }[model]
     prefix = f"wagtailsnippets_shop_{model}"
+    # (products and variants are under their category, and product)
+    edit_crumbs = {
+        "product": ["Test Category", "Test Product"],
+        "productvariant": [
+            "Test Category",
+            "Test Product",
+            # (a variant with no name, colour or size)
+            "Variant",
+        ],
+        "sale": [str(instance)],
+    }[model]
     pages = [
         (reverse(f"{prefix}:list"), []),
         (reverse(f"{prefix}:add"), [new_label]),
-        (reverse(f"{prefix}:edit", args=(instance.pk,)), [str(instance)]),
+        (reverse(f"{prefix}:edit", args=(instance.pk,)), edit_crumbs),
     ]
     for url, last in pages:
         content = admin_client.get(url).content.decode()
-        assert breadcrumbs(content) == ["Home", "Shop Stock", label, *last]
-        # the menu has no page, so Shop Stock isn't a link
-        assert not re.search(r"<a[^>]*>\s*Shop Stock", content)
+        assert breadcrumbs(content) == ["Home", menu, label, *last]
+        # the menu has no page, so it isn't a link
+        assert not re.search(rf"<a[^>]*>\s*{menu}", content)
 
 
 def test_product_variants_list_order(admin_client, product):
@@ -70,26 +81,27 @@ def test_product_variants_list_order(admin_client, product):
     baker.make("shop.ProductVariant", product=calendar, variant_name="Single", sort_order=1)
     baker.make("shop.ProductVariant", product=mug, variant_name="Small", sort_order=1)
     resp = admin_client.get(reverse("wagtailsnippets_shop_productvariant:list"))
-    # by category, then product, then the product's variant order
+    # by category, then product (in their order in the category: the mug was
+    # added after Test Product), then the product's variant order
     assert [str(variant) for variant in resp.context["object_list"]] == [
         "Calendar - Single",
+        "Test Product - Small",
         "Mug - Small",
         "Mug - Large",
-        "Test Product - Small",
     ]
     # no "Sort item order" for reordering all the variants together
     assert "Sort item order" not in resp.content.decode()
 
 
 def test_products_list_order(admin_client, product):
-    # by category (in the shop page order), then the shop page order (index),
-    # then name
+    # by category (in the shop page order), then the products' order in their
+    # category, then name
     cards = baker.make("shop.Category", title="Cards", sort_order=-2)
     notebooks = baker.make("shop.Category", title="Notebooks", sort_order=-1)
-    baker.make("shop.Product", category=notebooks, name="Notebook", index=1)
-    baker.make("shop.Product", category=cards, name="Card B", index=2)
-    baker.make("shop.Product", category=cards, name="Calendar", index=5)
-    baker.make("shop.Product", category=cards, name="Card A", index=2)
+    baker.make("shop.Product", category=notebooks, name="Notebook", sort_order=1)
+    baker.make("shop.Product", category=cards, name="Card B", sort_order=2)
+    baker.make("shop.Product", category=cards, name="Calendar", sort_order=5)
+    baker.make("shop.Product", category=cards, name="Card A", sort_order=2)
     resp = admin_client.get(reverse("wagtailsnippets_shop_product:list"))
     assert [p.name for p in resp.context["object_list"]] == [
         "Card A",
@@ -99,3 +111,14 @@ def test_products_list_order(admin_client, product):
         "Test Product",
     ]
     assert "Sort item order" not in resp.content.decode()
+
+
+def test_product_breadcrumb_links(admin_client, product):
+    variant = baker.make("shop.ProductVariant", product=product, variant_name="Small")
+    content = admin_client.get(
+        reverse("wagtailsnippets_shop_productvariant:edit", args=(variant.pk,))
+    ).content.decode()
+    products_url = reverse("wagtailsnippets_shop_product:list")
+    # the category's products, and the product's page
+    assert f'href="{products_url}?category={product.category.pk}"' in content
+    assert f'href="{reverse("wagtailsnippets_shop_product:edit", args=(product.pk,))}"' in content

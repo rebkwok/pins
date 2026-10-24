@@ -13,7 +13,7 @@
             <p><strong>The customer will be emailed</strong> to say their order is complete.</p>
         {% else %}
             <p>Cancel order <strong>{{ order.ref }}</strong>?</p>
-            <p>The customer won't be emailed. Cancelling doesn't change stock: if these items are going back into stock, update their stock in Shop Stock.</p>
+            <p>The customer won't be emailed. Cancelling doesn't change stock: if these items are going back into stock, update their stock in Shop stock > Products.</p>
         {% endif %}
         <form method="post">
             {% csrf_token %}

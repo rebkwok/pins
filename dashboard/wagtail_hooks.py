@@ -10,16 +10,6 @@ from wagtail.snippets.views.snippets import SnippetViewSet
 
 from home.models import FooterText
 from .view_as import ViewAsView
-from dogs.models import DogPage
-
-
-# ensure our modeladmin is created
-class DogPageViewSet(SnippetViewSet):
-    model = DogPage
-    add_to_admin_menu = True
-    list_display = ("title", "page_status", "category")
-    menu_order = 150
-    help_text = "Help"
 
 
 class FooterTextViewSet(SnippetViewSet):
@@ -27,17 +17,11 @@ class FooterTextViewSet(SnippetViewSet):
     search_fields = ("body",)
     add_to_admin_menu = True
     menu_label = "Footer Text"
-    menu_order = 400  # will put in 5th place (000 being 1st, 100 2nd)
-
-
-class CollectionMenuItem(MenuItem): 
-    def is_shown(self, request):
-        return request.user.is_superuser
-
-
-@hooks.register('register_admin_menu_item')
-def register_collections_menu_item():
-  return CollectionMenuItem('Collections', reverse('wagtailadmin_collections:index'), icon_name='folder-inverse', order=200)
+    # The admin menu's order: site content (Wagtail's Pages 100, Images 300 and
+    # Documents 400, then Footer Text and Facebook Changes), the shop (510-530,
+    # after Wagtail's Snippets at 500, if shown), fundraising (600s), then
+    # Wagtail's Reports, Settings and Help
+    menu_order = 450
 
 
 @hooks.register('construct_main_menu')
@@ -66,4 +50,3 @@ def register_view_as_url():
 
 
 register_snippet(FooterTextViewSet)
-register_snippet(DogPageViewSet)

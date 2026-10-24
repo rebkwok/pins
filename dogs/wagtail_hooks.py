@@ -29,7 +29,8 @@ def register_facebook_changes_menu_item():
         'Facebook Changes',
         reverse('facebook_changes'),
         icon_name='image',
-        order=250,
+        # (after Footer Text, see dashboard/wagtail_hooks.py)
+        order=460,
         permission=FACEBOOK_CHANGES_PERMISSION,
     )
 

@@ -215,3 +215,31 @@ def test_shop_groups_migration(migrations):
         .objects.filter(group=group)
         .values_list("collection_id", flat=True)
     ) == {shop.pk}
+
+
+@pytest.mark.django_db(transaction=True)
+def test_product_sort_order_migration(migrations):
+    apps = migrations([("shop", "0019_shop_settings_shipping_cost")])
+    Category = apps.get_model("shop", "Category")
+    Product = apps.get_model("shop", "Product")
+    cards, mugs = Category.objects.create(title="Cards", slug="cards"), Category.objects.create(title="Mugs", slug="mugs")
+    for category, name, index in [
+        (cards, "Card B", 2), (cards, "Card A", 2), (cards, "Calendar", 1), (mugs, "Mug", 100),
+    ]:
+        Product.objects.create(category=category, name=name, index=index, price=1)
+    apps = migrations([("shop", "0021_remove_product_index")])
+    Product = apps.get_model("shop", "Product")
+    # in order of index, then name, within each category
+    assert list(
+        Product.objects.order_by("category_id", "sort_order").values_list("name", "sort_order")
+    ) == [("Calendar", 0), ("Card A", 1), ("Card B", 2), ("Mug", 0)]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_shipping_cost_migration(migrations, monkeypatch):
+    # a SHOP_SHIPPING_COST environment variable is copied into the settings
+    apps = migrations([("shop", "0018_dispatcher_choices")])
+    apps.get_model("shop", "ShopSettings").objects.create()
+    monkeypatch.setenv("SHOP_SHIPPING_COST", "3.50")
+    apps = migrations([("shop", "0019_shop_settings_shipping_cost")])
+    assert str(apps.get_model("shop", "ShopSettings").objects.get().shipping_cost) == "3.50"

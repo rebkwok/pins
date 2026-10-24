@@ -30,7 +30,14 @@ from modelcluster.forms import BaseChildFormSet
 from salesman_stripe_connect.mixins import OrderAmountsMixin, StripeBasketMixin
 from modelcluster.models import ClusterableModel, ParentalKey
 from wagtail.admin.forms import WagtailAdminModelForm
-from wagtail.admin.panels import FieldPanel, InlinePanel, HelpPanel, MultiFieldPanel
+from wagtail.admin.panels import (
+    FieldPanel,
+    FieldRowPanel,
+    HelpPanel,
+    InlinePanel,
+    MultiFieldPanel,
+    Panel,
+)
 from wagtail.admin.panels.base import get_form_for_model
 from wagtail.contrib.forms.models import validate_to_address
 from wagtail.contrib.routable_page.models import RoutablePageMixin, path
@@ -539,6 +546,60 @@ def reserved_category_slugs():
     return slugs
 
 
+class CategoryProductsPanel(Panel):
+    """
+    On a category's page: its products, dragged into their order on the shop
+    (saved straight away, see admin_views.CategoryProductsReorderView)
+    """
+
+    class BoundPanel(Panel.BoundPanel):
+        template_name = "shop/admin/panels/category_products.html"
+
+        def get_context_data(self, parent_context=None):
+            from wagtail.admin.ui.tables import BooleanColumn, Column, Table, TitleColumn
+            from wagtail.admin.ui.tables.orderable import OrderableTableMixin, OrderingColumn
+
+            class OrderingHeaderColumn(OrderingColumn):
+                # (not the listings' "Sort" toggle: the products are always in order)
+                header_template_name = "shop/admin/panels/ordering_header.html"
+
+            class CategoryProductsTable(OrderableTableMixin, Table):
+                @property
+                def ordering_column(self):
+                    return OrderingHeaderColumn("ordering", width="80px", sort_key="sort_order")
+
+            context = super().get_context_data(parent_context)
+            context["request"] = self.request
+            category = self.instance
+            if not category.pk:
+                return context
+            products = list(category.products.order_by("sort_order", "name"))
+            can_reorder = self.request.user.has_perm("shop.change_product")
+            context["products"] = products
+            context["can_reorder"] = can_reorder and len(products) > 1
+            context["table"] = CategoryProductsTable(
+                [
+                    TitleColumn(
+                        "name",
+                        label="Product",
+                        get_url=lambda product: reverse(
+                            "wagtailsnippets_shop_product:edit", args=(product.pk,)
+                        ),
+                    ),
+                    Column("variants", label="Variants", accessor="get_variant_count"),
+                    BooleanColumn("live", label="Live"),
+                ],
+                products,
+                sort_order_field="sort_order",
+                reorder_url=(
+                    reverse("shop_category_products_reorder", args=(category.pk, 999999))
+                    if context["can_reorder"]
+                    else None
+                ),
+            )
+            return context
+
+
 class Category(models.Model):
     """
     A category of products, with its own page on the shop (served by the shop
@@ -564,7 +625,12 @@ class Category(models.Model):
     # The order on the shop page (categories are reordered in the Categories list)
     sort_order = models.IntegerField(null=True, blank=True, editable=False)
 
-    panels = [FieldPanel("title"), FieldPanel("slug"), FieldPanel("description")]
+    panels = [
+        FieldPanel("title"),
+        FieldPanel("slug"),
+        FieldPanel("description"),
+        CategoryProductsPanel(heading="Products"),
+    ]
 
     class Meta:
         ordering = ["sort_order", "title"]
@@ -614,12 +680,23 @@ class Category(models.Model):
 
     get_product_count.short_description = "Products"
 
+    def products_link(self):
+        """The category's product count, linking to its products in the admin"""
+        return format_html(
+            '<a href="{}?category={}">{}</a>',
+            reverse("wagtailsnippets_shop_product:list"),
+            self.pk,
+            self.get_product_count(),
+        )
+
+    products_link.short_description = "Products"
+
     @property
     def live_products(self):
         # products are live if they are set to live AND have at least one live variants
         return (
             self.products.filter(live=True, variants__isnull=False, variants__live=True)
-            .order_by("index")
+            .order_by("sort_order", "name")
             .distinct()
         )
 
@@ -718,6 +795,12 @@ VARIANT_NEEDS_NAME_MESSAGE = (
 )
 
 
+SHARED_STOCK_COLOUR_SIZE_MESSAGE = (
+    "Variants that share stock can't have a colour or size: sharing stock is for "
+    "the same item sold singly or in packs. Remove the colour and size, or untick "
+    "'Variants share stock' on the product."
+)
+
 PACK_SIZE_NOT_SHARED_MESSAGE = (
     "Items per pack is only used when the product's variants share stock: tick "
     "'Variants share stock' on the product, or set this to 1."
@@ -786,6 +869,13 @@ class RelativeStockFormMixin:
             self.instance.stock = models.F("stock") + change
 
 
+def add_colour_size_errors(form, cleaned_data):
+    """Variants that share stock can't have a colour or size"""
+    for field in ("colour", "size"):
+        if cleaned_data.get(field):
+            form.add_error(field, SHARED_STOCK_COLOUR_SIZE_MESSAGE)
+
+
 class ProductVariantAdminForm(RelativeStockFormMixin, WagtailAdminModelForm):
     """
     Admin form for product variants, on their own and in the product form.
@@ -813,12 +903,11 @@ class ProductVariantAdminForm(RelativeStockFormMixin, WagtailAdminModelForm):
         # On the variant's own page (in the product form, ProductAdminForm checks
         # this, as "Variants share stock" may be ticked in the same save)
         product = cleaned_data.get("product")
-        if (
-            product is not None
-            and not product.shares_stock
-            and (cleaned_data.get("pack_size") or 1) > 1
-        ):
-            self.add_error("pack_size", PACK_SIZE_NOT_SHARED_MESSAGE)
+        if product is not None:
+            if not product.shares_stock and (cleaned_data.get("pack_size") or 1) > 1:
+                self.add_error("pack_size", PACK_SIZE_NOT_SHARED_MESSAGE)
+            if product.shares_stock:
+                add_colour_size_errors(self, cleaned_data)
         return self._clean_stock(cleaned_data)
 
     def _check_variant_names(self, cleaned_data):
@@ -918,33 +1007,56 @@ def _list_icon(name, classname, text, colour=None):
     )
 
 
-class DispatcherWarningPanel(HelpPanel):
+class MessagePanel(HelpPanel):
     """
-    On a product's page: a warning if its dispatcher isn't in the Dispatchers
-    group any more (shown only then)
+    A message box (e.g. a warning) worked out for the instance being edited,
+    by the BoundPanel's get_message(), and only shown if there's a message.
+    (The box's style is on the message itself: a HelpPanel's classname is also
+    put on its section, which would make a box within a box.)
     """
+
+    message_class = "help-info"
 
     class BoundPanel(HelpPanel.BoundPanel):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
-            self.content = self.instance.dispatcher_warning or ""
+            message = self.get_message()
+            self.content = (
+                format_html(
+                    '<div class="help-block {}">{}</div>', self.panel.message_class, message
+                )
+                if message
+                else ""
+            )
+
+        def get_message(self):
+            return None
 
         def is_shown(self):
             return bool(self.content)
 
 
-class VariantStockHelpPanel(HelpPanel):
+class DispatcherWarningPanel(MessagePanel):
+    """
+    On a product's page: a warning if its dispatcher isn't in the Dispatchers
+    group any more (shown only then)
+    """
+
+    message_class = "help-warning"
+
+    class BoundPanel(MessagePanel.BoundPanel):
+        def get_message(self):
+            return self.instance.dispatcher_warning
+
+
+class VariantStockHelpPanel(MessagePanel):
     """
     On a variant's own edit page: whether the product's variants share stock
     (which is set on the product's page), with a link to the product's page
     """
 
-    class BoundPanel(HelpPanel.BoundPanel):
-        def __init__(self, **kwargs):
-            super().__init__(**kwargs)
-            self.content = self._content()
-
-        def _content(self):
+    class BoundPanel(MessagePanel.BoundPanel):
+        def get_message(self):
             product = self.instance.product if self.instance.product_id else None
             if product is None:
                 return (
@@ -961,6 +1073,11 @@ class VariantStockHelpPanel(HelpPanel):
                     product.stock,
                     url,
                 )
+            # Only a suggestion if the variants could share stock: more than one,
+            # without colours or sizes (which would be different items)
+            variants = product.variants.all()
+            if len(variants) < 2 or any(v.colour or v.size for v in variants):
+                return None
             return format_html(
                 "To sell this product's variants from the same stock (e.g. single "
                 "cards and packs of 5), tick 'Variants share stock' on the "
@@ -969,15 +1086,18 @@ class VariantStockHelpPanel(HelpPanel):
             )
 
 
+# (in rows, so each variant takes less room on the product's page; the rows'
+# inputs line up, see wagtail_hooks.shop_admin_css)
 PRODUCT_VARIANT_PANELS = [
-    FieldPanel("variant_name"),
-    FieldPanel("image"),
-    FieldPanel("price"),
-    StockFieldPanel("stock"),
-    FieldPanel("pack_size"),
-    FieldPanel("live"),
-    FieldPanel("colour"),
-    FieldPanel("size"),
+    FieldRowPanel(
+        [FieldPanel("variant_name"), FieldPanel("colour"), FieldPanel("size")],
+        classname="shop-field-row",
+    ),
+    FieldRowPanel(
+        [FieldPanel("price"), StockFieldPanel("stock"), FieldPanel("pack_size")],
+        classname="shop-field-row",
+    ),
+    FieldRowPanel([FieldPanel("image"), FieldPanel("live")], classname="shop-field-row"),
 ]
 
 
@@ -1086,15 +1206,20 @@ class ProductAdminForm(RelativeStockFormMixin, WagtailAdminModelForm):
     def _check_pack_sizes(self, cleaned_data):
         """
         Variants can only have more than 1 item per pack if the product's
-        variants share stock (which may be ticked in the same save)
+        variants share stock (which may be ticked in the same save), and
+        variants that share stock can't have a colour or size
         """
         variants_formset = self.formsets.get("variants")
-        if variants_formset is None or cleaned_data.get("shares_stock"):
+        if variants_formset is None:
             return
         variants_formset.errors  # clean the variant forms
         for form in variants_formset.forms:
-            pack_size = (getattr(form, "cleaned_data", None) or {}).get("pack_size") or 1
-            if pack_size > 1 and not variants_formset._should_delete_form(form):
+            if variants_formset._should_delete_form(form):
+                continue
+            variant_data = getattr(form, "cleaned_data", None) or {}
+            if cleaned_data.get("shares_stock"):
+                add_colour_size_errors(form, variant_data)
+            elif (variant_data.get("pack_size") or 1) > 1:
                 form.add_error("pack_size", PACK_SIZE_NOT_SHARED_MESSAGE)
 
     def clean(self):
@@ -1130,18 +1255,19 @@ class Product(ClusterableModel):
 
     name = models.CharField(max_length=255)
 
-    description = RichTextField(help_text="Description of the product", blank=True)
+    description = RichTextField(help_text="Shown with the product in the shop.", blank=True)
     price = models.DecimalField(
         max_digits=18,
         decimal_places=2,
         default=10,
-        help_text="Default price for this product. Can be overridden by setting price on individual variants.",
+        help_text="The price of each variant, unless the variant has its own.",
     )
-    index = models.PositiveIntegerField(
-        default=100, help_text="Used for ordering products on the category page"
-    )
+    # The order in its category on the shop (products are dragged into order on
+    # the category's page in the admin)
+    sort_order = models.IntegerField(null=True, blank=True, editable=False)
     live = models.BooleanField(
-        default=True, help_text="Display this product in the shop"
+        default=True,
+        help_text="Shown in the shop (with its live variants). Untick to hide it.",
     )
     shares_stock = models.BooleanField(
         default=False,
@@ -1191,33 +1317,25 @@ class Product(ClusterableModel):
     )
 
     panels = [
-        HelpPanel(
-            """
-            A Product is an item for sale; it has a name and a description.
-            
-            Product variants represent the actual items that are sold, and may have attributes e.g. size
-            and colour. Each product must have at least one variant in order to be available for sale.
-            """
+        MultiFieldPanel(
+            [
+                FieldPanel("category"),
+                FieldPanel("name"),
+                FieldPanel("description"),
+                FieldPanel("price"),
+                FieldPanel("live"),
+            ],
+            heading="Product",
         ),
-        FieldPanel("category"),
-        FieldPanel("name"),
         InlinePanel(
             "product_images",
             heading="Images",
             label="Image",
             help_text=(
-                "Shown in this order, followed by the images of the product's live "
-                "variants. Use the arrows to reorder them."
+                "Shown in this order (use the arrows to reorder them), followed by "
+                "the images of the product's live variants."
             ),
         ),
-        FieldPanel("price"),
-        FieldPanel("description"),
-        FieldPanel("index"),
-        FieldPanel("live"),
-        FieldPanel("requires_shipping"),
-        DispatcherWarningPanel(classname="help-block help-warning"),
-        FieldPanel("dispatcher"),
-        FieldPanel("notify_dispatcher"),
         MultiFieldPanel(
             [FieldPanel("shares_stock"), StockFieldPanel("stock")],
             heading="Shared stock",
@@ -1225,30 +1343,53 @@ class Product(ClusterableModel):
         ProductVariantsInlinePanel(
             "variants",
             panels=PRODUCT_VARIANT_PANELS,
-            heading="Product variants",
+            heading="Variants",
             label="Variant",
             help_text=mark_safe(
-                """Variants are the options customers choose from when they buy this
-            product. If there's more than one, each needs a name, colour or size.
+                """What customers choose from when they buy this product. Every
+            product needs at least one.
             <ul>
-            <li>Only one option (e.g. a mug): add one variant, with no name, colour
-              or size.</li>
-            <li>Sizes or colours (e.g. a T-shirt): a variant for each, with a colour
-              and size (e.g. Black, S) and no name.</li>
-            <li>Different versions (e.g. a hoodie): a name for each (e.g. Men's,
-              Women's), with a colour and size if needed.</li>
-            <li>Packs (e.g. cards sold as Single and Pack of 5): tick "Variants share
-              stock" above and set the shared stock, then give each variant its
-              items per pack (1 and 5).</li>
-            </ul>
-            Use the arrows to reorder the variants.
-            """
+            <li>One option (e.g. a mug): one variant, with no name, colour or
+              size.</li>
+            <li>Sizes or colours (e.g. T-shirts): a variant for each, e.g. colour
+              Black, size S.</li>
+            <li>Versions (e.g. Men's and Women's hoodies): a name for each.</li>
+            <li>Packs (e.g. Single and Pack of 5): tick "Variants share stock"
+              above, then give each variant its items per pack.</li>
+            </ul>"""
             ),
+        ),
+        MultiFieldPanel(
+            [
+                FieldPanel("requires_shipping"),
+                DispatcherWarningPanel(),
+                FieldPanel("dispatcher"),
+                FieldPanel("notify_dispatcher"),
+            ],
+            heading="Shipping",
         ),
     ]
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        if self.pk and self.sort_order is not None:
+            # moved to another category: last in the new one
+            old_category = (
+                Product.objects.filter(pk=self.pk).values_list("category_id", flat=True).first()
+            )
+            if old_category != self.category_id:
+                self.sort_order = None
+        if self.sort_order is None:
+            # New products go last in their category
+            last = (
+                Product.objects.filter(category_id=self.category_id)
+                .exclude(pk=self.pk)
+                .aggregate(last=models.Max("sort_order"))["last"]
+            )
+            self.sort_order = 0 if last is None else last + 1
+        super().save(*args, **kwargs)
 
     def clean(self):
         if self.notify_dispatcher:
@@ -1419,8 +1560,8 @@ class ProductVariant(Orderable):
         max_length=255,
         verbose_name="Variant name",
         help_text=(
-            "Can be left blank if there is only one variant for this product, or if "
-            "it only varies by colour and/or size."
+            "Blank if there's only one variant, or the variants only differ by "
+            "colour or size."
         ),
     )
     image = models.ForeignKey(
@@ -1435,27 +1576,23 @@ class ProductVariant(Orderable):
         blank=True,
         max_digits=18,
         decimal_places=2,
-        help_text=(
-            "Leave blank to use the product's price (which then also applies if the "
-            "product's price is changed)."
-        ),
+        help_text="Blank for the product's price.",
     )
     stock = models.IntegerField(
         default=1,
         help_text=(
-            "Quantity of this item currently in stock, not including items in "
-            "customers' baskets. Your change is added to the current stock when you "
-            "save, so items added to or removed from baskets meanwhile aren't lost."
+            "In stock, not counting customers' baskets. Your change is added to the "
+            "current stock when you save, so baskets' changes meanwhile aren't lost."
         ),
     )
     pack_size = models.PositiveIntegerField(
         default=1,
         validators=[MinValueValidator(1)],
         verbose_name="Items per pack",
-        help_text="If the variants share stock: e.g. 5 for a pack of 5.",
+        help_text="With shared stock: e.g. 5 for a pack of 5.",
     )
     live = models.BooleanField(
-        default=True, help_text="Display this product variant in the shop"
+        default=True, help_text="Shown in the shop."
     )
 
     colour = models.CharField(blank=True, default="")
@@ -1666,27 +1803,64 @@ class ShopPage(RoutablePageMixin, Page):
         )
 
 
-@register_setting
+NO_NOTIFY_ADDRESSES_WARNING = (
+    "Nobody is emailed about new shop orders: add an email address to "
+    "'Email new orders to'."
+)
+
+
+class NotifyAddressesWarningPanel(MessagePanel):
+    """On the shop settings: a warning if nobody is emailed about new orders"""
+
+    message_class = "help-warning"
+
+    class BoundPanel(MessagePanel.BoundPanel):
+        def get_message(self):
+            return None if self.instance.notify_email_addresses else NO_NOTIFY_ADDRESSES_WARNING
+
+
+@register_setting(icon="cogs")
 class ShopSettings(BaseGenericSetting):
     notify_email_addresses = models.CharField(
         max_length=255,
         blank=True,
+        verbose_name="Email new orders to",
         help_text=(
-            "Optional - new orders will be emailed to these addresses. "
-            "Separate multiple addresses by comma."
+            "Every new order is emailed to these addresses (separate them with "
+            "commas). Dispatchers are only emailed about products set to email "
+            "them, so whoever gets these emails passes the rest on."
         ),
         validators=[validate_to_address],
     )
     reply_to = models.EmailField(
         max_length=255,
         blank=True,
-        help_text=("Optional - reply to email address for shop notification emails."),
+        verbose_name="Reply-to address",
+        help_text=(
+            "Optional: where replies to the shop's emails (to customers and "
+            "dispatchers) go."
+        ),
+    )
+    shipping_cost = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        default=Decimal("4.99"),
+        validators=[MinValueValidator(0)],
+        help_text=(
+            "Added to orders that are delivered (not to orders that are collected, "
+            "or have nothing that needs shipping)."
+        ),
     )
 
     panels = [
+        NotifyAddressesWarningPanel(),
         FieldPanel("notify_email_addresses"),
         FieldPanel("reply_to"),
+        FieldPanel("shipping_cost"),
     ]
+
+    class Meta:
+        verbose_name = "Shop settings"
 
 
 class SaleCategory(models.Model):

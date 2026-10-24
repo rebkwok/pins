@@ -14,7 +14,7 @@ from django.urls import reverse
 from model_bakery import baker
 from salesman.core.utils import get_salesman_model
 
-from ..models import PACK_SIZE_NOT_SHARED_MESSAGE, ProductVariant
+from ..models import PACK_SIZE_NOT_SHARED_MESSAGE, SHARED_STOCK_COLOUR_SIZE_MESSAGE, ProductVariant
 from ..views import add_to_basket, increase_quantity
 from .factories import PRODUCT_FORM_DEFAULTS
 
@@ -239,7 +239,6 @@ def product_form_data(product, variants, **data):
         "name": product.name,
         "price": str(product.price),
         "description": json.dumps({"blocks": [], "entityMap": {}}),
-        "index": str(product.index),
         "live": "on",
         **PRODUCT_FORM_DEFAULTS,
         "shares_stock": "on" if product.shares_stock else "",
@@ -351,17 +350,66 @@ def test_variant_page_shared_stock(admin_client, cards, pack):
 
 
 def test_variant_page_separate_stock(admin_client, product):
-    variant = baker.make(ProductVariant, product=product, stock=4)
+    variant = baker.make(ProductVariant, product=product, variant_name="Single", stock=4)
+    baker.make(ProductVariant, product=product, variant_name="Pack of 5", stock=1)
     content = admin_client.get(variant_edit_url(variant)).content.decode()
     assert "tick 'Variants share stock' on the" in content
     assert f'<a href="{edit_url(product)}">product\'s page</a>' in content
 
 
+@pytest.mark.parametrize(
+    "variants",
+    [
+        # only one variant: nothing to share
+        [{"variant_name": "Mug"}],
+        # different colours or sizes are different items
+        [{"colour": "Black"}, {"colour": "White"}],
+        [{"variant_name": "Single", "size": "S"}, {"variant_name": "Pack"}],
+    ],
+)
+def test_variant_page_no_shared_stock_hint(admin_client, product, variants):
+    made = [baker.make(ProductVariant, product=product, **fields) for fields in variants]
+    content = admin_client.get(variant_edit_url(made[0])).content.decode()
+    assert "Variants share stock" not in content
+
+
 def test_new_variant_page(admin_client):
-    content = admin_client.get(
-        reverse("wagtailsnippets_shop_productvariant:add")
-    ).content.decode()
+    content = html.unescape(
+        admin_client.get(reverse("wagtailsnippets_shop_productvariant:add")).content.decode()
+    )
     assert "this is set on the product's page." in content
+
+
+def test_shared_stock_variants_no_colour_or_size(admin_client, cards, single, pack):
+    # sharing stock is for the same item, sold singly or in packs
+    data = product_form_data(cards, [single, pack], stock="13", stock_shown="13")
+    data["variants-0-colour"] = "Red"
+    data["variants-1-size"] = "A5"
+    resp = admin_client.post(edit_url(cards), data)
+    assert resp.status_code == 200
+    forms = resp.context["form"].formsets["variants"].forms
+    assert forms[0].errors["colour"] == [SHARED_STOCK_COLOUR_SIZE_MESSAGE]
+    assert forms[1].errors["size"] == [SHARED_STOCK_COLOUR_SIZE_MESSAGE]
+
+
+def test_ticking_shared_stock_with_colours(admin_client, product):
+    # e.g. T-shirts in different colours can't share stock
+    black = baker.make(ProductVariant, product=product, colour="Black", stock=1)
+    white = baker.make(ProductVariant, product=product, colour="White", stock=1)
+    product.shares_stock = True
+    data = product_form_data(product, [black, white], stock="5", stock_shown="0")
+    resp = admin_client.post(edit_url(product), data)
+    assert resp.status_code == 200
+    product.refresh_from_db()
+    assert not product.shares_stock
+
+
+def test_variant_page_shared_stock_colour(admin_client, cards, pack):
+    data = variant_form_data(pack)
+    data["colour"] = "Red"
+    resp = admin_client.post(variant_edit_url(pack), data)
+    assert resp.status_code == 200
+    assert resp.context["form"].errors["colour"] == [SHARED_STOCK_COLOUR_SIZE_MESSAGE]
 
 
 def test_admin_variants_list(admin_client, cards, single, pack):
@@ -531,3 +579,12 @@ def test_variant_page_made_live(admin_client, product):
     variant.refresh_from_db()
     resp = admin_client.post(variant_edit_url(variant), variant_form_data(variant))
     assert not any("is now live" in message for message in messages_for(resp))
+
+
+def test_check_pack_sizes_without_variants():
+    # (e.g. a product form without the variants formset)
+    from types import SimpleNamespace
+
+    from ..models import ProductAdminForm
+
+    assert ProductAdminForm._check_pack_sizes(SimpleNamespace(formsets={}), {}) is None

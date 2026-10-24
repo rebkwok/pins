@@ -499,7 +499,8 @@ class OrderViewSet(ModelViewSet):
     url_prefix = "shop/orders"
     icon = "list-ul"
     menu_label = "Orders"
-    menu_order = 250
+    # (the shop's menus are together, see dashboard/wagtail_hooks.py)
+    menu_order = 510
     add_to_admin_menu = True
 
     index_view_class = OrderIndexView

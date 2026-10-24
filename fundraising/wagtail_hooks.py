@@ -141,7 +141,8 @@ class RecipeBookGroup(SnippetViewSetGroup):
     menu_label = "Recipe Book"
     menu_icon = "tablet-alt"
     items = (RecipeBookSubmissionViewSet, PayPalIPNViewSet)
-    menu_order = 200
+    # (fundraising, after the shop: see dashboard/wagtail_hooks.py)
+    menu_order = 600
 
 
 @hooks.register("register_bulk_action")
@@ -299,19 +300,13 @@ class AuctionCategoriesMenuItem(MenuItem):
 def register_auction_menu_item():
     # (hidden if neither item is shown)
     submenu = Menu(items=[
-        AuctionCategoriesMenuItem('Auction Categories', reverse(AuctionCategoryViewSet().get_url_name("list")), icon_name='tablet-alt'),
-        PermissionMenuItem('Auctions', reverse('auctions'), icon_name='tablet-alt', permission=AUCTIONS_PERMISSION),
+        AuctionCategoriesMenuItem('Auction Categories', reverse(AuctionCategoryViewSet().get_url_name("list")), icon_name='tablet-alt', order=100),
+        PermissionMenuItem('Auctions', reverse('auctions'), icon_name='tablet-alt', permission=AUCTIONS_PERMISSION, order=200),
+        PermissionMenuItem('Auctions help', reverse('auction_docs'), icon_name='help', permission=AUCTIONS_PERMISSION, order=300),
     ])
 
-    return SubmenuMenuItem('Auctions', submenu, icon_name='hammer')
-
-
-@hooks.register('register_admin_menu_item')
-def register_auction_docs_menu_item():
-    return PermissionMenuItem(
-        'Auctions help', reverse('auction_docs'), icon_name='page', order=1000,
-        permission=AUCTIONS_PERMISSION,
-    )
+    # (after the Recipe Book)
+    return SubmenuMenuItem('Auctions', submenu, icon_name='hammer', order=610)
 
 
 register_snippet(RecipeBookGroup)

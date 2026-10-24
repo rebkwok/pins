@@ -92,18 +92,12 @@ def test_orders_only_group():
 
 def test_shop_admin_menu(client):
     items = menu(client, user_in("Shop admins"))
-    # (no Settings: the shop settings are in the Shop Stock menu; and no Wagtail
-    # help, which is about editing pages)
-    assert set(items) == {"orders", "shop-stock", "images"}
-    # not the dispatchers (site admins manage them)
-    assert items["shop-stock"] == [
-        "categories",
-        "products",
-        "product-variants",
-        "sales",
-        "discount-codes",
-        "shop-settings",
-    ]
+    # (no Settings: the shop settings are in the Shop setup menu; and no
+    # Wagtail help, which is about editing pages)
+    assert set(items) == {"orders", "shop-stock", "shop-setup", "images"}
+    assert items["shop-stock"] == ["categories", "products", "product-variants"]
+    # (they can see the dispatchers, but not change them)
+    assert items["shop-setup"] == ["sales", "discount-codes", "shop-settings", "dispatchers"]
 
 
 def test_orders_only_menu(client):
@@ -112,9 +106,26 @@ def test_orders_only_menu(client):
 
 def test_superuser_menu(client):
     items = menu(client, baker.make("auth.User", is_superuser=True))
-    assert {"auctions", "auctions-help", "facebook-changes", "orders", "help"} <= set(items)
-    assert "dispatchers" in items["shop-stock"]
-    assert "shop-settings" in items["shop-stock"]
+    # grouped: site content, the shop, fundraising, then Wagtail's own
+    assert list(items) == [
+        "explorer",
+        "images",
+        "documents",
+        "footer-text",
+        "facebook-changes",
+        "orders",
+        "shop-stock",
+        "shop-setup",
+        "recipe-book",
+        "auctions",
+        "reports",
+        "settings",
+        "help",
+    ]
+    assert items["auctions"] == ["auction-categories", "auctions", "auctions-help"]
+
+    assert "dispatchers" in items["shop-setup"]
+    assert "shop-settings" in items["shop-setup"]
     assert "shop-settings" not in items["settings"]
 
 
@@ -126,7 +137,7 @@ def test_superuser_menu(client):
         ("wagtailsnippets_shop_discountcode:list", True),
         ("shop_orders:index", True),
         ("wagtailimages:index", True),
-        ("shop_dispatchers:index", False),
+        ("shop_dispatchers:index", True),
         ("auctions", False),
         ("auction_docs", False),
         ("facebook_changes", False),
@@ -150,7 +161,7 @@ def test_shop_admin_shop_settings(client):
         reverse("wagtailsettings:edit", args=("shop", "shopsettings")), follow=True
     )
     assert resp.status_code == 200
-    assert "Notify email addresses" in resp.content.decode()
+    assert "Email new orders to" in resp.content.decode()
 
 
 @pytest.mark.parametrize(
@@ -178,8 +189,7 @@ def staff_with(codename):
 
 def test_manage_auctions_permission(client):
     items = menu(client, staff_with("manage_auctions"), url=reverse("auctions"))
-    assert items["auctions"] == ["auctions"]
-    assert "auctions-help" in items
+    assert items["auctions"] == ["auctions", "auctions-help"]
     assert "facebook-changes" not in items
     assert client.get(reverse("auction_docs")).status_code == 200
 
@@ -191,7 +201,6 @@ def test_auction_categories_only(client):
     url = reverse("wagtailsnippets_fundraising_auctioncategory:list")
     items = menu(client, user, url=url)
     assert items["auctions"] == ["auction-categories"]
-    assert "auctions-help" not in items
     assert client.get(reverse("auctions")).status_code == 302
 
 
@@ -203,10 +212,37 @@ def test_review_facebook_changes_permission(client):
     assert client.post(reverse("facebook_acknowledge")).status_code == 302
 
 
-def test_dispatchers_menu_needs_change_user(client):
-    user = staff_with("change_user")
-    user.groups.add(Group.objects.get(name="Shop admins"))
-    assert "dispatchers" in menu(client, user)["shop-stock"]
+def test_dispatchers_menu(client):
+    # for people who can change users (site admins) or edit products (shop
+    # admins), not e.g. orders-only users
+    assert "dispatchers" in menu(client, staff_with("change_user"), url=reverse("shop_dispatchers:index"))["shop-setup"]
+    assert "shop-setup" not in menu(client, user_in("Orders only"))
+
+
+def test_shop_admin_dispatchers_page(client, product):
+    # shop admins can see the dispatchers and their products, but not change them
+    dispatcher = baker.make(
+        "auth.User", first_name="Ann", last_name="Smith", email="ann@test.com"
+    )
+    dispatcher.groups.add(Group.objects.get(name="Dispatchers"))
+    product.dispatcher = dispatcher
+    product.notify_dispatcher = True
+    product.save()
+    client.force_login(user_in("Shop admins"))
+    url = reverse("shop_dispatchers:index")
+    content = client.get(url).content.decode()
+    assert "Ann Smith" in content
+    assert 'href="mailto:ann@test.com"' in content
+    assert reverse("wagtailsnippets_shop_product:edit", args=(product.pk,)) in content
+    assert "Test Product</a> (emailed)" in content
+    assert "ask a site admin" in content
+    # (no editing users, removing or adding)
+    assert reverse("wagtailusers_users:edit", args=(dispatcher.pk,)) not in content
+    assert 'name="remove"' not in content
+    assert "Add a dispatcher" not in content
+    resp = client.post(url, {"remove": dispatcher.pk})
+    assert resp.url == reverse("wagtailadmin_home")
+    assert dispatcher.groups.filter(name="Dispatchers").exists()
 
 
 # The Shop image collection
@@ -380,3 +416,63 @@ def test_search_other_areas(client):
     assert f'href="{reverse("wagtailimages:index")}?q=mug"' in content
     content = client.get(reverse("shop_orders:index_results"), {"q": "mug"}).content.decode()
     assert f'href="{reverse("wagtailsnippets_shop_product:list")}?q=mug"' in content
+
+
+# Shop settings
+
+
+def test_shop_settings_no_notify_addresses_warning(client):
+    from ..models import NO_NOTIFY_ADDRESSES_WARNING, ShopSettings
+
+    client.force_login(user_in("Shop admins"))
+    url = reverse("wagtailsettings:edit", args=("shop", "shopsettings"))
+    content = html_unescaped(client.get(url, follow=True))
+    assert NO_NOTIFY_ADDRESSES_WARNING in content
+    shop_settings = ShopSettings.load()
+    shop_settings.notify_email_addresses = "shop@test.com"
+    shop_settings.save()
+    assert NO_NOTIFY_ADDRESSES_WARNING not in html_unescaped(client.get(url, follow=True))
+
+
+def html_unescaped(resp):
+    import html
+
+    return html.unescape(resp.content.decode())
+
+
+def test_admin_home_no_notify_addresses_warning(client, root_page):
+    from ..models import ShopSettings
+
+    client.force_login(user_in("Shop admins"))
+    content = html_unescaped(client.get(reverse("wagtailadmin_home")))
+    assert "Nobody is emailed about new shop orders: add an email address to the shop settings." in content
+    shop_settings = ShopSettings.load()
+    shop_settings.notify_email_addresses = "shop@test.com"
+    shop_settings.save()
+    content = html_unescaped(client.get(reverse("wagtailadmin_home")))
+    assert "Nobody is emailed" not in content
+
+
+def test_admin_home_no_warning_for_others(client, root_page):
+    # (only for people who can change the shop settings)
+    client.force_login(user_in("Editors"))
+    assert "Nobody is emailed" not in html_unescaped(client.get(reverse("wagtailadmin_home")))
+
+
+def test_message_panels_one_box(client, product):
+    # the message box's style is on the message, not on its panel's section too
+    # (a box within a box)
+    from ..models import MessagePanel
+
+    variant = baker.make("shop.ProductVariant", product=product, variant_name="Single")
+    baker.make("shop.ProductVariant", product=product, variant_name="Pack of 5")
+    client.force_login(baker.make("auth.User", is_superuser=True))
+    content = client.get(
+        reverse("wagtailsnippets_shop_productvariant:edit", args=(variant.pk,))
+    ).content.decode()
+    assert "Variants share stock" in content
+    assert 'class="w-panel help-block' not in content
+    # (no message: nothing shown)
+    assert MessagePanel().bind_to_model(type(product)).get_bound_panel(
+        instance=product, request=None, form=None
+    ).get_message() is None

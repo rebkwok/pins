@@ -312,15 +312,17 @@ def test_admin_dispatchers_page(admin_client, dispatcher, product):
     resp = admin_client.get(reverse("shop_dispatchers:index"))
     assert reverse("shop_dispatchers:index") == DISPATCHERS_URL
     content = html.unescape(resp.content.decode())
-    # the dispatchers, with how many products they dispatch
-    assert [(d, d.product_count) for d in resp.context["dispatchers"]] == [(dispatcher, 1)]
+    # the dispatchers, with the products they dispatch
+    assert list(resp.context["dispatchers"]) == [dispatcher]
+    assert list(resp.context["dispatchers"][0].dispatched_products.all()) == [product]
+    assert "ask a site admin" not in content
     assert reverse("wagtailusers_users:edit", args=(dispatcher.pk,)) in content
     assert f'name="remove" value="{dispatcher.pk}"' in content
     # users who aren't dispatchers can be added
     choices = [label for _, label in resp.context["form"].fields["user"].choices]
     assert "Cat Lee (cat@test.com)" in choices
     assert "Ann Smith (ann@test.com)" not in choices
-    assert "Shop Stock" in content
+    assert "Shop setup" in content
 
 
 def test_admin_dispatchers_page_empty(admin_client):
@@ -373,8 +375,8 @@ def test_admin_remove_not_a_dispatcher(admin_client):
 
 
 def test_admin_dispatchers_needs_permission(client):
-    # e.g. an admin user who can't change users: Wagtail sends them to the
-    # dashboard, with a message
+    # e.g. an admin user who can't change users or products: Wagtail sends them
+    # to the dashboard, with a message
     user = baker.make("auth.User")
     user.user_permissions.add(Permission.objects.get(codename="access_admin"))
     client.force_login(user)

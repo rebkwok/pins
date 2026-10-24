@@ -1,6 +1,6 @@
 """
 Categories: plain models (not Wagtail pages), with pages served by the shop page,
-managed in the Shop Stock admin, and created from a product's category chooser.
+managed in the Shop admin, and created from a product's category chooser.
 """
 
 import html

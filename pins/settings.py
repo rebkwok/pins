@@ -639,7 +639,6 @@ SALESMAN_STRIPE_CONNECT_PAID_STATUS = "PROCESSING"
 # after the basket timeout, and Stripe requires sessions to expire between 30
 # minutes and 24 hours after they're created.
 # Flat shipping cost for shop orders that are delivered (not collected)
-SHOP_SHIPPING_COST = Decimal(env.str("SHOP_SHIPPING_COST", default="4.99"))
 
 BASKET_TIMEOUT_MINUTES = env.int("BASKET_TIMEOUT_MINUTES", 30)
 if not 30 <= BASKET_TIMEOUT_MINUTES < 24 * 60:

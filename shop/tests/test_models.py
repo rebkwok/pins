@@ -530,7 +530,6 @@ def test_product_admin_form_rejects_duplicate_variants(product):
         "name": "Mug",
         "price": "10",
         "description": json.dumps({"blocks": [], "entityMap": {}}),
-        "index": "1",
         "live": "on",
         **PRODUCT_FORM_DEFAULTS,
         "variants-TOTAL_FORMS": "2",

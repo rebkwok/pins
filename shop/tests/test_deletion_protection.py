@@ -188,7 +188,6 @@ def product_form_data(product, delete):
         "name": product.name,
         "price": str(product.price),
         "description": json.dumps({"blocks": [], "entityMap": {}}),
-        "index": str(product.index),
         "live": "on",
         **PRODUCT_FORM_DEFAULTS,
         "variants-TOTAL_FORMS": str(product.variants.count()),

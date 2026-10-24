@@ -2,7 +2,7 @@ from decimal import Decimal
 import pytest
 from model_bakery import baker
 
-from ..models import Sale, SaleProduct
+from ..models import Sale, SaleProduct, ShopSettings
 
 pytestmark = pytest.mark.django_db
 
@@ -26,8 +26,11 @@ def test_basket_shipping_modifier(basket):
     assert basket.total == Decimal("24.99")
 
 
-def test_basket_shipping_modifier_cost_setting(basket, settings):
-    settings.SHOP_SHIPPING_COST = Decimal("5.50")
+def test_basket_shipping_modifier_cost_setting(basket):
+    # the shipping cost in the shop settings
+    shop_settings = ShopSettings.load()
+    shop_settings.shipping_cost = Decimal("5.50")
+    shop_settings.save()
     basket.shipping_method = "deliver"
     basket.save()
     basket.update(request=None)

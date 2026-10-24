@@ -2,27 +2,39 @@ from django.contrib import messages
 from django.shortcuts import redirect
 from django.template.defaultfilters import pluralize
 from django.urls import path, reverse
+from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from wagtail import hooks
 from wagtail.admin.admin_url_finder import AdminURLFinder
+from wagtail.admin.menu import MenuItem
 from wagtail.admin.viewsets.base import ViewSet
 from wagtail.admin.panels import FieldPanel
 from wagtail.admin.ui.tables import BooleanColumn
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.chooser import SnippetChooserViewSet
 from wagtail.admin.search import SearchArea
+from wagtail.admin.ui.components import Component
 from wagtail.permission_policies import ModelPermissionPolicy
+from wagtail.snippets.views.snippets import EditView as SnippetEditView
 from wagtail.snippets.views.snippets import IndexView as SnippetIndexView
 from wagtail.snippets.views.snippets import SnippetViewSet, SnippetViewSetGroup
 
 from common.admin_menu import PermissionMenuItem
 
 from .admin_orders import OrderPermissionPolicy, OrderViewSet
-from .admin_views import SHOP_STOCK_MENU_LABEL, DispatchersView
+from .admin_views import (
+    SHOP_SETUP_MENU_LABEL,
+    SHOP_STOCK_MENU_LABEL,
+    CategoryProductsReorderView,
+    DispatchersView,
+)
 from .models import (
     PRODUCT_VARIANT_PANELS,
     Category,
+    NO_NOTIFY_ADDRESSES_WARNING,
     DiscountCode,
     Order,
+    ShopSettings,
     Product,
     ProductVariant,
     Sale,
@@ -34,16 +46,18 @@ from .models import (
 
 
 
-class ShopStockViewSet(SnippetViewSet):
+class ShopViewSet(SnippetViewSet):
     """
-    A snippet in the Shop Stock menu, with Shop Stock in its breadcrumbs
-    (Home > Shop Stock > Products). The menu has no page of its own, so it
+    A snippet in one of the shop menus, with the menu in its breadcrumbs
+    (e.g. Home > Shop stock > Products). The menu has no page of its own, so it
     isn't a link.
     """
 
+    shop_menu_label = SHOP_STOCK_MENU_LABEL
+
     @property
     def breadcrumbs_items(self):
-        return [*super().breadcrumbs_items, {"url": None, "label": SHOP_STOCK_MENU_LABEL}]
+        return [*super().breadcrumbs_items, {"url": None, "label": self.shop_menu_label}]
 
 
 # The default order of the shop stock lists (unless a column is sorted): by
@@ -51,7 +65,7 @@ class ShopStockViewSet(SnippetViewSet):
 PRODUCT_ORDERING = (
     "category__sort_order",
     "category__title",
-    "index",
+    "sort_order",
     "name",
 )
 
@@ -65,14 +79,51 @@ class CategoryChooserViewSet(SnippetChooserViewSet):
     create_action_label = "Add a category"
 
 
-class CategoryViewSet(ShopStockViewSet):
+class CategoryViewSet(ShopViewSet):
     model = Category
     icon = "folder-open-inverse"
     # Dragged into their order on the shop page
     sort_order_field = "sort_order"
-    list_display = ("title", "get_product_count", "url_display")
+    list_display = ("title", "products_link", "url_display")
     search_fields = ("title",)
     chooser_viewset_class = CategoryChooserViewSet
+
+
+def category_crumb(category):
+    """A breadcrumb for a category: its products in the Products list"""
+    return {
+        "url": f"{reverse('wagtailsnippets_shop_product:list')}?category={category.pk}",
+        "label": category.title,
+    }
+
+
+class ProductEditView(SnippetEditView):
+    """Breadcrumbs: Home > Shop stock > Products > category > product"""
+
+    def get_breadcrumbs_items(self):
+        items = super().get_breadcrumbs_items()
+        return [*items[:-1], category_crumb(self.object.category), items[-1]]
+
+
+class ProductVariantEditView(SnippetEditView):
+    """
+    Breadcrumbs: Home > Shop stock > Product variants > category > product >
+    variant
+    """
+
+    def get_breadcrumbs_items(self):
+        items = super().get_breadcrumbs_items()
+        product = self.object.product
+        return [
+            *items[:-1],
+            category_crumb(product.category),
+            {
+                "url": reverse("wagtailsnippets_shop_product:edit", args=(product.pk,)),
+                "label": product.name,
+            },
+            # (the variant, without its product's name)
+            {**items[-1], "label": self.object.variant_full_name() or "Variant"},
+        ]
 
 
 class ProductIndexView(SnippetIndexView):
@@ -81,12 +132,11 @@ class ProductIndexView(SnippetIndexView):
     show_other_searches = True
 
 
-class ProductViewSet(ShopStockViewSet):
+class ProductViewSet(ShopViewSet):
     model = Product
     list_display = (
         "name",
         "category_link",
-        "index",
         "dispatcher_display",
         BooleanColumn("live"),
         "get_variant_count",
@@ -94,6 +144,7 @@ class ProductViewSet(ShopStockViewSet):
     list_filter = ("category",)
     search_fields = ("name", "category__title")
     index_view_class = ProductIndexView
+    edit_view_class = ProductEditView
 
     def get_queryset(self, request):
         return Product.objects.select_related("category").order_by(
@@ -101,14 +152,14 @@ class ProductViewSet(ShopStockViewSet):
         )
 
 
-class ProductVariantViewSet(ShopStockViewSet):
+class ProductVariantViewSet(ShopViewSet):
     model = ProductVariant
     # Variants are ordered within their product (on the product's page), so the
     # list doesn't offer reordering all variants together
     sort_order_field = None
     panels = [
         FieldPanel("product"),
-        VariantStockHelpPanel(classname="help-block help-info"),
+        VariantStockHelpPanel(),
         *PRODUCT_VARIANT_PANELS,
     ]
     list_display = (
@@ -121,6 +172,7 @@ class ProductVariantViewSet(ShopStockViewSet):
     )
     list_filter = ("product",)
     search_fields = ("product__name", "variant_name", "colour", "size")
+    edit_view_class = ProductVariantEditView
 
     def get_queryset(self, request):
         # Each product's variants are listed together, in the product's order
@@ -132,8 +184,9 @@ class ProductVariantViewSet(ShopStockViewSet):
         )
 
 
-class SaleViewSet(ShopStockViewSet):
+class SaleViewSet(ShopViewSet):
     model = Sale
+    shop_menu_label = SHOP_SETUP_MENU_LABEL
     list_display = (
         "name",
         "start_date",
@@ -142,21 +195,22 @@ class SaleViewSet(ShopStockViewSet):
     search_fields = ("name",)
 
 
-class DiscountCodeViewSet(ShopStockViewSet):
+class DiscountCodeViewSet(ShopViewSet):
     model = DiscountCode
+    shop_menu_label = SHOP_SETUP_MENU_LABEL
     icon = "tag"
     list_display = ("code", "amount", "status", "description", "date_created")
     list_filter = ("active",)
     search_fields = ("code", "description")
 
 
-class DispatchersMenuItem(PermissionMenuItem):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, permission=DispatchersView.permission, **kwargs)
+class DispatchersMenuItem(MenuItem):
+    def is_shown(self, request):
+        return DispatchersView.can_view(request.user)
 
 
 class DispatchersViewSet(ViewSet):
-    """Shop Stock > Dispatchers: the users in the Dispatchers group"""
+    """Shop setup > Dispatchers: the users in the Dispatchers group"""
 
     name = "shop_dispatchers"
     menu_label = "Dispatchers"
@@ -179,7 +233,7 @@ class ShopSettingsMenuItem(PermissionMenuItem):
 
 class ShopSettingsViewSet(ViewSet):
     """
-    Shop Stock > Shop settings: a link to the shop settings (a Wagtail setting,
+    Shop setup > Shop settings: a link to the shop settings (a Wagtail setting,
     removed from the Settings menu so they're with the rest of the shop)
     """
 
@@ -196,28 +250,83 @@ class ShopSettingsViewSet(ViewSet):
         return []
 
 
+class NoNotifyAddressesPanel(Component):
+    """On the admin home: a warning if nobody is emailed about new orders"""
+
+    name = "shop_no_notify_addresses"
+    order = 10
+
+    def render_html(self, parent_context=None):
+        return format_html(
+            '<div class="help-block help-warning w-mb-8"><p>{} <a href="{}">Shop settings</a></p></div>',
+            NO_NOTIFY_ADDRESSES_WARNING.replace("'Email new orders to'", "the shop settings"),
+            reverse("wagtailsettings:edit", args=("shop", "shopsettings")),
+        )
+
+
+@hooks.register("construct_homepage_panels")
+def warn_about_no_notify_addresses(request, panels):
+    if request.user.has_perm("shop.change_shopsettings") and not (
+        ShopSettings.load(request_or_site=request).notify_email_addresses
+    ):
+        panels.append(NoNotifyAddressesPanel())
+
+
+@hooks.register("register_admin_urls")
+def register_category_products_reorder_url():
+    return [
+        path(
+            "shop/categories/<int:category_pk>/products/reorder/<int:pk>/",
+            CategoryProductsReorderView.as_view(),
+            name="shop_category_products_reorder",
+        )
+    ]
+
+
+@hooks.register("insert_global_admin_css")
+def shop_admin_css():
+    # Fields in a row (e.g. a variant's price, stock and items per pack) line up
+    # whatever the length of their help text: their labels at the top, and
+    # their inputs at the bottom
+    return mark_safe(
+        """<style>
+        .shop-field-row .w-field-row > .w-panel__wrapper,
+        .shop-field-row .w-field-row > .w-panel__wrapper > .w-field__wrapper,
+        .shop-field-row .w-field { display: flex; flex-direction: column; }
+        .shop-field-row .w-field-row > .w-panel__wrapper > .w-field__wrapper,
+        .shop-field-row .w-field { flex-grow: 1; }
+        .shop-field-row .w-field__input { margin-top: auto; }
+        </style>"""
+    )
+
+
 @hooks.register("construct_settings_menu")
 def hide_shop_settings(request, menu_items):
-    # (in the Shop Stock menu instead)
+    # (in the Shop setup menu instead)
     menu_items[:] = [item for item in menu_items if item.name != "shop-settings"]
 
 
-class ProductGroup(SnippetViewSetGroup):
+class ShopStockGroup(SnippetViewSetGroup):
+    """What's sold in the shop"""
+
     menu_label = SHOP_STOCK_MENU_LABEL
     menu_icon = "pick"
-    items = (
-        CategoryViewSet,
-        ProductViewSet,
-        ProductVariantViewSet,
-        SaleViewSet,
-        DiscountCodeViewSet,
-        ShopSettingsViewSet,
-        DispatchersViewSet,
-    )
-    menu_order = 200
+    items = (CategoryViewSet, ProductViewSet, ProductVariantViewSet)
+    # (after Orders, see dashboard/wagtail_hooks.py)
+    menu_order = 520
 
 
-register_snippet(ProductGroup)
+class ShopSetupGroup(SnippetViewSetGroup):
+    """The shop's promotions and settings"""
+
+    menu_label = SHOP_SETUP_MENU_LABEL
+    menu_icon = "cogs"
+    items = (SaleViewSet, DiscountCodeViewSet, ShopSettingsViewSet, DispatchersViewSet)
+    menu_order = 530
+
+
+register_snippet(ShopStockGroup)
+register_snippet(ShopSetupGroup)
 
 
 class PermissionSearchArea(SearchArea):
