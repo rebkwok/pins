@@ -101,7 +101,7 @@ class DispatchersView(WagtailAdminTemplateMixin, TemplateView):
     """
     Dispatcher activity: the users in the Dispatchers group, with their products
     and the items they still have to send (or hold for collection), so shop
-    admins and Orders only users can check that orders are being sent; and the
+    admins and Shop managers can check that orders are being sent; and the
     items of products without a dispatcher. Site admins (who can change users,
     and so their groups) can add existing users to the group and remove them.
     """
@@ -112,7 +112,7 @@ class DispatchersView(WagtailAdminTemplateMixin, TemplateView):
 
     # (changing a user's groups needs permission to change users)
     manage_permission = "auth.change_user"
-    # shop admins (who choose products' dispatchers) and Orders only users
+    # shop admins (who choose products' dispatchers) and Shop managers
     view_permissions = ("shop.change_product", "shop.view_order")
     # The oldest pending order is highlighted if it's older than this
     OVERDUE_DAYS = 3

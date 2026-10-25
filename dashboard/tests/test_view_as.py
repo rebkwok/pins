@@ -35,7 +35,7 @@ def test_view_as_groups():
     # Moderators), not groups that can't
     Group.objects.create(name="No admin")
     names = [g.name for g in view_as_groups()]
-    assert {"Shop admins", "Orders only", "Dispatchers", "Editors"} <= set(names)
+    assert {"Shop admins", "Shop manager", "Dispatchers", "Editors"} <= set(names)
     assert "No admin" not in names
     assert names == sorted(names)
 
@@ -48,7 +48,7 @@ def test_view_as_page(client, superuser):
         for item in re.findall(r"<li.*?</li>", nav, re.S)
     ] == ["Home", "Settings", "View as a role"]
     assert "View as Shop admins" in content
-    assert "View as Orders only" in content
+    assert "View as Shop manager" in content
     assert "Anything you do while viewing as a group is real" in content
 
 
@@ -90,8 +90,8 @@ def test_view_as(client, superuser):
     assert client.get(VIEW_AS_URL).url == reverse("wagtailadmin_home")
 
 
-def test_view_as_orders_only_starts_at_orders(client, superuser):
-    client.post(VIEW_AS_URL, {"group": group("Orders only").pk})
+def test_view_as_shop_manager_starts_at_orders(client, superuser):
+    client.post(VIEW_AS_URL, {"group": group("Shop manager").pk})
     assert client.get(reverse("wagtailadmin_home")).url == reverse("shop_orders:index")
 
 
@@ -148,7 +148,7 @@ def test_view_as_user_reused_and_reset():
     shop_admins = group("Shop admins")
     user = get_view_as_user(shop_admins)
     # e.g. changed in the admin
-    user.groups.add(group("Orders only"))
+    user.groups.add(group("Shop manager"))
     user.user_permissions.add(Permission.objects.get(codename="change_user"))
     user.is_superuser = True
     user.save()

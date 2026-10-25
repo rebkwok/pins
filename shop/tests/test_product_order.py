@@ -85,7 +85,7 @@ def test_reorder_product_from_another_category(admin_client, category, products)
 
 def test_reorder_needs_permission(client, category, products):
     user = baker.make("auth.User")
-    user.groups.add(Group.objects.get(name="Orders only"))
+    user.groups.add(Group.objects.get(name="Shop manager"))
     client.force_login(user)
     admin_client_resp = client.post(reorder_url(category, products[2], 0))
     assert admin_client_resp.status_code == 302

@@ -243,3 +243,19 @@ def test_shipping_cost_migration(migrations, monkeypatch):
     monkeypatch.setenv("SHOP_SHIPPING_COST", "3.50")
     apps = migrations([("shop", "0019_shop_settings_shipping_cost")])
     assert str(apps.get_model("shop", "ShopSettings").objects.get().shipping_cost) == "3.50"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_rename_orders_only_group_migration(migrations):
+    apps = migrations([("shop", "0027_order_checkout_details")])
+    Group = apps.get_model("auth", "Group")
+    # (transactional tests flush the database, so the groups may have gone)
+    Group.objects.filter(name="Shop manager").delete()
+    Group.objects.get_or_create(name="Orders only")
+    apps = migrations([("shop", "0028_rename_orders_only_group")])
+    Group = apps.get_model("auth", "Group")
+    assert Group.objects.filter(name="Shop manager").exists()
+    assert not Group.objects.filter(name="Orders only").exists()
+    # and back
+    apps = migrations([("shop", "0027_order_checkout_details")])
+    assert apps.get_model("auth", "Group").objects.filter(name="Orders only").exists()

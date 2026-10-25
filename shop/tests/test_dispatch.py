@@ -263,7 +263,7 @@ def test_see_dispatchers_orders_cant_mark_shipped(client, shop_variants, dispatc
 
 
 def test_see_dispatchers_orders_permission(client, dispatcher):
-    # e.g. another dispatcher, or an orders-only user
+    # e.g. another dispatcher, or an shop-manager user
     other = make_dispatcher("Bob", "bob@test.com")
     client.force_login(other)
     assert client.get(URL, {"dispatcher": dispatcher.pk}).url == reverse("wagtailadmin_home")
@@ -351,11 +351,11 @@ def test_orders_without_dispatcher_filter(client, shop_variants):
         assert len(resp.context["object_list"]) == 2
 
 
-def test_orders_only_see_dispatcher_activity(client, shop_variants, dispatcher):
+def test_shop_manager_see_dispatcher_activity(client, shop_variants, dispatcher):
     mug, card, raffle = shop_variants
     order_with([mug])
     user = baker.make("auth.User")
-    user.groups.add(Group.objects.get(name="Orders only"))
+    user.groups.add(Group.objects.get(name="Shop manager"))
     client.force_login(user)
     resp = client.get(DISPATCHERS_URL)
     assert resp.status_code == 200

@@ -1,5 +1,5 @@
 """
-The shop's roles: what Shop admins and Orders only users (groups created by
+The shop's roles: what Shop admins and Shop managers (groups created by
 migration 0017) see in the admin menu and can use, and the admin pages that
 need their own permissions.
 """
@@ -80,8 +80,8 @@ def test_shop_admins_group():
     ) == {("Shop", "add_image"), ("Shop", "change_image"), ("Shop", "choose_image")}
 
 
-def test_orders_only_group():
-    group = Group.objects.get(name="Orders only")
+def test_shop_manager_group():
+    group = Group.objects.get(name="Shop manager")
     assert set(group.permissions.values_list("codename", flat=True)) == {
         "access_admin",
         "change_order",
@@ -102,8 +102,8 @@ def test_shop_admin_menu(client):
     assert items["shop-admin"] == ["sales", "discount-codes", "shop-settings", "shop-activity"]
 
 
-def test_orders_only_menu(client):
-    assert set(menu(client, user_in("Orders only"))) == {"orders", "dispatcher-activity"}
+def test_shop_manager_menu(client):
+    assert set(menu(client, user_in("Shop manager"))) == {"orders", "dispatcher-activity"}
 
 
 def test_superuser_menu(client):
@@ -174,8 +174,8 @@ def test_shop_admin_shop_settings(client):
         ("wagtailimages:index", False),
     ],
 )
-def test_orders_only_pages(client, url_name, allowed):
-    client.force_login(user_in("Orders only"))
+def test_shop_manager_pages(client, url_name, allowed):
+    client.force_login(user_in("Shop manager"))
     resp = client.get(reverse(url_name))
     assert resp.status_code == (200 if allowed else 302)
 
@@ -216,10 +216,10 @@ def test_review_facebook_changes_permission(client):
 
 def test_dispatchers_menu(client):
     # Dispatcher activity: for people who can change users (site admins), edit
-    # products (shop admins) or see orders (Orders only users); not dispatchers
+    # products (shop admins) or see orders (Shop managers); not dispatchers
     url = reverse("shop_dispatchers:index")
     assert "dispatcher-activity" in menu(client, staff_with("change_user"), url=url)
-    assert "dispatcher-activity" in menu(client, user_in("Orders only"), url=url)
+    assert "dispatcher-activity" in menu(client, user_in("Shop manager"), url=url)
     dispatcher = user_in("Dispatchers")
     client.force_login(dispatcher)
     assert client.get(url).url == reverse("wagtailadmin_home")
@@ -302,9 +302,9 @@ def test_help_menu_for_page_editors(client):
 # The admin home
 
 
-def test_orders_only_start_at_orders(client):
+def test_shop_manager_start_at_orders(client):
     # their only admin page
-    client.force_login(user_in("Orders only"))
+    client.force_login(user_in("Shop manager"))
     resp = client.get(reverse("wagtailadmin_home"))
     assert resp.url == ORDERS_URL
 
@@ -403,12 +403,12 @@ def sidebar_search_url(client, user):
 
 
 def test_sidebar_search(client):
-    # shop admins search products, orders only users orders, and page editors
+    # shop admins search products, shop managers orders, and page editors
     # (and superusers) pages
     assert sidebar_search_url(client, user_in("Shop admins")) == reverse(
         "wagtailsnippets_shop_product:list"
     )
-    assert sidebar_search_url(client, user_in("Orders only")) == ORDERS_URL
+    assert sidebar_search_url(client, user_in("Shop manager")) == ORDERS_URL
     assert sidebar_search_url(
         client, baker.make("auth.User", is_superuser=True)
     ) == reverse("wagtailadmin_pages:search")

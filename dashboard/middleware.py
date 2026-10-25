@@ -5,7 +5,7 @@ from wagtail.admin.menu import SubmenuMenuItem, admin_menu
 
 
 # The shop's order pages (menu item names): users whose menu is just these (e.g.
-# Orders only users: Orders and Dispatcher activity) start at the first
+# Shop managers: Orders and Dispatcher activity) start at the first
 ORDER_PAGES = {"items-to-send", "orders", "dispatcher-activity"}
 
 

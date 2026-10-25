@@ -250,7 +250,7 @@ class DispatchersViewSet(ViewSet):
 
     @property
     def menu_item_class(self):
-        # For those who can see the page (shop admins, Orders only users, and
+        # For those who can see the page (shop admins, Shop managers, and
         # site admins)
         return DispatchersMenuItem
 

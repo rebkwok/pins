@@ -2,8 +2,8 @@
 Shop admin > Shop activity: the shop's entries in Wagtail's audit log (see
 activity.py), like Reports > Site history but just the shop's: its products,
 variants, categories, sales, discount codes, orders and settings, and
-dispatchers added or removed. For shop admins (and superusers); Orders only
-users see each order's activity on its page.
+dispatchers added or removed. For shop admins (and superusers); shop managers
+see each order's activity on its page.
 """
 
 from django.contrib.contenttypes.models import ContentType

@@ -60,9 +60,9 @@ def test_superuser(client, logged):
     assert len(messages(client.get(URL))) == 4
 
 
-@pytest.mark.parametrize("group", ["Orders only", DISPATCHERS_GROUP])
+@pytest.mark.parametrize("group", ["Shop manager", DISPATCHERS_GROUP])
 def test_others_cant_see_it(client, logged, group):
-    # (Orders only users see each order's activity on its page)
+    # (Shop managers see each order's activity on its page)
     client.force_login(user_in(group))
     resp = client.get(URL)
     assert resp.status_code == 302
@@ -74,7 +74,7 @@ def test_menu_item(client):
     client.force_login(user_in("Shop admins"))
     content = client.get(reverse("wagtailadmin_home")).content.decode()
     assert '"name": "shop-activity"' in content
-    client.force_login(user_in("Orders only"))
+    client.force_login(user_in("Shop manager"))
     content = client.get(reverse("shop_orders:index")).content.decode()
     assert '"name": "shop-activity"' not in content
 
