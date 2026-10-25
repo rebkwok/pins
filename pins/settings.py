@@ -30,7 +30,6 @@ root = environ.Path(__file__) - 2  # two folders back (/a/b/ - 3 = /)
 
 # defaults
 env = environ.Env(DEBUG=(bool, False),
-                  SHOW_DEBUG_TOOLBAR=(bool, False),
                   USE_MAILCATCHER=(bool, False),
                   LOCAL=(bool, False),
                   TESTING=(bool, False),
