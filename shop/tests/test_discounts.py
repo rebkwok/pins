@@ -3,7 +3,7 @@ Discount codes: a single-use amount off the whole basket (including shipping,
 after sale prices), claimed when payment starts and used by the order.
 """
 import html
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import Mock
 
@@ -11,6 +11,7 @@ import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.messages import get_messages
 from django.urls import reverse
+from django.utils import timezone
 from model_bakery import baker
 from salesman.checkout.payment import PaymentError
 from salesman.core.utils import get_salesman_model
@@ -501,8 +502,10 @@ def test_payment_ended_releases_code(rf, discounted_basket, code, create_session
     code.refresh_from_db()
     assert code.basket is None
     assert code.status() == "Available"
-    # the code stays applied to the basket
-    assert Basket.objects.get(id=discounted_basket.id).discount_code == code
+    # a cancelled payment: the basket keeps its items and the code; an expired
+    # one (or timed out basket) is emptied, so it loses the code
+    expected = code if end == "cancel" else None
+    assert Basket.objects.get(id=discounted_basket.id).discount_code == expected
 
 
 def test_order_uses_code(rf, discounted_basket, code, freezer):
@@ -655,3 +658,47 @@ def test_remove_code_htmx_no_basket(client):
     resp = htmx_post(client, reverse("shop:remove_discount_code"))
     assert resp.headers["HX-Refresh"] == "true"
     assert messages_for(resp) == []
+
+
+# An emptied basket loses its discount code, so it isn't still applied when the
+# customer next shops
+
+
+def test_removing_last_item_removes_code(basket_client, discounted_basket, product):
+    other = baker.make("shop.ProductVariant", product=product, variant_name="Large", stock=5)
+    discounted_basket.add(other)
+    first, second = discounted_basket.get_items()
+    # one item left: the code stays
+    discounted_basket.remove(first.ref)
+    assert Basket.objects.get(id=discounted_basket.id).discount_code is not None
+    # the last one, from the basket page: it's removed
+    basket_client.post(
+        reverse("shop:delete_basket_item", args=(second.ref,)),
+        {"product_id": second.product.id},
+    )
+    basket = Basket.objects.get(id=discounted_basket.id)
+    assert basket.discount_code is None
+    assert Basket.DISCOUNT_CODE_KEY not in basket.extra
+
+
+def test_expired_basket_loses_code(discounted_basket, product, freezer):
+    freezer.move_to(timezone.now() + timedelta(days=1))
+    assert Basket.clear_expired() == 1
+    basket = Basket.objects.get(id=discounted_basket.id)
+    assert not basket.items.exists()
+    assert basket.discount_code is None
+    # adding something later: no code
+    variant = baker.make("shop.ProductVariant", product=product, stock=5, price=3)
+    basket.add(variant)
+    assert Basket.objects.get(id=basket.id).discount_code is None
+
+
+def test_cleared_basket_loses_code(discounted_basket):
+    # e.g. its checkout session expired
+    discounted_basket.clear()
+    assert Basket.objects.get(id=discounted_basket.id).discount_code is None
+
+
+def test_clear_basket_without_code(basket):
+    basket.clear()
+    assert Basket.DISCOUNT_CODE_KEY not in Basket.objects.get(id=basket.id).extra

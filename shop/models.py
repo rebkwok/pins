@@ -428,6 +428,24 @@ class Basket(StripeBasketMixin, BaseBasket):
         code.save(update_fields=["basket"])
         return None
 
+    def clear(self):
+        super().clear()
+        self._remove_discount_code()
+
+    def remove(self, ref):
+        super().remove(ref)
+        if not self.items.exists():
+            self._remove_discount_code()
+
+    def _remove_discount_code(self):
+        """
+        The basket is empty (its last item was removed, or it timed out): remove
+        its discount code, so it isn't still applied when the customer next
+        shops
+        """
+        if self.extra.pop(self.DISCOUNT_CODE_KEY, None) is not None:
+            self.save(update_fields=["extra"])
+
     def release_discount_code(self):
         """The basket's payment has ended without an order: release its code"""
         DiscountCode.objects.filter(basket=self, order__isnull=True).update(basket=None)
