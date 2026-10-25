@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.shortcuts import redirect
 from django.template.defaultfilters import pluralize
+from django.templatetags.static import static
 from django.urls import path, reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
@@ -140,7 +141,7 @@ class ProductViewSet(ShopViewSet):
         "category_link",
         "dispatcher_display",
         BooleanColumn("live"),
-        "get_variant_count",
+        "variants_link",
     )
     list_filter = ("category",)
     search_fields = ("name", "category__title")
@@ -282,6 +283,15 @@ def register_category_products_reorder_url():
             name="shop_category_products_reorder",
         )
     ]
+
+
+@hooks.register("insert_global_admin_js")
+def shop_admin_js():
+    # The product page's stock fields: only those that apply (the script does
+    # nothing on other pages)
+    return format_html(
+        '<script src="{}" defer></script>', static("shop/js/admin_stock_fields.js")
+    )
 
 
 @hooks.register("insert_global_admin_css")

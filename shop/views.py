@@ -176,8 +176,12 @@ def get_basket_context(basket_data):
         item_data["product_type"] = product.name
         item_data["category"] = product.category.title
         item_data["variant_name"] = variant.variant_full_name()
-        # the most it can be changed to (its stock was taken when added)
-        item_data["max_quantity"] = variant.available + int(item_data["quantity"])
+        # the most it can be changed to (its stock was taken when added); None
+        # if there's no stock limit
+        available = variant.available
+        item_data["max_quantity"] = (
+            available + int(item_data["quantity"]) if available is not None else None
+        )
         # a thumbnail: the variant's image, or the product's first
         item_data["image"] = variant.image or next(
             (carousel_image.image for carousel_image in product.images), None
@@ -288,7 +292,8 @@ def _selectable_id(variant):
     The variant's id, to keep it selected in the variant options; None if none
     are left (its option is disabled, so the first available one is selected)
     """
-    return variant.id if variant.available > 0 else None
+    available = variant.available
+    return variant.id if available is None or available > 0 else None
 
 
 def _variant_options_oob_html(request, variant):
@@ -319,7 +324,7 @@ def _max_quantity(request, variant, in_basket):
     already in the basket (in the basket, where its stock has been taken); None
     if unknown. (Used to disable the + button, see quantity_buttons.js.)
     """
-    if variant is None:
+    if variant is None or variant.available is None:
         return None
     if not in_basket:
         return variant.available

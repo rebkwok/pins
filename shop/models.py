@@ -850,8 +850,8 @@ class ProductVariantAdminForm(RelativeStockFormMixin, WagtailAdminModelForm):
     Admin form for product variants, on their own and in the product form.
     Stock is changed relative to the stock shown (see RelativeStockFormMixin).
 
-    If the product's variants share stock, the variant's own stock isn't used, so
-    it isn't in the form (or shown). (Its pack size is always shown, so it can be
+    If the product's variants share stock (or it has no stock limit), the
+    variant's own stock isn't used, so it isn't in the form (or shown). (Its pack size is always shown, so it can be
     set in the same save as ticking the product's "Variants share stock".)
     """
 
@@ -862,7 +862,8 @@ class ProductVariantAdminForm(RelativeStockFormMixin, WagtailAdminModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._init_stock_shown()
-        if self.instance.product_id is not None and self.instance.product.shares_stock:
+        product = self.instance.product if self.instance.product_id is not None else None
+        if product is not None and (product.shares_stock or product.unlimited_stock):
             del self.fields["stock"]
             del self.fields["stock_shown"]
 
@@ -1033,6 +1034,12 @@ class VariantStockHelpPanel(MessagePanel):
                     "and packs of 5): this is set on the product's page."
                 )
             url = reverse("wagtailsnippets_shop_product:edit", args=(product.pk,))
+            if product.unlimited_stock:
+                return format_html(
+                    "This product has no stock limit, so its variants' stock isn't "
+                    'counted. This is set on the <a href="{}">product\'s page</a>.',
+                    url,
+                )
             if product.shares_stock:
                 return format_html(
                     "This product's variants share stock: <strong>{}</strong> single "
@@ -1132,6 +1139,12 @@ class ProductVariantsInlinePanel(InlinePanel):
         return options
 
 
+UNLIMITED_SHARED_MESSAGE = (
+    "A product with no stock limit can't share stock between its variants: untick "
+    "one of them."
+)
+
+
 class ProductAdminForm(RelativeStockFormMixin, WagtailAdminModelForm):
     """
     The product's shared stock (used if its variants share stock) is changed
@@ -1194,6 +1207,8 @@ class ProductAdminForm(RelativeStockFormMixin, WagtailAdminModelForm):
     def clean(self):
         cleaned_data = super().clean()
         self._clean_stock(cleaned_data)
+        if cleaned_data.get("unlimited_stock") and cleaned_data.get("shares_stock"):
+            self.add_error("unlimited_stock", UNLIMITED_SHARED_MESSAGE)
         self._check_pack_sizes(cleaned_data)
         # Variants removed from the product in the form can't be deleted if
         # they've been ordered or are in customers' baskets
@@ -1237,6 +1252,14 @@ class Product(ClusterableModel):
     live = models.BooleanField(
         default=True,
         help_text="Shown in the shop (with its live variants). Untick to hide it.",
+    )
+    unlimited_stock = models.BooleanField(
+        default=False,
+        verbose_name="No stock limit",
+        help_text=(
+            "Tick for things that can't run out, e.g. competition entries or items "
+            "made to order: stock isn't counted, and they're never out of stock."
+        ),
     )
     shares_stock = models.BooleanField(
         default=False,
@@ -1307,8 +1330,12 @@ class Product(ClusterableModel):
             ),
         ),
         MultiFieldPanel(
-            [FieldPanel("shares_stock"), StockFieldPanel("stock")],
-            heading="Shared stock",
+            [
+                FieldPanel("unlimited_stock"),
+                FieldPanel("shares_stock"),
+                StockFieldPanel("stock"),
+            ],
+            heading="Stock",
         ),
         ProductVariantsInlinePanel(
             "variants",
@@ -1453,6 +1480,17 @@ class Product(ClusterableModel):
 
     get_variant_count.short_description = "# variants"
 
+    def variants_link(self):
+        """The product's variant count, linking to its variants in the admin"""
+        return format_html(
+            '<a href="{}?product={}">{}</a>',
+            reverse("wagtailsnippets_shop_productvariant:list"),
+            self.pk,
+            self.get_variant_count(),
+        )
+
+    variants_link.short_description = "Variants"
+
     @property
     def live_variants(self):
         return self.variants.filter(live=True)
@@ -1485,6 +1523,8 @@ class Product(ClusterableModel):
         their pack sizes). (Variants that aren't live don't count, even if they
         have stock.)
         """
+        if self.unlimited_stock:
+            return not self.live_variants.exists()
         if self.shares_stock:
             return not self.live_variants.filter(pack_size__lte=self.stock).exists()
         return not self.live_variants.filter(stock__gt=0).exists()
@@ -1693,7 +1733,12 @@ class ProductVariant(Orderable):
 
     @property
     def available(self):
-        """How many of this variant can be added to baskets"""
+        """
+        How many of this variant can be added to baskets; None if there's no
+        limit (the product has no stock limit)
+        """
+        if self.product.unlimited_stock:
+            return None
         return self.stock_holder.stock // self.items_per_unit
 
     def has_stock_for(self, quantity, in_basket=0):
@@ -1701,6 +1746,8 @@ class ProductVariant(Orderable):
         Whether there's stock for this quantity of the variant, if the basket
         already has in_basket of it (which have been taken from stock)
         """
+        if self.product.unlimited_stock:
+            return True
         return self.stock_holder.stock + (in_basket - quantity) * self.items_per_unit >= 0
 
     def stock_display(self):
@@ -1709,6 +1756,8 @@ class ProductVariant(Orderable):
         marked, as its stock may be out of date.
         """
         not_live = "" if self.live else ", not live"
+        if self.product.unlimited_stock:
+            return f"No limit{' (not live)' if not self.live else ''}"
         if not self.product.shares_stock:
             return f"{self.stock} (not live)" if not self.live else self.stock
         if self.pack_size == 1:
@@ -1718,8 +1767,11 @@ class ProductVariant(Orderable):
     def stock_reminder(self):
         """
         A reminder to check the stock, when the variant is made live (its stock
-        may not be right any more); None if it has no stock to sell
+        may not be right any more); None if it has no stock to sell (or no stock
+        limit)
         """
+        if self.product.unlimited_stock:
+            return None
         if self.product.shares_stock:
             if self.available <= 0:
                 return None
@@ -1752,8 +1804,13 @@ class ProductVariant(Orderable):
         return self.get_discounted_price() or self.base_price
 
     def stock_note(self):
-        """For the shop: "Out of stock", or "Only 3 left" if stock is low"""
+        """
+        For the shop: "Out of stock", or "Only 3 left" if stock is low (nothing
+        if there's no stock limit)
+        """
         available = self.available
+        if available is None:
+            return ""
         if available <= 0:
             return "Out of stock"
         if available <= LOW_STOCK:

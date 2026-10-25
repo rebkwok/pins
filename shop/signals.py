@@ -326,10 +326,14 @@ def adjust_stock(variant, change):
     """
     Add change (a quantity of the variant, which may be negative) to its stock:
     the variant's own stock, or the product's if its variants share stock (in
-    single items, so change x the variant's pack size). Uses an F expression so
+    single items, so change x the variant's pack size); nothing if the product
+    has no stock limit. Uses an F expression so
     concurrent updates can't overwrite each other, then refreshes the in-memory
     stock value.
     """
+    if variant.product.unlimited_stock:
+        # (no stock is counted)
+        return
     holder = variant.stock_holder
     type(holder).objects.filter(pk=holder.pk).update(
         stock=F("stock") + change * variant.items_per_unit
