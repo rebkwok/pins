@@ -7,6 +7,8 @@
             <strong class="shop-order__status">{{ order.display_status }}</strong>
             <span>Placed {{ order.date_created|date:"j M Y, H:i" }}</span>
             <span>Total {{ order.total|gbp }}</span>
+            {# the order's status page, as the customer sees it (the link from their emails, e.g. to send it again) #}
+            <a href="{% url 'shop:order_status' order.token %}" target="_blank" rel="noopener">Customer's order page<span class="w-sr-only"> (opens in a new tab)</span></a>
         </p>
 
         {% if can_complete or complete_after_shipping or can_cancel or can_refund %}

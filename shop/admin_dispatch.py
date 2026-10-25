@@ -23,18 +23,12 @@ from wagtail.admin.viewsets.base import ViewSet
 from common.users import real_users_q
 
 from .admin_orders import OrderItemsExportMixin
-from .admin_views import SHOP_SETUP_MENU_LABEL, DispatchersView
+from .admin_views import SHIPPABLE_STATUSES, DispatchersView
 from .models import DISPATCHERS_GROUP, Order, OrderItem, dispatcher_name, is_dispatcher
 
 User = get_user_model()
 
 # The orders whose items can be sent (paid)
-SHIPPABLE_STATUSES = [
-    Order.Status.PROCESSING,
-    Order.Status.PARTIALLY_SHIPPED,
-    Order.Status.SHIPPED,
-    Order.Status.COMPLETED,
-]
 # Orders' items sent recently, on the Sent tab
 SENT_ITEMS_SHOWN = 100
 
@@ -130,8 +124,7 @@ class DispatchView(OrderItemsExportMixin, WagtailAdminTemplateMixin, TemplateVie
     def get_breadcrumbs_items(self):
         if self.read_only:
             return self.breadcrumbs_items + [
-                {"url": None, "label": SHOP_SETUP_MENU_LABEL},
-                {"url": reverse("shop_dispatchers:index"), "label": "Dispatchers"},
+                {"url": reverse("shop_dispatchers:index"), "label": DispatchersView.page_title},
                 {"url": "", "label": self.get_page_title()},
             ]
         return self.breadcrumbs_items + [{"url": "", "label": self.page_title}]

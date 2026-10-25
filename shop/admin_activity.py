@@ -1,5 +1,5 @@
 """
-Shop setup > Shop activity: the shop's entries in Wagtail's audit log (see
+Shop admin > Shop activity: the shop's entries in Wagtail's audit log (see
 activity.py), like Reports > Site history but just the shop's: its products,
 variants, categories, sales, discount codes, orders and settings, and
 dispatchers added or removed. For shop admins (and superusers); Orders only
@@ -20,7 +20,7 @@ from wagtail.log_actions import registry as log_registry
 from wagtail.models import ModelLogEntry
 
 from . import activity
-from .admin_views import SHOP_SETUP_MENU_LABEL, DispatchersView
+from .admin_views import SHOP_ADMIN_MENU_LABEL, DispatchersView
 from .models import Category, DiscountCode, Order, Product, ProductVariant, Sale, ShopSettings
 
 SHOP_MODELS = (Product, ProductVariant, Category, Sale, DiscountCode, Order, ShopSettings)
@@ -85,7 +85,7 @@ class ShopActivityView(LogEntriesView):
     def get_breadcrumbs_items(self):
         return [
             *self.breadcrumbs_items,
-            {"url": None, "label": SHOP_SETUP_MENU_LABEL},
+            {"url": None, "label": SHOP_ADMIN_MENU_LABEL},
             {"url": "", "label": self.page_title},
         ]
 

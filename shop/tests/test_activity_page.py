@@ -1,4 +1,4 @@
-"""Shop setup > Shop activity (admin_activity.py): the shop's log entries"""
+"""Shop admin > Shop activity (admin_activity.py): the shop's log entries"""
 
 import html
 

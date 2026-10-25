@@ -12,6 +12,7 @@ from wagtail.admin.viewsets.base import ViewSet
 from wagtail.admin.panels import FieldPanel
 from wagtail.admin.ui.tables import BooleanColumn
 from wagtail.log_actions import log
+from wagtail.models import Collection, GroupCollectionPermission
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.chooser import SnippetChooserViewSet
 from wagtail.admin.search import SearchArea
@@ -26,7 +27,7 @@ from common.admin_menu import PermissionMenuItem
 from .admin_dispatch import DispatchViewSet
 from .admin_orders import OrderPermissionPolicy, OrderViewSet
 from .admin_views import (
-    SHOP_SETUP_MENU_LABEL,
+    SHOP_ADMIN_MENU_LABEL,
     SHOP_STOCK_MENU_LABEL,
     CategoryProductsReorderView,
     DispatchersView,
@@ -35,6 +36,7 @@ from . import activity
 from .admin_activity import ShopActivityViewSet
 from .models import (
     PRODUCT_VARIANT_PANELS,
+    SHOP_COLLECTION,
     Category,
     NO_NOTIFY_ADDRESSES_WARNING,
     DiscountCode,
@@ -210,7 +212,7 @@ class ProductVariantViewSet(ShopViewSet):
 
 class SaleViewSet(ShopViewSet):
     model = Sale
-    shop_menu_label = SHOP_SETUP_MENU_LABEL
+    shop_menu_label = SHOP_ADMIN_MENU_LABEL
     list_display = (
         "name",
         "start_date",
@@ -221,7 +223,7 @@ class SaleViewSet(ShopViewSet):
 
 class DiscountCodeViewSet(ShopViewSet):
     model = DiscountCode
-    shop_menu_label = SHOP_SETUP_MENU_LABEL
+    shop_menu_label = SHOP_ADMIN_MENU_LABEL
     icon = "tag"
     list_display = ("code", "amount", "status", "description", "date_created")
     list_filter = ("active",)
@@ -234,16 +236,22 @@ class DispatchersMenuItem(MenuItem):
 
 
 class DispatchersViewSet(ViewSet):
-    """Shop setup > Dispatchers: the users in the Dispatchers group"""
+    """
+    Dispatcher activity (in the main menu, by Orders): the users in the
+    Dispatchers group, and the items they have to send
+    """
 
     name = "shop_dispatchers"
-    menu_label = "Dispatchers"
+    menu_label = "Dispatcher activity"
     icon = "group"
+    add_to_admin_menu = True
+    # (after Orders, see dashboard/wagtail_hooks.py)
+    menu_order = 515
 
     @property
     def menu_item_class(self):
-        # Only for users who can change users' groups (site admins), like the
-        # page itself
+        # For those who can see the page (shop admins, Orders only users, and
+        # site admins)
         return DispatchersMenuItem
 
     def get_urlpatterns(self):
@@ -257,7 +265,7 @@ class ShopSettingsMenuItem(PermissionMenuItem):
 
 class ShopSettingsViewSet(ViewSet):
     """
-    Shop setup > Shop settings: a link to the shop settings (a Wagtail setting,
+    Shop admin > Shop settings: a link to the shop settings (a Wagtail setting,
     removed from the Settings menu so they're with the rest of the shop)
     """
 
@@ -339,9 +347,36 @@ def shop_admin_css():
     )
 
 
+def only_shop_images(user):
+    """
+    Whether the user's image permissions are all in the Shop collection (e.g.
+    shop admins, who add images from products' pages)
+    """
+    if user.is_superuser:
+        return False
+    permissions = GroupCollectionPermission.objects.filter(
+        group__user=user, permission__content_type__app_label="wagtailimages"
+    ).select_related("collection")
+    shop = Collection.get_first_root_node().get_children().filter(name=SHOP_COLLECTION).first()
+    if shop is None or not permissions:
+        return False
+    return all(
+        permission.collection == shop or permission.collection.is_descendant_of(shop)
+        for permission in permissions
+    )
+
+
+@hooks.register("construct_main_menu")
+def hide_images_for_shop_admins(request, menu_items):
+    # Shop admins add images from products' pages, so the Images menu isn't
+    # theirs (they still need permission to add images)
+    if only_shop_images(request.user):
+        menu_items[:] = [item for item in menu_items if item.name != "images"]
+
+
 @hooks.register("construct_settings_menu")
 def hide_shop_settings(request, menu_items):
-    # (in the Shop setup menu instead)
+    # (in the Shop admin menu instead)
     menu_items[:] = [item for item in menu_items if item.name != "shop-settings"]
 
 
@@ -355,23 +390,22 @@ class ShopStockGroup(SnippetViewSetGroup):
     menu_order = 520
 
 
-class ShopSetupGroup(SnippetViewSetGroup):
+class ShopAdminGroup(SnippetViewSetGroup):
     """The shop's promotions and settings"""
 
-    menu_label = SHOP_SETUP_MENU_LABEL
+    menu_label = SHOP_ADMIN_MENU_LABEL
     menu_icon = "cogs"
     items = (
         SaleViewSet,
         DiscountCodeViewSet,
         ShopSettingsViewSet,
-        DispatchersViewSet,
         ShopActivityViewSet,
     )
     menu_order = 530
 
 
 register_snippet(ShopStockGroup)
-register_snippet(ShopSetupGroup)
+register_snippet(ShopAdminGroup)
 
 
 class PermissionSearchArea(SearchArea):
@@ -423,6 +457,11 @@ def register_order_viewset():
 @hooks.register("register_admin_viewset")
 def register_dispatch_viewset():
     return DispatchViewSet()
+
+
+@hooks.register("register_admin_viewset")
+def register_dispatchers_viewset():
+    return DispatchersViewSet()
 
 
 def _protected_variants_response(request, variants, obj):

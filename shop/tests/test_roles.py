@@ -92,22 +92,18 @@ def test_orders_only_group():
 
 def test_shop_admin_menu(client):
     items = menu(client, user_in("Shop admins"))
-    # (no Settings: the shop settings are in the Shop setup menu; and no
+    # (no Settings: the shop settings are in the Shop admin menu; and no
     # Wagtail help, which is about editing pages)
-    assert set(items) == {"orders", "shop-stock", "shop-setup", "images"}
+    # (and Dispatcher activity, where they can see the dispatchers, but not
+    # change them)
+    # (and no Images: they add images from products' pages)
+    assert set(items) == {"orders", "dispatcher-activity", "shop-stock", "shop-admin"}
     assert items["shop-stock"] == ["categories", "products", "product-variants"]
-    # (they can see the dispatchers, but not change them)
-    assert items["shop-setup"] == [
-        "sales",
-        "discount-codes",
-        "shop-settings",
-        "dispatchers",
-        "shop-activity",
-    ]
+    assert items["shop-admin"] == ["sales", "discount-codes", "shop-settings", "shop-activity"]
 
 
 def test_orders_only_menu(client):
-    assert set(menu(client, user_in("Orders only"))) == {"orders"}
+    assert set(menu(client, user_in("Orders only"))) == {"orders", "dispatcher-activity"}
 
 
 def test_superuser_menu(client):
@@ -120,8 +116,9 @@ def test_superuser_menu(client):
         "footer-text",
         "facebook-changes",
         "orders",
+        "dispatcher-activity",
         "shop-stock",
-        "shop-setup",
+        "shop-admin",
         "recipe-book",
         "auctions",
         "reports",
@@ -130,8 +127,7 @@ def test_superuser_menu(client):
     ]
     assert items["auctions"] == ["auction-categories", "auctions", "auctions-help"]
 
-    assert "dispatchers" in items["shop-setup"]
-    assert "shop-settings" in items["shop-setup"]
+    assert "shop-settings" in items["shop-admin"]
     assert "shop-settings" not in items["settings"]
 
 
@@ -219,10 +215,14 @@ def test_review_facebook_changes_permission(client):
 
 
 def test_dispatchers_menu(client):
-    # for people who can change users (site admins) or edit products (shop
-    # admins), not e.g. orders-only users
-    assert "dispatchers" in menu(client, staff_with("change_user"), url=reverse("shop_dispatchers:index"))["shop-setup"]
-    assert "shop-setup" not in menu(client, user_in("Orders only"))
+    # Dispatcher activity: for people who can change users (site admins), edit
+    # products (shop admins) or see orders (Orders only users); not dispatchers
+    url = reverse("shop_dispatchers:index")
+    assert "dispatcher-activity" in menu(client, staff_with("change_user"), url=url)
+    assert "dispatcher-activity" in menu(client, user_in("Orders only"), url=url)
+    dispatcher = user_in("Dispatchers")
+    client.force_login(dispatcher)
+    assert client.get(url).url == reverse("wagtailadmin_home")
 
 
 def test_shop_admin_dispatchers_page(client, product):
@@ -240,7 +240,9 @@ def test_shop_admin_dispatchers_page(client, product):
     assert "Ann Smith" in content
     assert 'href="mailto:ann@test.com"' in content
     assert reverse("wagtailsnippets_shop_product:edit", args=(product.pk,)) in content
-    assert "Test Product</a> (emailed)" in content
+    # (emailed about new orders: an icon, with a key above the table)
+    assert '<span class="w-sr-only">(emailed about new orders)</span>' in content
+    assert "The dispatcher is emailed about new orders for this product." in content
     assert "ask a site admin" in content
     # (no editing users, removing or adding)
     assert reverse("wagtailusers_users:edit", args=(dispatcher.pk,)) not in content
@@ -482,3 +484,56 @@ def test_message_panels_one_box(client, product):
     assert MessagePanel().bind_to_model(type(product)).get_bound_panel(
         instance=product, request=None, form=None
     ).get_message() is None
+
+
+def test_images_menu(client):
+    # shown to those with image permissions outside the Shop collection (e.g.
+    # Editors), not to those with only the Shop collection's (shop admins)
+    from wagtail.models import Collection, GroupCollectionPermission
+    from django.contrib.auth.models import Permission
+
+    from ..wagtail_hooks import only_shop_images
+
+    shop_admin = user_in("Shop admins")
+    assert only_shop_images(shop_admin)
+    editor = user_in("Editors")
+    assert not only_shop_images(editor)
+    assert "images" in menu(client, editor, url=reverse("wagtailadmin_home"))
+    # with a sub-collection of the Shop collection: still only the shop's
+    shop = Collection.get_first_root_node().get_children().get(name="Shop")
+    mugs = shop.add_child(name="Mugs")
+    group = Group.objects.create(name="Mug photographers")
+    GroupCollectionPermission.objects.create(
+        group=group, collection=mugs, permission=Permission.objects.get(codename="add_image")
+    )
+    photographer = baker.make("auth.User")
+    photographer.groups.add(group)
+    assert only_shop_images(photographer)
+    # no image permissions, or a superuser: not hidden by this
+    assert not only_shop_images(baker.make("auth.User"))
+    assert not only_shop_images(baker.make("auth.User", is_superuser=True))
+
+
+def test_shop_admin_starts_at_welcome_page(client):
+    # (their menu has submenus, e.g. Shop stock)
+    client.force_login(user_in("Shop admins"))
+    assert client.get(reverse("wagtailadmin_home")).status_code == 200
+
+
+def test_other_plain_menus_start_at_welcome_page(client):
+    # several pages that aren't the shop's order pages (e.g. Images and
+    # Documents): the welcome page
+    from django.contrib.auth.models import Permission
+    from wagtail.models import Collection, GroupCollectionPermission
+
+    group = Group.objects.create(name="Media")
+    group.permissions.add(Permission.objects.get(codename="access_admin"))
+    root = Collection.get_first_root_node()
+    for codename in ["add_image", "add_document"]:
+        GroupCollectionPermission.objects.create(
+            group=group, collection=root, permission=Permission.objects.get(codename=codename)
+        )
+    user = baker.make("auth.User")
+    user.groups.add(group)
+    assert {"images", "documents"} <= set(menu(client, user, url=reverse("wagtailimages:index")))
+    assert client.get(reverse("wagtailadmin_home")).status_code == 200

@@ -786,3 +786,11 @@ def test_mark_items_not_sent_with_unshipped_product(admin_client, shop_variants)
         {"items": [order.items.get(product_id=mug.id).pk], "action": "not_sent"},
     )
     assert "ask a Stripe admin to refund the items" in messages_for(resp)[0]
+
+
+def test_customer_order_page_link(admin_client, order):
+    # the order's status page, as the customer sees it (its address is encoded,
+    # so admins can't easily find it otherwise)
+    content = admin_client.get(reverse("shop_orders:edit", args=(order.pk,))).content.decode()
+    url = reverse("shop:order_status", args=(order.token,))
+    assert f'<a href="{url}" target="_blank" rel="noopener">Customer\'s order page' in content

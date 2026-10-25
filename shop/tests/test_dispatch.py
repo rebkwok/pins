@@ -7,13 +7,14 @@ the download.
 import html
 import io
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from django.contrib.auth.models import Group
 from django.contrib.messages import get_messages
 from django.core import mail
 from django.urls import reverse
+from django.utils import timezone
 from model_bakery import baker
 from openpyxl import load_workbook
 
@@ -270,7 +271,91 @@ def test_see_non_dispatcher(client):
 
 
 def test_dispatchers_page_links(client, dispatcher):
+    # nothing pending yet
     shop_admin(client)
     page = client.get(reverse("shop_dispatchers:index")).content.decode()
-    assert f'href="{URL}?dispatcher={dispatcher.pk}"' in page
-    assert "See their items to send" in page
+    assert "None pending" in page
+    assert f'href="{URL}?dispatcher={dispatcher.pk}"' not in page
+
+
+# Dispatcher activity: each dispatcher's pending items
+
+
+DISPATCHERS_URL = reverse("shop_dispatchers:index")
+
+
+def backdate(order, when):
+    # (after creating all the orders: salesman's next order ref is from the
+    # latest order by date)
+    type(order).objects.filter(pk=order.pk).update(date_created=when)
+
+
+def test_dispatcher_activity(client, shop_variants, dispatcher):
+    mug, card, raffle = shop_variants
+    older = order_with([mug, card, raffle])
+    newer = order_with([mug], shipping_method="collect")
+    # not pending: unpaid orders, or items already sent
+    make_order([mug], status=OrderStatus.HOLD)
+    sent = make_order([mug])
+    sent.mark_items_shipped(sent.items.all(), dispatcher)
+    oldest = timezone.now() - timedelta(days=5)
+    backdate(older, oldest)
+    backdate(newer, timezone.now() - timedelta(days=1))
+    shop_admin(client)
+    resp = client.get(DISPATCHERS_URL)
+    (ann,) = resp.context["dispatchers"]
+    assert (ann.pending["count"], ann.pending["to_send"], ann.pending["to_collect"]) == (2, 1, 1)
+    # the oldest is over 3 days old
+    assert ann.pending["overdue"]
+    page = " ".join(content(resp).split())
+    assert f'<a href="{URL}?dispatcher={dispatcher.pk}">Pending items (2)</a>' in page
+    assert "1 to send, 1 to collect" in page
+    assert f"Oldest: {timezone.localtime(oldest):%-d %b} (over 3 days)" in page
+    # the card has no dispatcher (and the raffle ticket isn't shipped)
+    without = resp.context["pending_without_dispatcher"]
+    assert (without["count"], without["to_send"], without["overdue"]) == (1, 1, True)
+    orders_url = reverse("shop_orders:index")
+    assert f'<a href="{orders_url}?no_dispatcher=true">Pending items (1)</a>' in page
+    assert "No dispatcher" in page
+
+
+def test_dispatcher_activity_not_overdue(client, shop_variants, dispatcher):
+    mug, card, raffle = shop_variants
+    order = order_with([mug], shipping_method="collect")
+    yesterday = timezone.now() - timedelta(days=1)
+    backdate(order, yesterday)
+    shop_admin(client)
+    page = " ".join(content(client.get(DISPATCHERS_URL)).split())
+    assert "1 to collect" in page
+    assert "to send" not in page
+    assert f"Oldest: {timezone.localtime(yesterday):%-d %b} </div>" in page
+    assert "No dispatcher" not in page
+
+
+def test_orders_without_dispatcher_filter(client, shop_variants):
+    # the orders with items of products without a dispatcher, still to send
+    mug, card, raffle = shop_variants
+    with_card = order_with([card])
+    order_with([mug])
+    shop_admin(client)
+    resp = client.get(reverse("shop_orders:index"), {"no_dispatcher": "true"})
+    assert list(resp.context["object_list"]) == [with_card]
+    for value in ["", "false"]:
+        resp = client.get(reverse("shop_orders:index"), {"no_dispatcher": value})
+        assert len(resp.context["object_list"]) == 2
+
+
+def test_orders_only_see_dispatcher_activity(client, shop_variants, dispatcher):
+    mug, card, raffle = shop_variants
+    order_with([mug])
+    user = baker.make("auth.User")
+    user.groups.add(Group.objects.get(name="Orders only"))
+    client.force_login(user)
+    resp = client.get(DISPATCHERS_URL)
+    assert resp.status_code == 200
+    assert "ask a site admin" in content(resp)
+    # and a dispatcher's items (read-only)
+    resp = client.get(URL, {"dispatcher": dispatcher.pk})
+    assert resp.status_code == 200
+    # they start at the orders list (their menu is the shop's order pages)
+    assert client.get(reverse("wagtailadmin_home")).url == reverse("shop_orders:index")

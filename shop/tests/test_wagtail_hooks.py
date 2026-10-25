@@ -35,7 +35,7 @@ def breadcrumbs(content):
     [
         ("product", "Shop stock", "Products", "New: Product"),
         ("productvariant", "Shop stock", "Product variants", "New: Product variant"),
-        ("sale", "Shop setup", "Sales", "New: Sale"),
+        ("sale", "Shop admin", "Sales", "New: Sale"),
     ],
 )
 def test_shop_breadcrumbs(

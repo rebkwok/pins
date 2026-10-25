@@ -4,42 +4,50 @@
 {% block main_content %}
     <p class="help-block help-info">
         Dispatchers are users who send (or hold, for collection) some of the shop's
-        products. Choose each product's dispatcher on the product's page.
+        products. Check here that they're sending the orders that come in: their
+        pending items are those in paid orders that they haven't marked sent yet.
+        Choose each product's dispatcher on the product's page.
         {% if not can_manage %}
             To add or remove dispatchers, or change their details, ask a site admin.
         {% endif %}
     </p>
 
-    {% if dispatchers %}
-        <table class="listing">
+    {% if dispatchers or pending_without_dispatcher %}
+        <p class="shop-dispatchers__key">
+            {% icon name="mail" classname="shop-dispatcher-emailed" %}
+            The dispatcher is emailed about new orders for this product.
+        </p>
+        <table class="listing shop-dispatchers">
             <thead>
                 <tr>
                     <th>Name</th>
                     <th>Email</th>
                     <th>Products</th>
-                    <th><span class="w-sr-only">Items to send</span></th>
+                    <th>Pending</th>
                     {% if can_manage %}<th><span class="w-sr-only">Actions</span></th>{% endif %}
                 </tr>
             </thead>
             <tbody>
                 {% for dispatcher in dispatchers %}
                     <tr>
-                        <td>
+                        <td data-label="Name">
                             {% if can_manage %}
                                 <a href="{% url 'wagtailusers_users:edit' dispatcher.pk %}">{{ dispatcher.get_full_name|default:dispatcher.get_username }}</a>
                             {% else %}
                                 {{ dispatcher.get_full_name|default:dispatcher.get_username }}
                             {% endif %}
                         </td>
-                        <td>{% if dispatcher.email %}<a href="mailto:{{ dispatcher.email }}">{{ dispatcher.email }}</a>{% else %}-{% endif %}</td>
-                        <td>
+                        <td data-label="Email">{% if dispatcher.email %}<a href="mailto:{{ dispatcher.email }}">{{ dispatcher.email }}</a>{% else %}-{% endif %}</td>
+                        <td data-label="Products">
                             {% for product in dispatcher.dispatched_products.all %}
-                                <a href="{% url 'wagtailsnippets_shop_product:edit' product.pk %}">{{ product.name }}</a>{% if product.notify_dispatcher %} (emailed){% endif %}{% if not forloop.last %}<br>{% endif %}
+                                <a href="{% url 'wagtailsnippets_shop_product:edit' product.pk %}">{{ product.name }}</a>{% if product.notify_dispatcher %} <span title="Emailed about new orders for this product">{% icon name="mail" classname="shop-dispatcher-emailed" %}<span class="w-sr-only">(emailed about new orders)</span></span>{% endif %}{% if not forloop.last %}<br>{% endif %}
                             {% empty %}
                                 -
                             {% endfor %}
                         </td>
-                        <td><a href="{% url 'shop_dispatch:index' %}?dispatcher={{ dispatcher.pk }}">See their items to send</a></td>
+                        <td data-label="Pending">
+                            {% include "shop/admin/includes/dispatcher_pending.html" with pending=dispatcher.pending url=dispatcher.pending_url %}
+                        </td>
                         {% if can_manage %}
                             <td>
                                 <form method="post">
@@ -50,6 +58,18 @@
                         {% endif %}
                     </tr>
                 {% endfor %}
+                {% if pending_without_dispatcher %}
+                    {# items of products without a dispatcher (sent by shop admins) #}
+                    <tr>
+                        <td data-label="Name"><em>No dispatcher</em></td>
+                        <td data-label="Email">-</td>
+                        <td data-label="Products">Products without a dispatcher</td>
+                        <td data-label="Pending">
+                            {% include "shop/admin/includes/dispatcher_pending.html" with pending=pending_without_dispatcher url=pending_without_dispatcher_url %}
+                        </td>
+                        {% if can_manage %}<td></td>{% endif %}
+                    </tr>
+                {% endif %}
             </tbody>
         </table>
     {% else %}
@@ -64,4 +84,21 @@
             <button type="submit" class="button">Add</button>
         </form>
     {% endif %}
+{% endblock %}
+
+{% block extra_css %}
+    {{ block.super }}
+    <style>
+        .shop-dispatchers__key { display: flex; align-items: center; gap: 0.4rem; }
+        .shop-dispatcher-emailed { width: 1em; height: 1em; vertical-align: -0.125em; }
+        .shop-dispatchers__detail { font-size: 0.9em; color: var(--w-color-text-meta); }
+        .shop-dispatchers__overdue { color: var(--w-color-critical-200); font-weight: 600; }
+        /* Phones: each dispatcher as a card */
+        @media (max-width: 50em) {
+            .shop-dispatchers thead { display: none; }
+            .shop-dispatchers tr { display: block; padding: 0.75rem 0; border-bottom: 1px solid var(--w-color-border-furniture); }
+            .shop-dispatchers td { display: flex; gap: 0.75rem; padding: 0.15rem 0; border: none; }
+            .shop-dispatchers td[data-label]::before { content: attr(data-label); flex: 0 0 5.5rem; font-weight: 600; }
+        }
+    </style>
 {% endblock %}

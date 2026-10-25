@@ -34,6 +34,7 @@ from wagtail.permission_policies import ModelPermissionPolicy
 from common.users import real_users_q
 
 from . import activity
+from .admin_views import SHIPPABLE_STATUSES
 from .models import DISPATCHERS_GROUP, Order, OrderItem, Product, ProductVariant
 from .payment import PayByStripe
 from .templatetags.shoptags import gbp
@@ -94,6 +95,12 @@ class OrderFilterSet(WagtailFilterSet):
         method="filter_dispatcher",
         empty_label="Any dispatcher",
     )
+    # (from Dispatcher activity: the items that shop admins send themselves)
+    no_dispatcher = django_filters.BooleanFilter(
+        label="Has items without a dispatcher to ship or collect",
+        method="filter_no_dispatcher",
+        widget=forms.Select(choices=[("", "Any"), ("true", "Yes")]),
+    )
     product = django_filters.ModelChoiceFilter(
         label="Product",
         queryset=Product.objects.order_by("category__sort_order", "category__title", "name"),
@@ -134,16 +141,21 @@ class OrderFilterSet(WagtailFilterSet):
 
     def filter_to_ship(self, queryset, name, value):
         to_ship = Q(
-            items__shipping_status=OrderItem.TO_SEND,
-            status__in=[
-                Order.Status.PROCESSING,
-                Order.Status.PARTIALLY_SHIPPED,
-                Order.Status.SHIPPED,
-                Order.Status.COMPLETED,
-            ],
+            items__shipping_status=OrderItem.TO_SEND, status__in=SHIPPABLE_STATUSES
         )
         ids = Order.objects.filter(to_ship).values("id")
         return queryset.filter(id__in=ids) if value else queryset.exclude(id__in=ids)
+
+    def filter_no_dispatcher(self, queryset, name, value):
+        if not value:
+            return queryset
+        return queryset.filter(
+            id__in=Order.objects.filter(
+                items__shipping_status=OrderItem.TO_SEND,
+                items__dispatcher__isnull=True,
+                status__in=SHIPPABLE_STATUSES,
+            ).values("id")
+        )
 
     def filter_dispatcher(self, queryset, name, value):
         return queryset.filter(

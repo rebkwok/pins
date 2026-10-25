@@ -320,7 +320,7 @@ def test_admin_dispatchers_page(admin_client, dispatcher, product):
     choices = [label for _, label in resp.context["form"].fields["user"].choices]
     assert "Cat Lee (cat@test.com)" in choices
     assert "Ann Smith (ann@test.com)" not in choices
-    assert "Shop setup" in content
+    assert "Shop admin" in content
 
 
 def test_admin_dispatchers_page_empty(admin_client):
