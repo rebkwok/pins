@@ -1,6 +1,7 @@
 """The shop's activity log (activity.py): what's logged, by whom, and its messages"""
 
 import html
+import json
 from decimal import Decimal
 
 import pytest
@@ -15,6 +16,7 @@ from salesman_stripe_connect import signals as stripe_signals
 from .. import activity
 from ..models import DISPATCHERS_GROUP, OrderItem, Product
 from ..payment import PayByStripe
+from .factories import PRODUCT_FORM_DEFAULTS
 
 pytestmark = pytest.mark.django_db
 
@@ -165,3 +167,198 @@ def test_formatters_without_data(order):
     entry = activity.log_order(order, activity.ORDER_PAID)
     assert entry.message == "Paid £0.00"
     assert activity.gbp(None) == "£0.00"
+
+
+# What changed, when shop items and the shop settings are edited
+
+
+def product_form_data(product, variants, **data):
+    form = {
+        "category": product.category.id,
+        "name": product.name,
+        "price": str(product.price),
+        "description": json.dumps({"blocks": [], "entityMap": {}}),
+        "live": "on",
+        "requires_shipping": "on",
+        **PRODUCT_FORM_DEFAULTS,
+        "stock_shown": "0",
+        "variants-TOTAL_FORMS": str(len(variants)),
+        "variants-INITIAL_FORMS": str(len(variants)),
+        "variants-MIN_NUM_FORMS": "0",
+        "variants-MAX_NUM_FORMS": "1000",
+    }
+    for i, variant in enumerate(variants):
+        form.update(
+            {
+                f"variants-{i}-id": str(variant.id),
+                f"variants-{i}-variant_name": variant.variant_name,
+                f"variants-{i}-price": str(variant.price),
+                f"variants-{i}-stock": str(variant.stock),
+                f"variants-{i}-stock_shown": str(variant.stock),
+                f"variants-{i}-pack_size": "1",
+                f"variants-{i}-live": "on",
+                f"variants-{i}-ORDER": str(i + 1),
+            }
+        )
+    form.update(data)
+    return {key: value for key, value in form.items() if value != ""}
+
+
+def last_entry(obj):
+    return entries(obj)[-1]
+
+
+@pytest.fixture
+def mug(product):
+    small = baker.make("shop.ProductVariant", product=product, variant_name="Small", price=10, stock=5)
+    large = baker.make("shop.ProductVariant", product=product, variant_name="Large", price=12, stock=3)
+    return product, small, large
+
+
+def edit_product(client, product, variants, **data):
+    url = reverse("wagtailsnippets_shop_product:edit", args=(product.id,))
+    resp = client.post(url, product_form_data(product, variants, **data))
+    assert resp.status_code == 302, resp.context["form"].errors if resp.context else resp
+    return last_entry(product)
+
+
+def test_product_edited(client, admin, mug):
+    product, small, large = mug
+    other = baker.make("shop.Category", title="Gifts", slug="gifts")
+    entry = edit_product(
+        client,
+        product,
+        [small, large],
+        price="15.00",
+        category=str(other.id),
+        **{"variants-0-stock": "8", "variants-1-live": "", "variants-1-variant_name": "Big"},
+    )
+    assert (entry.action, entry.user) == (activity.EDITED, admin)
+    assert entry.data["changes"] == [
+        "Category: Test Category → Gifts",
+        "Price: £12.00 → £15.00",
+        "Variant Small: Stock: +3",
+        "Variant Large: Variant name: Large → Big",
+        "Variant Large: Live: yes → no",
+    ]
+    assert entry.message.startswith("Edited: Category: Test Category → Gifts; Price:")
+
+
+def test_product_variants_added_and_removed(client, admin, mug):
+    product, small, large = mug
+    entry = edit_product(
+        client,
+        product,
+        [small, large],
+        **{
+            "variants-TOTAL_FORMS": "3",
+            "variants-1-DELETE": "on",
+            "variants-2-variant_name": "Medium",
+            "variants-2-colour": "Blue",
+            "variants-2-price": "11",
+            "variants-2-stock": "2",
+            "variants-2-pack_size": "1",
+            "variants-2-live": "on",
+            "variants-2-ORDER": "3",
+        },
+    )
+    assert entry.data["changes"] == ["Removed variant: Large", "Added variant: Medium, Blue"]
+
+
+def test_product_saved_without_changes(client, admin, mug):
+    # nothing logged
+    product, small, large = mug
+    url = reverse("wagtailsnippets_shop_product:edit", args=(product.id,))
+    assert client.post(url, product_form_data(product, [small, large])).status_code == 302
+    assert entries(product, activity.EDITED) == []
+
+
+def test_product_description_changed(client, admin, mug):
+    product, small, large = mug
+    description = json.dumps(
+        {"blocks": [{"key": "a", "type": "unstyled", "text": "Lovely mug", "depth": 0,
+                     "inlineStyleRanges": [], "entityRanges": []}], "entityMap": {}}
+    )
+    entry = edit_product(client, product, [small, large], description=description)
+    assert entry.data["changes"] == ["Description changed"]
+
+
+def test_category_and_discount_code_edited(client, admin, category):
+    url = reverse("wagtailsnippets_shop_category:edit", args=(category.id,))
+    client.post(url, {"title": "Mugs", "slug": category.slug, "description": json.dumps({"blocks": [], "entityMap": {}})})
+    assert last_entry(category).data["changes"] == ["Title: Test Category → Mugs"]
+    code = baker.make("shop.DiscountCode", code="PINS5", amount=Decimal("5.00"), active=True, description="")
+    url = reverse("wagtailsnippets_shop_discountcode:edit", args=(code.id,))
+    resp = client.post(url, {"code": "PINS5", "amount": "7.50", "description": "", "discount_type": code.discount_type})
+    assert resp.status_code == 302, resp.context["form"].errors
+    assert last_entry(code).data["changes"] == ["Amount: £5.00 → £7.50", "Active: yes → no"]
+
+
+def test_shop_settings_edited(client, admin):
+    from ..models import ShopSettings
+
+    # (the settings' own address: the one without its id redirects to it)
+    settings = ShopSettings.load()
+    url = reverse("wagtailsettings:edit", args=("shop", "shopsettings", settings.pk))
+    data = {"notify_email_addresses": "shop@pins.test", "reply_to": "", "shipping_cost": "5.50"}
+    assert client.post(url, data).status_code == 302
+    # one entry (Wagtail's, with what changed)
+    (entry,) = entries(settings)
+    assert (entry.action, entry.user) == (activity.SETTINGS_EDITED, admin)
+    assert entry.message == (
+        "Edited: Email new orders to: (blank) → shop@pins.test; Shipping cost: £4.99 → £5.50"
+    )
+    # saving without changes: Wagtail's own entry
+    client.post(url, data)
+    assert [entry.message for entry in entries(settings)][-1] == "Edited"
+
+
+def test_shop_settings_saved_outside_admin(admin):
+    # (not logged, as there's no Wagtail entry to add the changes to)
+    from ..models import ShopSettings
+
+    settings = ShopSettings.load()
+    settings.shipping_cost = Decimal("6.00")
+    settings.save()
+    assert entries(settings) == []
+
+
+def test_display_values():
+    from django import forms
+
+    assert activity.display_value(forms.CharField(), "") == "(blank)"
+    assert activity.display_value(forms.BooleanField(), False) == "no"
+    assert activity.display_value(forms.ChoiceField(choices=[("a", "Apple")]), "a") == "Apple"
+    assert activity.display_value(forms.CharField(), "x" * 100).endswith("…")
+
+
+def test_display_multiple_choices(category):
+    from django import forms
+
+    from ..models import Category
+
+    other = Category.objects.create(title="Cards")
+    field = forms.ModelMultipleChoiceField(queryset=Category.objects.all())
+    assert activity.display_value(field, [category.pk, other]) == "Test Category, Cards"
+    assert activity.display_value(field, category.pk) == "Test Category"
+
+
+def test_untouched_extra_form_ignored():
+    # (e.g. an extra variant form that was added but left blank)
+    from types import SimpleNamespace
+
+    from ..models import ProductVariant
+
+    blank = SimpleNamespace(has_changed=lambda: False, instance=ProductVariant())
+    formset = SimpleNamespace(model=ProductVariant, forms=[blank], can_delete=True)
+    form = SimpleNamespace(changed_data=[], fields={}, cleaned_data={}, formsets={"variants": formset})
+    assert activity.form_changes(form) == []
+
+
+def test_sale_discounts_named(category, product):
+    from ..models import Sale, SaleCategory, SaleProduct
+
+    sale = baker.make(Sale, name="Summer")
+    assert str(SaleCategory(sale=sale, category=category, discount=20)) == "Test Category (20% off)"
+    assert str(SaleProduct(sale=sale, product=product, discount=5)) == "Test Product (5% off)"
+    assert str(SaleProduct(sale=sale, discount=5)) == "5% off"

@@ -168,3 +168,143 @@ def register(actions):
 def amount_data(amount):
     """An amount for an entry's data (which is stored as JSON)"""
     return str(Decimal(amount).quantize(Decimal("0.01")))
+
+
+# What changed when a shop item (or the shop settings) is edited
+
+EDITED = "shop.edited"
+SETTINGS_EDITED = "shop.settings.edited"
+
+MAX_VALUE_LENGTH = 60
+
+
+def display_value(field, value):
+    """A form field's value, for a log message"""
+    from django import forms
+
+    if value in (None, ""):
+        return "(blank)"
+    if isinstance(field, forms.BooleanField):
+        return "yes" if value else "no"
+    if isinstance(field, forms.ModelMultipleChoiceField):
+        objects = value if hasattr(value, "__iter__") else [value]
+        names = [str(obj) if hasattr(obj, "pk") else str(field.queryset.filter(pk=obj).first() or obj) for obj in objects]
+        return ", ".join(names) or "(none)"
+    if isinstance(field, forms.ModelChoiceField):
+        if not hasattr(value, "pk"):
+            value = field.queryset.filter(pk=value).first() or value
+        return str(value)
+    if isinstance(field, forms.ChoiceField):
+        return str(dict(field.choices).get(value, value))
+    if isinstance(field, forms.DecimalField):
+        return gbp(value)
+    return Truncator(str(value)).chars(MAX_VALUE_LENGTH)
+
+
+def is_long_text(field):
+    """Rich text or long text, which is described as just "changed" """
+    from django import forms
+
+    widget = field.widget
+    return isinstance(widget, forms.Textarea) or "RichText" in type(widget).__name__ or "Draftail" in type(widget).__name__
+
+
+def field_changes(form):
+    """The changed fields of a form (not its formsets), e.g. "Price: £10.00 → £12.00" """
+    changes = []
+    data = getattr(form, "cleaned_data", {})
+    for name in form.changed_data:
+        if name in ("stock_shown", "ORDER", "DELETE", "id") or name not in form.fields:
+            continue
+        field = form.fields[name]
+        label = str(field.label or name.replace("_", " ").capitalize())
+        if name == "stock" and "stock_shown" in form.fields:
+            # stock is changed relative to the stock shown (RelativeStockFormMixin)
+            change = (data.get("stock") or 0) - (data.get("stock_shown") or form.initial.get("stock") or 0)
+            if change:
+                changes.append(f"{label}: {change:+d}")
+            continue
+        if is_long_text(field):
+            # (rich text's submitted value never matches its initial value
+            # exactly, so compare the values that would be stored)
+            if str(form.initial.get(name) or "").strip() != str(data.get(name) or "").strip():
+                changes.append(f"{label} changed")
+            continue
+        old = display_value(field, form.initial.get(name, field.initial))
+        new = display_value(field, data.get(name))
+        if old != new:
+            changes.append(f"{label}: {old} → {new}")
+    return changes
+
+
+def item_name(form):
+    """A formset item's name (e.g. a variant's), or for a new one, its form's names"""
+    instance = form.instance
+    if instance.pk:
+        # its name before this edit (the form has changed the instance)
+        instance = type(instance).objects.filter(pk=instance.pk).first() or instance
+    if instance.pk and hasattr(instance, "variant_full_name"):
+        # a variant, on its product's page: just its own name
+        return instance.variant_full_name() or "(no name)"
+    try:
+        return str(instance)
+    except Exception:
+        # e.g. a new variant, whose name includes its product's (not set yet)
+        data = getattr(form, "cleaned_data", {})
+        names = [str(data[key]) for key in ("variant_name", "colour", "size", "title", "name") if data.get(key)]
+        return ", ".join(names)
+
+
+def form_changes(form):
+    """
+    What changed in an edit form, including its formsets (e.g. a product's
+    variants and images): ["Price: £10.00 → £12.00", "Added variant: Large",
+    "Variant Small: Stock: +5"]
+    """
+    changes = field_changes(form)
+    for formset in getattr(form, "formsets", {}).values():
+        # e.g. "variant", "image" (on the product's page)
+        kind = str(formset.model._meta.verbose_name).removeprefix("product ")
+        for child in formset.forms:
+            if not getattr(child, "cleaned_data", None) and not child.has_changed():
+                continue
+            name = item_name(child) if child.instance.pk else ""
+            if formset.can_delete and formset._should_delete_form(child):
+                if child.instance.pk:
+                    changes.append(f"Removed {kind}: {name}")
+                continue
+            if child.instance.pk is None:
+                if child.has_changed():
+                    new_name = item_name(child)
+                    changes.append(f"Added {kind}" + (f": {new_name}" if new_name else ""))
+                continue
+            changes += [f"{kind.capitalize()} {name}: {change}" for change in field_changes(child)]
+    return changes
+
+
+class Edited(ShopLogFormatter):
+    label = "Edit (with changes)"
+
+    def format_message(self, log_entry):
+        return f"Edited: {'; '.join(self.data(log_entry, 'changes', []))}"
+
+
+SHOP_LOG_ACTIONS[EDITED] = Edited
+
+
+class SettingsEdited(Edited):
+    label = "Shop settings edited"
+
+
+SHOP_LOG_ACTIONS[SETTINGS_EDITED] = SettingsEdited
+
+
+def settings_value(field, value):
+    """A setting's value, for a log message"""
+    from django.db import models
+
+    if value in (None, ""):
+        return "(blank)"
+    if isinstance(field, models.DecimalField):
+        return gbp(value)
+    return Truncator(str(value)).chars(MAX_VALUE_LENGTH)

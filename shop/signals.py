@@ -7,12 +7,13 @@ from django.core.mail import EmailMessage
 from django.db import transaction
 from django.db.models import F
 from django.db.models import ProtectedError
-from django.db.models.signals import post_delete, post_init, post_save, pre_delete
+from django.db.models.signals import post_delete, post_init, post_save, pre_delete, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
 
 from salesman.core.utils import get_salesman_model
 from salesman.orders.signals import status_changed
+from wagtail.models import ModelLogEntry
 from salesman_stripe_connect import signals as stripe_signals
 
 from . import activity
@@ -437,3 +438,48 @@ def log_dispute_created(sender, order, message, **kwargs):
 @receiver(stripe_signals.dispute_closed)
 def log_dispute_closed(sender, order, message, **kwargs):
     activity.log_order(order, activity.ORDER_DISPUTE_CLOSED, message=message)
+
+
+# The shop settings are edited in Wagtail's settings view, which logs just
+# "Edited": add what changed to that entry (if anything did). The changes are
+# worked out when the settings are saved (just before the entry is logged), by
+# settings pk.
+_settings_changes = {}
+
+
+@receiver(pre_save, sender=ShopSettings)
+def remember_shop_settings(sender, instance, **kwargs):
+    instance._previous = ShopSettings.objects.filter(pk=instance.pk).first() if instance.pk else None
+
+
+@receiver(post_save, sender=ShopSettings)
+def remember_shop_settings_changes(sender, instance, created, **kwargs):
+    previous = getattr(instance, "_previous", None)
+    _settings_changes.pop(instance.pk, None)
+    if previous is None:
+        return
+    changes = []
+    for field in ShopSettings._meta.concrete_fields:
+        if field.primary_key:
+            continue
+        old, new = getattr(previous, field.attname), getattr(instance, field.attname)
+        if old != new:
+            changes.append(
+                f"{str(field.verbose_name).capitalize()}: "
+                f"{activity.settings_value(field, old)} → {activity.settings_value(field, new)}"
+            )
+    if changes:
+        _settings_changes[instance.pk] = changes
+
+
+@receiver(pre_save, sender=ModelLogEntry)
+def add_shop_settings_changes(sender, instance, **kwargs):
+    if (
+        instance.pk is None
+        and instance.action == "wagtail.edit"
+        and instance.content_type.model_class() is ShopSettings
+    ):
+        changes = _settings_changes.pop(int(instance.object_id), None)
+        if changes:
+            instance.action = activity.SETTINGS_EDITED
+            instance.data = {**(instance.data or {}), "changes": changes}

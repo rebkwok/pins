@@ -11,6 +11,7 @@ from wagtail.admin.menu import MenuItem
 from wagtail.admin.viewsets.base import ViewSet
 from wagtail.admin.panels import FieldPanel
 from wagtail.admin.ui.tables import BooleanColumn
+from wagtail.log_actions import log
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.chooser import SnippetChooserViewSet
 from wagtail.admin.search import SearchArea
@@ -49,6 +50,24 @@ from .models import (
 
 
 
+class ShopEditView(SnippetEditView):
+    """
+    Edit a shop item, logging what changed (e.g. "Price: £10.00 → £12.00", see
+    activity.form_changes) instead of Wagtail's plain "Edited"; nothing is
+    logged if nothing changed. (The shop's snippets don't have revisions or
+    drafts.)
+    """
+
+    def save_instance(self):
+        changes = activity.form_changes(self.form)
+        instance = self.form.save()
+        self.has_content_changes = self.form.has_changed()
+        self.new_revision = None
+        if changes:
+            log(instance=instance, action=activity.EDITED, data={"changes": changes})
+        return instance
+
+
 class ShopViewSet(SnippetViewSet):
     """
     A snippet in one of the shop menus, with the menu in its breadcrumbs
@@ -57,6 +76,7 @@ class ShopViewSet(SnippetViewSet):
     """
 
     shop_menu_label = SHOP_STOCK_MENU_LABEL
+    edit_view_class = ShopEditView
 
     @property
     def breadcrumbs_items(self):
@@ -100,7 +120,7 @@ def category_crumb(category):
     }
 
 
-class ProductEditView(SnippetEditView):
+class ProductEditView(ShopEditView):
     """Breadcrumbs: Home > Shop stock > Products > category > product"""
 
     def get_breadcrumbs_items(self):
@@ -108,7 +128,7 @@ class ProductEditView(SnippetEditView):
         return [*items[:-1], category_crumb(self.object.category), items[-1]]
 
 
-class ProductVariantEditView(SnippetEditView):
+class ProductVariantEditView(ShopEditView):
     """
     Breadcrumbs: Home > Shop stock > Product variants > category > product >
     variant

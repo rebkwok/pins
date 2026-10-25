@@ -2047,6 +2047,10 @@ class SaleCategory(models.Model):
     class Meta:
         unique_together = ("sale", "category")
 
+    def __str__(self):
+        # e.g. "Mugs (20% off)" (in the activity log)
+        return f"{self.category} ({self.discount}% off)" if self.category_id else f"{self.discount}% off"
+
 
 class SaleProduct(models.Model):
     """
@@ -2061,6 +2065,10 @@ class SaleProduct(models.Model):
 
     class Meta:
         unique_together = ("sale", "product")
+
+    def __str__(self):
+        # e.g. "Mugs (20% off)" (in the activity log)
+        return f"{self.product} ({self.discount}% off)" if self.product_id else f"{self.discount}% off"
 
 
 class Sale(ClusterableModel):
