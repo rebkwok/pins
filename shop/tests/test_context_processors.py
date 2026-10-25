@@ -83,7 +83,7 @@ def test_shop_page_does_not_create_basket(client, site_home_page):
     assert resp.status_code == 200
     assert resp.context["page"] == shop_page
     assert not Basket.objects.exists()
-    assert "(0)" in resp.content.decode()
+    assert 'aria-label="Basket (0 items)"' in resp.content.decode()
 
 
 def test_logged_out_visitor_can_shop(client, site_home_page, product):
@@ -112,7 +112,7 @@ def test_logged_out_visitor_can_shop(client, site_home_page, product):
 
     resp = client.get("/shop/")
     assert resp.context["basket_quantity"] == 2
-    assert "(2)" in resp.content.decode()
+    assert 'aria-label="Basket (2 items)"' in resp.content.decode()
     assert Basket.objects.count() == 1
 
 
@@ -163,7 +163,7 @@ def test_visitor_logs_in_after_adding_to_basket(client, site_home_page, product)
 
     resp = client.get("/shop/")
     assert resp.context["basket_quantity"] == 2
-    assert "(2)" in resp.content.decode()
+    assert 'aria-label="Basket (2 items)"' in resp.content.decode()
     assert Basket.objects.get().user == user
     assert BASKET_ID_SESSION_KEY not in client.session
     # stock is unaffected by the merge

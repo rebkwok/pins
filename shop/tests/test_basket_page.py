@@ -5,6 +5,7 @@ import html
 import pytest
 import wagtail_factories
 from django.urls import reverse
+from django.contrib.auth.models import AnonymousUser
 from model_bakery import baker
 from ..forms import MainButton
 
@@ -180,8 +181,8 @@ def test_refused_updates_variant_options(client, product):
     content = increase(client, large, 1)
     assert "Only 1 available</div>" in content
     assert f"<div id='id_select_variant_wrapper_{product.id}' hx-swap-oob='true'>" in content
-    assert f'<option value="{large.id}" data-available="1" selected> Large (only 1 left) </option>' in content
-    assert f'<option value="{small.id}" data-available="10">' in content
+    assert f'<option value="{large.id}" data-available="1" data-in-basket="0" data-name="Large" selected> Large (only 1 left) </option>' in content
+    assert f'<option value="{small.id}" data-available="10" data-in-basket="0" data-name="Small">' in content
     # still in stock: the buttons stay
     assert f"<div id='change_quantity_wrapper_{product.id}' hx-swap-oob='true'></div>" not in content
 
@@ -241,9 +242,91 @@ def test_added_variant_stays_selected(client, product):
 
     content = add(large, 1)
     assert "Added!" in content
-    assert f'<option value="{large.id}" data-available="2" selected>' in content
+    # (with how many are in the basket, for "1 in your basket")
+    assert f'<option value="{large.id}" data-available="2" data-in-basket="1" data-name="Large" selected>' in content
     # the last ones: their option is disabled, so it isn't kept selected
     content = add(large, 2)
-    assert f'<option value="{large.id}" data-available="0" disabled>' in content
+    assert f'<option value="{large.id}" data-available="0" data-in-basket="3" data-name="Large" disabled>' in content
     assert " selected" not in content.split("id_select_variant_wrapper")[1].split("</select>")[0]
-    assert f'<option value="{small.id}" data-available="10">' in content
+    assert f'<option value="{small.id}" data-available="10" data-in-basket="0" data-name="Small">' in content
+
+
+# "N in your basket", by the product's form
+
+
+def test_in_basket_tag(rf, basket):
+    from django.template import Context, Template
+
+    variant = basket.get_items()[0].product
+    other = baker.make("shop.ProductVariant", product=variant.product, stock=5)
+    template = Template("{% load shoptags %}{% in_basket variant %}")
+    request = rf.get("/")
+    request.session = {"BASKET_ID": basket.id}
+    request.user = AnonymousUser()
+    assert template.render(Context({"request": request, "variant": variant})) == "2"
+    assert template.render(Context({"request": request, "variant": other})) == "0"
+    # no basket, or no request
+    request = rf.get("/")
+    request.session = {}
+    request.user = AnonymousUser()
+    assert template.render(Context({"request": request, "variant": variant})) == "0"
+    assert template.render(Context({"variant": variant})) == "0"
+
+
+def test_in_basket_on_product_page(basket_client, basket):
+    variant = basket.get_items()[0].product
+    content = get(basket_client, reverse("shop:product_detail", args=(variant.product.id,)))
+    assert f'data-available="{variant.available}" data-in-basket="2"' in content
+    # (filled in by quantity_buttons.js)
+    assert f'<p class="shop-in-basket" hidden><a href="{reverse("shop:basket")}"></a></p>' in content
+
+
+# The order status page
+
+
+@pytest.fixture
+def paid_order(order):
+    order.status = order.Status.PROCESSING
+    order.save()
+    order.pay(amount=order.total, transaction_id="pi_1", payment_method="stripe")
+    return order
+
+
+@pytest.mark.parametrize(
+    "shipping_status,shipping_method,label",
+    [
+        ("to_send", "deliver", "To be sent"),
+        ("to_send", "collect", "To be collected"),
+        ("shipped", "deliver", "Shipped"),
+        ("shipped", "collect", "Collected"),
+        ("not_sent", "deliver", "Won't be sent"),
+        ("no_shipping", "deliver", None),
+    ],
+)
+def test_order_status_item_status(client, paid_order, shipping_status, shipping_method, label):
+    paid_order.shipping_method = shipping_method
+    paid_order.save()
+    paid_order.items.update(shipping_status=shipping_status)
+    resp = client.get(reverse("shop:order_status", args=(paid_order.token,)))
+    (item,) = resp.context["items"]
+    assert item["status"] == label
+    if label:
+        assert f'<span class="basket-item__status">{label}</span>' in html.unescape(resp.content.decode())
+
+
+def test_order_status_page(client, paid_order):
+    content = get(client, reverse("shop:order_status", args=(paid_order.token,)))
+    assert ">Go to shop</a>" in content
+    assert "Continue shopping" not in content
+    # the basket link isn't shown
+    assert "shop-basket-link" not in content
+
+
+def test_in_basket_variant_names(basket_client, basket):
+    # each option has its short name, for "In your basket: Small × 2" whichever
+    # variant is selected
+    variant = basket.get_items()[0].product
+    baker.make("shop.ProductVariant", product=variant.product, variant_name="Large", stock=5)
+    content = get(basket_client, reverse("shop:product_detail", args=(variant.product.id,)))
+    assert f'value="{variant.id}" data-available="{variant.available}" data-in-basket="2" data-name="Small"' in content
+    assert 'data-in-basket="0" data-name="Large"' in content

@@ -960,3 +960,167 @@
 .basket-item > [id^='updated_'].alert-info {
   color: #444;
 }
+
+/* "N in your basket", by the product's form */
+.shop-in-basket {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.shop-in-basket a {
+  color: #0f5132;
+}
+
+.shop-in-basket a::before {
+  content: "\2713\00a0";
+}
+
+/* The order status page */
+.order-details {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.order-details dt {
+  font-weight: 600;
+}
+
+.order-details dd {
+  margin: 0;
+}
+
+.basket-item__status {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 8px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  background: #ece7dc;
+  color: #333;
+}
+
+/* A main button that isn't full width (e.g. "Continue to payment") */
+.btn.shop-main-btn--inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  margin: 0;
+  padding: 0 20px;
+}
+
+.btn.shop-main-btn:hover,
+.btn.shop-main-btn:focus-visible {
+  color: var(--white);
+  background-color: var(--pins);
+  filter: brightness(0.95);
+}
+
+.shop-secondary-btn {
+  min-height: 48px;
+}
+
+/* The header's basket link */
+.btn.shop-basket-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 12px;
+  color: var(--white);
+  background-color: var(--pins);
+  border: none;
+  border-radius: 4px;
+}
+
+.btn.shop-basket-link:hover,
+.btn.shop-basket-link:focus-visible {
+  color: var(--white);
+  background-color: var(--pins);
+  filter: brightness(0.95);
+}
+
+.shop-basket-link__label {
+  display: none;
+}
+
+.shop-basket-link__count {
+  min-width: 1.5em;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--pins);
+  background: var(--white);
+}
+
+@media (min-width: 768px) {
+  .shop-basket-link__label {
+    display: inline;
+  }
+}
+
+/* (the card's short version is only for phones, where its form is hidden) */
+.shop-card .shop-in-basket--compact {
+  display: none;
+}
+
+@media (max-width: 767.98px) {
+  .shop-card--options .shop-in-basket--compact:not([hidden]) {
+    display: block;
+    margin-top: auto;
+  }
+
+  /* (the note takes the space above the button instead) */
+  .shop-card--options .shop-in-basket--compact:not([hidden]) + .shop-card__choose {
+    margin-top: 4px;
+  }
+}
+
+/* The shop's pink buttons (Choose options, Search, Checkout...): pink in every
+   state, so they don't turn Bootstrap grey when pressed, or when the page is
+   shown again with the button still focused (e.g. going back); slightly
+   darker on hover, only where there's a mouse */
+.btn.basket-btn {
+  --bs-btn-color: var(--white);
+  --bs-btn-bg: var(--pins);
+  --bs-btn-border-color: var(--pins);
+  --bs-btn-hover-color: var(--white);
+  --bs-btn-hover-bg: var(--pins);
+  --bs-btn-hover-border-color: var(--pins);
+  --bs-btn-active-color: var(--white);
+  --bs-btn-active-bg: var(--pins);
+  --bs-btn-active-border-color: var(--pins);
+  --bs-btn-disabled-color: var(--white);
+  --bs-btn-disabled-bg: var(--pins);
+  --bs-btn-disabled-border-color: var(--pins);
+}
+
+.btn.basket-btn:active {
+  filter: brightness(0.9);
+}
+
+@media (hover: hover) {
+  .btn.basket-btn:hover {
+    filter: brightness(0.95);
+  }
+}
+
+@media (hover: none) {
+  .btn.shop-main-btn:hover,
+  .btn.shop-basket-link:hover {
+    filter: none;
+  }
+}
+
+/* main-v1.3.css turns every a.btn grey on hover. Phones keep a link's :hover
+   after it's tapped, and going back shows the page with it still applied, so
+   the shop's link buttons ("Choose options", the basket link, ...) stay pink */
+a.btn.basket-btn:hover,
+a.btn.shop-basket-link:hover {
+  color: var(--white);
+  background-color: var(--pins);
+}

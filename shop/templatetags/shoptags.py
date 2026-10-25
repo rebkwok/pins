@@ -4,7 +4,7 @@ from decimal import Decimal
 from django import template
 from wagtail.models import Page
 
-from shop.models import ShopPage
+from shop.models import Basket, ShopPage
 
 
 register = template.Library()
@@ -53,6 +53,28 @@ def shop_breadcrumbs(context):
         items[-1]["url"] = None
 
     return {"items": items, "request": context.request}
+
+
+@register.simple_tag(takes_context=True)
+def in_basket(context, variant):
+    """
+    How many of the variant are in the visitor's basket (0 if none, or no
+    basket). The basket's quantities are looked up once per request, when first
+    needed (e.g. after adding to the basket, so they include what was added).
+    """
+    request = context.get("request")
+    if request is None:
+        return 0
+    quantities = getattr(request, "_shop_in_basket", None)
+    if quantities is None:
+        basket = Basket.get_existing(request)
+        quantities = {}
+        if basket is not None:
+            for item in basket.get_items():
+                if item.product is not None:
+                    quantities[item.product.id] = quantities.get(item.product.id, 0) + item.quantity
+        request._shop_in_basket = quantities
+    return quantities.get(variant.id, 0)
 
 
 @register.simple_tag(takes_context=True)

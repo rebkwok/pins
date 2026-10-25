@@ -203,8 +203,8 @@ def test_order_status_no_shipping(client, entry_basket):
     entry_basket.shipping_method = "none"
     entry_basket.save()
     order = Order.objects.create_from_basket(entry_basket, None)
-    content = client.get(reverse("shop:order_status", args=(order.token,))).content.decode()
-    assert "Shipping method: No shipping needed" in content
+    content = " ".join(client.get(reverse("shop:order_status", args=(order.token,))).content.decode().split())
+    assert "<dt>Shipping method</dt> <dd>No shipping needed</dd>" in content
     assert "Shipping address" not in content
 
 

@@ -6,14 +6,14 @@
     {% with variants=product.live_variants %}
         {% if variants|length == 1 %}
             {% with variant=variants.0 %}
-                <input type="hidden" name="product_id" id="id_product_{{ product.id }}" value="{{ variant.id }}" data-available="{{ variant.available }}">
+                <input type="hidden" name="product_id" id="id_product_{{ product.id }}" value="{{ variant.id }}" data-available="{{ variant.available }}" data-in-basket="{% in_basket variant %}">
                 {% with note=variant.stock_note %}{% if note %}<p class="shop-card__stock">{{ note }}</p>{% endif %}{% endwith %}
             {% endwith %}
         {% else %}
             <label class="visually-hidden" for="id_product_{{ product.id }}">Option</label>
             <select name="product_id" required id="id_product_{{ product.id }}" class="form-select shop-card__variant">
                 {% for variant in variants %}
-                    <option value="{{ variant.id }}" data-available="{{ variant.available }}"{% if variant.id == selected_variant_id %} selected{% endif %}{% if variant.available <= 0 %} disabled{% endif %}>
+                    <option value="{{ variant.id }}" data-available="{{ variant.available }}" data-in-basket="{% in_basket variant %}" data-name="{{ variant.variant_full_name|default:product.name }}"{% if variant.id == selected_variant_id %} selected{% endif %}{% if variant.available <= 0 %} disabled{% endif %}>
                         {{ variant.variant_full_name|default:product.name }}{% if product.price_summary.varies %} – {{ variant.current_price|gbp }}{% endif %}{% with note=variant.stock_note %}{% if note %} ({{ note|lower }}){% endif %}{% endwith %}
                     </option>
                 {% endfor %}

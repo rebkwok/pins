@@ -4,6 +4,8 @@
     <div id="id_select_variant_wrapper_{{ product.id }}">
         {% include "shop/includes/select_variant_field.html" %}
     </div>
+    {# What's in the basket from this product (quantity_buttons.js, from the variants' data-in-basket) #}
+    <p class="shop-in-basket" hidden><a href="{% url 'shop:basket' %}"></a></p>
     {% if not product.out_of_stock %}
         <div id="change_quantity_wrapper_{{ product.id }}" class="shop-card__buy">
             <div class="input-group quantity">

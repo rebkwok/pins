@@ -31,6 +31,7 @@ from .models import (
     SHIPPING_METHODS,
     SHIPPING_NONE,
     DiscountCode,
+    OrderItem,
     Product,
     ProductVariant,
 )
@@ -976,13 +977,38 @@ def order_status_view(request, token):
     return _order_status(request, token)
 
 
+def _customer_item_status(order, shipping_status):
+    """
+    An order item's shipping status for the customer, once the order has been
+    paid (None if there's nothing to say, e.g. it doesn't need shipping)
+    """
+    if not order.can_ship_items:
+        return None
+    collected = order.is_collected
+    return {
+        OrderItem.TO_SEND: "To be collected" if collected else "To be sent",
+        OrderItem.SHIPPED: "Collected" if collected else "Shipped",
+        OrderItem.NOT_SENT: "Won't be sent",
+    }.get(shipping_status)
+
+
 def _order_status(request, token, new=False):
     order = get_object_or_404(Order, token=token)
-    # Group the order items by product, as for the basket
-    order_data = get_basket_context(order.serializable_data())["basket"]
+    # The items as for the basket (name, variant, thumbnail), with their sale
+    # labels and shipping status
+    order_data = order.serializable_data()
+    extra_rows = order_data.get("_extra", {}).get("rows", [])
+    items_by_product = get_basket_context(order_data)["basket"]["items"]
+    items = []
+    for product_items in items_by_product.values():
+        for item in product_items:
+            item["extra_rows"] = item.get("_extra", {}).get("rows", [])
+            item["status"] = _customer_item_status(order, item["shipping_status"])
+            items.append(item)
     context = {
         "order": order,
-        "items_by_product": order_data["items"],
+        "items": items,
+        "extra_rows": extra_rows,
         "new_order": new,
         "hide_basket": True,
     }

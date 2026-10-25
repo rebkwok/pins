@@ -1,5 +1,5 @@
 {% extends "shop/base.html" %}
-{% load wagtailcore_tags wagtailimages_tags %}
+{% load shoptags %}
 
 {% block title %}Order Status{% endblock %}
 
@@ -7,37 +7,53 @@
     {% include "shop/includes/header-hero.html" with title="Order status" %}
 
     <div class="container shop-basket">
-        <div class="row">
-            <div class="col-md-12">
-                {% if new_order %}
-                    <h2>Thank you for your order!</h2>
-                {% endif %}
-
-                <ul>
-                    <li>Ref: {{ order.ref }}</li>
-                    <li>Status: {{ order.status_display }}</li>
-                    <li>Items ordered:
-                        <ul>
-                        {% for products in items_by_product.values %}
-                            {% for product in products %}
-                            <li>{{ product.product_data.name }} ({{ product.category }}) - {{ product.quantity }} - £{{ product.total|floatformat:2 }}</li>
-                            {% endfor %}
-                        {% endfor %}
-                        </ul>
-                    <li>Order date: {{ order.date_created|date:"d M Y" }}</li>
-                    <li>Shipping method: {{ order.get_shipping_method_display }}</li>
+        {% if new_order %}
+            <h2 class="basket-summary__title">Thank you for your order!</h2>
+        {% endif %}
+        <div class="basket-layout basket-layout--checkout">
+            <aside class="basket-summary" aria-label="Order details">
+                <h2 class="basket-summary__title">Order {{ order.ref }}</h2>
+                <dl class="order-details">
+                    <dt>Status</dt>
+                    <dd>{{ order.display_status }}</dd>
+                    <dt>Order date</dt>
+                    <dd>{{ order.date_created|date:"d M Y" }}</dd>
+                    <dt>Shipping method</dt>
+                    <dd>{{ order.get_shipping_method_display }}</dd>
                     {% if order.needs_delivery %}
-                        <li>Shipping address: {{ order.shipping_address }}</li>
+                        <dt>Shipping address</dt>
+                        <dd class="order-details__address">{{ order.shipping_address|linebreaksbr }}</dd>
                     {% endif %}
-                    <li>Order total: £{{ order.total|floatformat:2 }}</li>
-                    <li>Amount paid: £{{ order.amount_received|floatformat:2 }}</li>
-                    {% if order.amount_refunded %}
-                        <li>Amount refunded: £{{ order.amount_refunded|floatformat:2 }}</li>
-                    {% endif %}
-                    {% if order.amount_due %}
-                        <li>Amount outstanding: £{{ order.amount_due|floatformat:2 }}</li>
-                    {% endif %}
-                </ul>
+                </dl>
+            </aside>
+
+            <div class="basket-details">
+                <h2 class="basket-summary__title">Items</h2>
+                {% for item in items %}
+                    {% include "shop/includes/basket_item.html" %}
+                {% endfor %}
+                {% include "shop/includes/basket_extra.html" with is_checkout=True %}
+                <p class="basket-line basket-line--total">
+                    <span>Order total</span>
+                    <span>£{{ order.total|floatformat:2 }}</span>
+                </p>
+                <p class="basket-line">
+                    <span>Amount paid</span>
+                    <span>£{{ order.amount_received|floatformat:2 }}</span>
+                </p>
+                {% if order.amount_refunded %}
+                    <p class="basket-line">
+                        <span>Amount refunded</span>
+                        <span>£{{ order.amount_refunded|floatformat:2 }}</span>
+                    </p>
+                {% endif %}
+                {% if order.amount_due %}
+                    <p class="basket-line">
+                        <span>Amount outstanding</span>
+                        <span>£{{ order.amount_due|floatformat:2 }}</span>
+                    </p>
+                {% endif %}
+                <p class="basket-continue"><a href="{% shop_url %}">Go to shop</a></p>
             </div>
         </div>
     </div>

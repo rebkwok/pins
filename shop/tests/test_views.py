@@ -347,7 +347,7 @@ def test_add_to_basket(rf, product):
     resp = add_to_basket(request, product.id)
     content = resp.content.decode()
     # 3 items in basket
-    assert '<i class="fa-solid fa-basket-shopping"></i>  (3)' in content
+    assert 'aria-label="Basket (3 items)"' in content
     # the "Added!" message, with a link to the basket
     assert "Added!" in content
     assert f"<a href='{reverse('shop:basket')}'>Go to basket</a>" in content
@@ -382,7 +382,7 @@ def test_add_to_basket_out_of_stock(rf, basket, product):
     resp = add_to_basket(request, product.id)
     content = resp.content.decode()
     # 4 item now in basket
-    assert '<i class="fa-solid fa-basket-shopping"></i>  (4)' in content
+    assert 'aria-label="Basket (4 items)"' in content
 
     # variant 1 out of stock; another variant still in stock, so quantity and +/- buttons still shown
     assert (
@@ -390,8 +390,8 @@ def test_add_to_basket_out_of_stock(rf, basket, product):
         in content
     )
     options = " ".join(content.split())
-    assert f'<option value="{variant1.id}" data-available="0" disabled> Small (out of stock) </option>' in options
-    assert f'<option value="{variant2.id}" data-available="2"> Medium (only 2 left) </option>' in options
+    assert f'<option value="{variant1.id}" data-available="0" data-in-basket="4" data-name="Small" disabled> Small (out of stock) </option>' in options
+    assert f'<option value="{variant2.id}" data-available="2" data-in-basket="0" data-name="Medium"> Medium (only 2 left) </option>' in options
 
     # add to basket so variant2 now also out of stock
     request = rf.post(
@@ -406,7 +406,7 @@ def test_add_to_basket_out_of_stock(rf, basket, product):
     resp = add_to_basket(request, product.id)
     content = resp.content.decode()
     # 6 items now in basket
-    assert '<i class="fa-solid fa-basket-shopping"></i>  (6)' in content
+    assert 'aria-label="Basket (6 items)"' in content
 
     # so quantity and +/- buttons hidden
     assert (
@@ -455,7 +455,7 @@ def test_add_to_basket_cant_increase(rf, product):
     resp = add_to_basket(request, product.id)
     content = resp.content.decode()
     # no items in basket
-    assert '<i class="fa-solid fa-basket-shopping"></i>  (0)' in content
+    assert 'aria-label="Basket (0 items)"' in content
     # how many are available, with the stock note and quantity up to date
     assert "Only 1 available</div>" in content
     assert "Only 1 left" in content
@@ -819,24 +819,21 @@ def test_order_status_view(rf, order):
     request = rf.get("/")
     resp = order_status_view(request, order.token)
     assert resp.context_data["order"] == order
-    items_by_product = resp.context_data["items_by_product"]
-    # items are organised by product identifier
-    assert len(items_by_product["test-category-test-product"]) == 1
-    # and has category added in
-    assert (
-        items_by_product["test-category-test-product"][0]["category"]
-        == "Test Category"
-    )
+    # the items as in the basket (name, variant), without a shipping status
+    # until it's paid
+    (item,) = resp.context_data["items"]
+    assert (item["product_type"], item["variant_name"], item["status"]) == ("Test Product", "Small", None)
     assert resp.context_data["hide_basket"]
     assert not resp.context_data["new_order"]
-    content = resp.rendered_content
-    assert f"Ref: {order.ref}" in content
-    assert "Status: Created" in content
-    assert "Test Product - Small (Test Category) - 2 - £20.00" in content
-    assert "Shipping method: Collect in person" in content
-    assert "Order total: £20.00" in content
-    assert "Amount paid: £0.00" in content
-    assert "Amount outstanding: £20.00" in content
+    content = " ".join(resp.rendered_content.split())
+    assert f"Order {order.ref}</h2>" in content
+    assert "<dt>Status</dt> <dd>Awaiting payment</dd>" in content
+    assert "<strong>Test Product</strong> <span class=\"basket-item__variant\">Small</span>" in content
+    assert "Quantity: <span" in content and ">2</span>" in content
+    assert "<dt>Shipping method</dt> <dd>Collect in person</dd>" in content
+    assert "<span>Order total</span> <span>£20.00</span>" in content
+    assert "<span>Amount paid</span> <span>£0.00</span>" in content
+    assert "<span>Amount outstanding</span> <span>£20.00</span>" in content
     assert "Thank you for your order!" not in resp.rendered_content
 
 

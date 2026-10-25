@@ -1,8 +1,9 @@
-// The quantity -/+ buttons: disable "-" at 1 and "+" at the most that can be
+// The shop's product forms. The quantity -/+ buttons: disable "-" at 1 and "+" at the most that can be
 // added (the quantity field's max in the basket, or if the server said it
 // couldn't be increased; otherwise the selected variant's data-available on the
 // shop and product pages). The server still checks (stock
 // may have changed since the page loaded), and says if it can't increase.
+// Also what's in the basket from the product ("N in your basket").
 (function () {
     function maxQuantity(input) {
         if (input.max) {
@@ -38,8 +39,46 @@
         }
     }
 
+    // What's in the basket from this product (the variants' data-in-basket):
+    // "N in your basket", or with a choice of variants, which ones, e.g. "In
+    // your basket: Black, S × 1, Black, L × 2" (whichever is selected)
+    function setNote(note, text) {
+        if (note) {
+            note.hidden = !text;
+            note.querySelector("a").textContent = text;
+        }
+    }
+
+    function updateInBasket(form) {
+        const variant = form.querySelector("[name=product_id]");
+        let text = "";
+        let total = 0;
+        if (variant && variant.tagName === "SELECT") {
+            const inBasket = [...variant.options].filter(
+                (option) => Number(option.dataset.inBasket || 0) > 0
+            );
+            total = inBasket.reduce((sum, option) => sum + Number(option.dataset.inBasket), 0);
+            if (inBasket.length) {
+                text = "In your basket: " + inBasket
+                    .map((option) => `${option.dataset.name} × ${option.dataset.inBasket}`)
+                    .join(", ");
+            }
+        } else if (variant && Number(variant.dataset.inBasket || 0) > 0) {
+            total = Number(variant.dataset.inBasket);
+            text = `${total} in your basket`;
+        }
+        setNote(form.querySelector(".shop-in-basket"), text);
+        // a shop page card on phones, where the form is hidden: just the total
+        const card = form.closest(".shop-card");
+        setNote(
+            card && card.querySelector(".shop-in-basket--compact"),
+            total ? `${total} in your basket` : ""
+        );
+    }
+
     function updateAll() {
         document.querySelectorAll(".input-group.quantity").forEach(update);
+        document.querySelectorAll("form.shop-form").forEach(updateInBasket);
     }
 
     document.addEventListener("DOMContentLoaded", updateAll);

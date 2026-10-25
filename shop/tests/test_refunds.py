@@ -208,8 +208,8 @@ def test_webhook_refund_emailed_once(
 
 def test_order_status_page_refunds(client, paid_order):
     PayByStripe.record_refund(paid_order, "re_1", Decimal("5.00"))
-    content = client.get(reverse("shop:order_status", args=(paid_order.token,))).content.decode()
-    assert "Amount paid: £20.00" in content
-    assert "Amount refunded: £5.00" in content
+    content = " ".join(client.get(reverse("shop:order_status", args=(paid_order.token,))).content.decode().split())
+    assert "<span>Amount paid</span> <span>£20.00</span>" in content
+    assert "<span>Amount refunded</span> <span>£5.00</span>" in content
     # nothing is due because of a refund
     assert "Amount outstanding" not in content

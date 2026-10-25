@@ -19,6 +19,8 @@
     {% include "shop/includes/product_price.html" %}
     {% include "shop/includes/product_form.html" %}
     {% if has_choice > 1 and not product.out_of_stock %}
+        {# On phones, where the form is hidden: how many are in the basket, from all its variants (quantity_buttons.js) #}
+        <p class="shop-in-basket shop-in-basket--compact" hidden><a href="{% url 'shop:basket' %}"></a></p>
         <a href="{% url 'shop:product_detail' product.id %}" class="btn basket-btn shop-card__choose">Choose options</a>
     {% endif %}
 </article>

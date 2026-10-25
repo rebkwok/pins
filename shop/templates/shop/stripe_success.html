@@ -18,7 +18,7 @@
                 {% endif %}
                 {% if order %}
                     <p>Your order confirmation has been emailed to {{ email }}.</p>
-                    <p><a href="{% url 'shop:order_status' order.token %}">View your order</a></p>
+                    <p><a class="btn basket-btn shop-main-btn shop-main-btn--inline" href="{% url 'shop:order_status' order.token %}">View your order</a></p>
                 {% else %}
                     <p>Your order is being processed. You will receive a confirmation email{% if email %} at {{ email }}{% endif %} shortly.</p>
                 {% endif %}

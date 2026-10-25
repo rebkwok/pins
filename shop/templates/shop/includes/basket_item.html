@@ -80,6 +80,9 @@ id); on the checkout page it's a summary.
         </form>
         <div id="updated_{{ item.product_id }}" class="basket-item__message"></div>
     {% else %}
-        <div class="basket-item__quantity">Quantity: <span id="quantity_{{ item.product_id }}">{{ item.quantity }}</span></div>
+        <div class="basket-item__quantity">
+            Quantity: <span id="quantity_{{ item.product_id }}">{{ item.quantity }}</span>
+            {% if item.status %}<span class="basket-item__status">{{ item.status }}</span>{% endif %}
+        </div>
     {% endif %}
 </div>
