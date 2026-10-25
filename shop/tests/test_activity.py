@@ -362,3 +362,25 @@ def test_sale_discounts_named(category, product):
     assert str(SaleCategory(sale=sale, category=category, discount=20)) == "Test Category (20% off)"
     assert str(SaleProduct(sale=sale, product=product, discount=5)) == "Test Product (5% off)"
     assert str(SaleProduct(sale=sale, discount=5)) == "5% off"
+
+
+def test_description_saved_in_editor_unchanged(client, admin, mug):
+    # a description saved outside the admin (e.g. imported) has no block keys;
+    # saving it in the admin adds them, which isn't a change
+    product, small, large = mug
+    product.description = "<p>Lovely mug</p>"
+    product.save()
+    description = json.dumps(
+        {"blocks": [{"key": "abcde", "type": "unstyled", "text": "Lovely mug", "depth": 0,
+                     "inlineStyleRanges": [], "entityRanges": []}], "entityMap": {}}
+    )
+    url = reverse("wagtailsnippets_shop_product:edit", args=(product.id,))
+    client.post(url, product_form_data(product, [small, large], description=description, price="13"))
+    assert last_entry(product).data["changes"] == ["Price: £12.00 → £13.00"]
+    product.refresh_from_db()
+    assert 'data-block-key="abcde"' in product.description
+
+
+def test_comparable_html():
+    assert activity.comparable_html('<p data-block-key="x1">Hi</p>\n<p>There</p>') == "<p>Hi</p><p>There</p>"
+    assert activity.comparable_html(None) == ""

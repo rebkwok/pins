@@ -11,6 +11,7 @@ admin are attributed to whoever took them); entries logged outside the admin
 (e.g. from the Stripe webhook) have no user, and are shown as "system".
 """
 
+import re
 from decimal import Decimal
 
 from django.utils.text import Truncator
@@ -209,6 +210,16 @@ def is_long_text(field):
     return isinstance(widget, forms.Textarea) or "RichText" in type(widget).__name__ or "Draftail" in type(widget).__name__
 
 
+def comparable_html(value):
+    """
+    Rich text, to compare: without the editor's block keys (added when rich text
+    saved outside the admin, e.g. imported, is first saved in the admin) or
+    whitespace between tags
+    """
+    html = re.sub(r'\s*data-block-key="[^"]*"', "", str(value or ""))
+    return re.sub(r">\s+<", "><", html).strip()
+
+
 def field_changes(form):
     """The changed fields of a form (not its formsets), e.g. "Price: £10.00 → £12.00" """
     changes = []
@@ -227,7 +238,7 @@ def field_changes(form):
         if is_long_text(field):
             # (rich text's submitted value never matches its initial value
             # exactly, so compare the values that would be stored)
-            if str(form.initial.get(name) or "").strip() != str(data.get(name) or "").strip():
+            if comparable_html(form.initial.get(name)) != comparable_html(data.get(name)):
                 changes.append(f"{label} changed")
             continue
         old = display_value(field, form.initial.get(name, field.initial))
