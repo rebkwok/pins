@@ -1124,3 +1124,18 @@ a.btn.shop-basket-link:hover {
   color: var(--white);
   background-color: var(--pins);
 }
+
+/* The checkout form's sections */
+.basket-details fieldset {
+  margin-bottom: 24px;
+}
+
+.basket-details legend {
+  font-family: var(--font--primary);
+  font-size: 1.4rem;
+  margin-bottom: 8px;
+}
+
+.shop-uk-note {
+  margin-bottom: 12px;
+}

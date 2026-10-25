@@ -46,12 +46,23 @@
                 <dl class="dispatch-order__details">
                     <dt>Customer</dt>
                     <dd>{{ order.name|default:"-" }}</dd>
+                    {% if order.phone %}
+                        <dt>Mobile</dt>
+                        <dd><a href="tel:{{ order.phone }}">{{ order.phone }}</a></dd>
+                    {% endif %}
                     {% if order.is_collected %}
                         <dt>Email</dt>
                         <dd><a href="mailto:{{ order.email }}">{{ order.email }}</a></dd>
                     {% else %}
                         <dt>Address</dt>
-                        <dd>{{ order.shipping_address|linebreaksbr|default:"-" }}</dd>
+                        <dd>
+                            {{ order.shipping_address|linebreaksbr|default:"-" }}
+                            {% if order.outside_uk %}<br><strong class="dispatch-order__warning">Outside the UK: check shipping has been arranged with the shop.</strong>{% endif %}
+                        </dd>
+                        {% if order.safe_place %}
+                            <dt>Safe place</dt>
+                            <dd>{{ order.safe_place }}</dd>
+                        {% endif %}
                     {% endif %}
                 </dl>
                 <ul class="dispatch-order__items">
@@ -78,6 +89,7 @@
         {% endfor %}
     </div>
     <style>
+        .dispatch-order__warning { color: var(--w-color-critical-200); }
         .dispatch { max-width: 50rem; margin-top: 1.5rem; }
         .dispatch__tabs { display: flex; gap: 1.5rem; border-bottom: 1px solid var(--w-color-border-furniture); margin-bottom: 1.5rem; }
         .dispatch__tabs a { padding: 0.5rem 0; text-decoration: none; color: var(--w-color-text-label); border-bottom: 3px solid transparent; }

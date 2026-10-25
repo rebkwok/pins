@@ -23,6 +23,7 @@ def test_checkout_form_email_fields():
         "shipping_method": "collect",
         "billing_address": "-",
         "shipping_address": "-",
+        "consent": "on",
     }
     form = CheckoutForm(payment_method="stripe", shipping_method="collect", data=data)
     # payment and shipping methods are passed from shopping basked

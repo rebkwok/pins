@@ -98,15 +98,38 @@ SHIPPING_METHOD_NOTES = {
 logger = logging.getLogger(__name__)
 
 
+UK = "United Kingdom"
+# Checkout details saved on the basket (see views.save_checkout_details), which
+# become the order's
+CHECKOUT_DETAILS = ("phone", "safe_place", "country", "consent_at")
+
+
 class Order(OrderAmountsMixin, BaseOrder):
     name = models.CharField(max_length=255, verbose_name="Name")
     shipping_method = models.CharField(
         choices=tuple(SHIPPING_METHOD_CHOICES.items()), default=SHIPPING_DELIVER
     )
+    phone = models.CharField(max_length=40, blank=True, verbose_name="Mobile number")
+    # For delivery
+    safe_place = models.CharField(max_length=255, blank=True, verbose_name="Safe place")
+    country = models.CharField(
+        max_length=100, blank=True, help_text="The delivery address's country."
+    )
+    consent_at = models.DateTimeField(
+        null=True, blank=True, verbose_name="Data processing consent given"
+    )
 
     @property
     def needs_delivery(self):
         return self.shipping_method == SHIPPING_DELIVER
+
+    @property
+    def outside_uk(self):
+        """
+        Delivered outside the UK (shipping outside the UK isn't standard: the
+        customer should have arranged it first)
+        """
+        return self.needs_delivery and bool(self.country) and self.country != UK
 
     @transaction.atomic
     def populate_from_basket(
@@ -117,6 +140,10 @@ class Order(OrderAmountsMixin, BaseOrder):
     ) -> None:
         basket.extra["basket_id"] = basket.id
         self.name = basket.extra.pop("name", "")
+        for field in CHECKOUT_DETAILS:
+            value = basket.extra.pop(field, None)
+            if value:
+                setattr(self, field, value)
         self.shipping_method = basket.shipping_method
         if self.status == self.Status.PROCESSING and not basket.requires_shipping:
             # A paid order with nothing to ship is complete. It's created

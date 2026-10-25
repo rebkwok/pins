@@ -53,6 +53,7 @@ def checkout_ready(basket):
         {
             "email": "test@test.com",
             "shipping_address": "-",
+            "consent": "on",
             "billing_address": "-",
             "payment_method": "stripe",
         }
@@ -559,6 +560,7 @@ def test_free_order_from_checkout(basket_client, discounted_basket, code):
         "shipping_method": "collect",
         "billing_address": "-",
         "shipping_address": "-",
+        "consent": "on",
     }
     resp = basket_client.post(checkout_url(), data)
     order = Order.objects.get()

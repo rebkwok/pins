@@ -45,6 +45,8 @@ def order_with(variants, **kwargs):
     order = make_order(variants, **kwargs)
     order.name = "Cat"
     order.shipping_address = "1 Road\nTown"
+    order.phone = "07700 900123"
+    order.safe_place = "Porch"
     order.save()
     return order
 
@@ -171,10 +173,14 @@ def test_download(dispatcher_client, shop_variants, freezer):
     assert sheet.title == "Items to send"
     rows = list(sheet.values)
     assert rows[0] == (
-        "Order", "Date", "Customer", "Email", "Shipping method", "Shipping address", "Item", "Quantity",
+        "Order", "Date", "Customer", "Email", "Mobile number", "Shipping method",
+        "Shipping address", "Safe place", "Item", "Quantity",
     )
     assert [row[0] for row in rows[1:]] == [first.ref, second.ref]
-    assert rows[1][2:] == ("Cat", "c@test.com", "Delivery", "1 Road\nTown", "Test Product - Mug", 2)
+    assert rows[1][2:] == (
+        "Cat", "c@test.com", "07700 900123", "Delivery", "1 Road\nTown", "Porch",
+        "Test Product - Mug", 2,
+    )
     # (each order shaded in turn)
     assert sheet["A2"].fill.fill_type == "solid"
     assert sheet["A3"].fill.fill_type is None

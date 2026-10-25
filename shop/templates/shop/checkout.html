@@ -1,6 +1,6 @@
 {% extends "shop/base.html" %}
 {% load wagtailcore_tags wagtailimages_tags %}
-{% load crispy_forms_tags %}
+{% load crispy_forms_tags static %}
 
 {% block title %}Checkout{% endblock %}
 
@@ -43,7 +43,7 @@
                 </aside>
 
                 <div class="basket-details">
-                    <h2>Your details</h2>
+                    {# (the form's sections have headings: Your details, Delivery address, Data processing consent) #}
                     {% if form.errors %}
                         <p class="text-danger">Please correct the errors below:</p>
                     {% endif %}
@@ -65,3 +65,8 @@
         {% endif %}
     </div>
 {% endblock content %}
+
+{% block extra_js %}
+    {{ block.super }}
+    <script src="{% static 'shop/js/checkout.js' %}" defer></script>
+{% endblock extra_js %}

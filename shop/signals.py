@@ -155,8 +155,7 @@ def shop_order_message(order):
         )
     lines += ["", f"Customer: {order.name} ({order.email})"]
     lines.append(f"Shipping method: {order.get_shipping_method_display()}")
-    if order.needs_delivery:
-        lines += ["Shipping address:", order.shipping_address]
+    lines += customer_details_lines(order)
     lines += ["", "Items:"]
     lines += [
         f"- {item.quantity} x {item.name}: {note}" for item, note in zip(items, notes)
@@ -172,6 +171,29 @@ def shop_order_message(order):
         lines.append(f"Total: £{order.total:.2f}")
     lines += ["", f"View the order: {order_admin_url(order)}"]
     return "\n".join(lines)
+
+
+OUTSIDE_UK_WARNING = (
+    "OUTSIDE THE UK: check that shipping has been arranged with the customer (it "
+    "isn't standard)."
+)
+
+
+def customer_details_lines(order):
+    """
+    For the shop's and dispatchers' emails: the customer's mobile number, and
+    for delivery, the address (flagged if it's outside the UK) and safe place
+    """
+    lines = []
+    if order.phone:
+        lines.append(f"Mobile number: {order.phone}")
+    if order.needs_delivery:
+        lines += ["Shipping address:", order.shipping_address]
+        if order.outside_uk:
+            lines.append(OUTSIDE_UK_WARNING)
+        if order.safe_place:
+            lines.append(f"Safe place: {order.safe_place}")
+    return lines
 
 
 def notify_dispatchers(order):
@@ -198,10 +220,9 @@ def notify_dispatchers(order):
             lines = [f"Shop order '{order.ref}' has items for you to {to_do}:"]
             lines += [f"- {item.quantity} x {item.name}" for item in dispatcher_items]
             lines += ["", f"Customer: {order.name} ({order.email})"]
-            if order.needs_delivery:
-                lines += ["Shipping address:", order.shipping_address]
-            else:
+            if not order.needs_delivery:
                 lines += [f"Shipping method: {order.get_shipping_method_display()}"]
+            lines += customer_details_lines(order)
             lines += [
                 "",
                 "Mark the items as sent once you've sent them: "

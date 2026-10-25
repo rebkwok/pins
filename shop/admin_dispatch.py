@@ -77,8 +77,10 @@ class DispatchView(OrderItemsExportMixin, WagtailAdminTemplateMixin, TemplateVie
         "order.date_created",
         "order.name",
         "order.email",
+        "order.phone",
         "order.get_shipping_method_display",
         "order.shipping_address",
+        "order.safe_place",
         "name",
         "quantity",
     ]
@@ -88,7 +90,9 @@ class DispatchView(OrderItemsExportMixin, WagtailAdminTemplateMixin, TemplateVie
         "order.name": "Customer",
         "order.email": "Email",
         "order.get_shipping_method_display": "Shipping method",
+        "order.phone": "Mobile number",
         "order.shipping_address": "Shipping address",
+        "order.safe_place": "Safe place",
         "name": "Item",
         "quantity": "Quantity",
     }

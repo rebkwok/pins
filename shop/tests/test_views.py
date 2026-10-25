@@ -725,6 +725,7 @@ CHECKOUT_FORM_DATA = {
     "shipping_method": "collect",
     "billing_address": "-",
     "shipping_address": "-",
+    "consent": "on",
 }
 
 
@@ -762,6 +763,7 @@ def test_post_checkout_view_invalid_form(rf, basket):
         "shipping_method": "collect",
         "billing_address": "-",
         "shipping_address": "-",
+        "consent": "on",
     }
     request = rf.post(
         reverse("shop:checkout") + "?payment-method=stripe&shipping-method=collect",

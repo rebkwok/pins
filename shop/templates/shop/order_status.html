@@ -23,6 +23,14 @@
                     {% if order.needs_delivery %}
                         <dt>Shipping address</dt>
                         <dd class="order-details__address">{{ order.shipping_address|linebreaksbr }}</dd>
+                        {% if order.safe_place %}
+                            <dt>Safe place</dt>
+                            <dd>{{ order.safe_place }}</dd>
+                        {% endif %}
+                    {% endif %}
+                    {% if order.phone %}
+                        <dt>Mobile number</dt>
+                        <dd>{{ order.phone }}</dd>
                     {% endif %}
                 </dl>
             </aside>

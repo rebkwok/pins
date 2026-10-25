@@ -18,7 +18,7 @@ from salesman.checkout.serializers import CheckoutSerializer
 from salesman.conf import app_settings as salesman_settings
 from salesman.core.utils import get_salesman_model
 
-from .forms import CheckoutForm
+from .forms import UK_ONLY_NOTE, CheckoutForm
 from .basket_serializers import BasketSerializer
 from .models import (
     DISCOUNT_CODE_IN_USE,
@@ -811,6 +811,8 @@ def get_checkout_options_context(request, basket):
     )
     return {
         "payment_methods": payment_methods,
+        # with the delivery option: shipping is within the UK only
+        "uk_only_note": UK_ONLY_NOTE,
         "shipping_methods": shipping_methods,
         "requires_shipping": requires_shipping,
         # The basket's shipping method, which its total includes
@@ -871,7 +873,7 @@ def cancel_payment(request):
 CHECKOUT_ERROR = "There was an error submitting this order"
 
 
-def _checkout(request, basket):
+def _checkout(request, basket, data):
     """
     Process the checkout with salesman's checkout serializer: save the
     customer's details on the basket and start the payment.
@@ -884,9 +886,7 @@ def _checkout(request, basket):
     ):
         return None, CHECKOUT_ERROR
     basket.update(request)
-    serializer = CheckoutSerializer(
-        data=request.POST, context={"request": request, "basket": basket}
-    )
+    serializer = CheckoutSerializer(data=data, context={"request": request, "basket": basket})
     if not serializer.is_valid():
         logger.error("Checkout failed: %s", serializer.errors)
         return None, CHECKOUT_ERROR
@@ -950,7 +950,13 @@ def checkout_view(request):
             data=request.POST,
         )
         if form.is_valid():
-            url, error = _checkout(request, basket)
+            # The customer's details (they become the order's), and the
+            # formatted delivery address for salesman's checkout
+            basket.extra.update(form.checkout_details())
+            basket.save(update_fields=["extra"])
+            data = request.POST.copy()
+            data["shipping_address"] = form.formatted_address()
+            url, error = _checkout(request, basket, data)
             if url is not None:
                 # Stripe checkout, or the new order status page
                 return HttpResponseRedirect(url)

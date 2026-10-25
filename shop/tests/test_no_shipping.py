@@ -143,7 +143,8 @@ def test_checkout_no_shipping(rf, entry_basket, shipping_method):
     assert '<p class="basket-options__help">No shipping needed</p>' in content
     assert "shop-shipping-reminder" not in content
     # no shipping address
-    assert 'type="hidden" name="shipping_address" value="-"' in " ".join(content.split())
+    assert 'name="address_line1"' not in content
+    assert "Delivery address" not in content
 
 
 @pytest.mark.parametrize("shipping_method", [None, "none", "unknown"])
@@ -175,6 +176,7 @@ def test_order_no_shipping(mock_basket_payment, rf, entry_basket):
             "shipping_method": "none",
             "billing_address": "-",
             "shipping_address": "-",
+            "consent": "on",
         },
     )
     request.session = {"BASKET_ID": entry_basket.id}
@@ -193,10 +195,8 @@ def test_order_no_shipping(mock_basket_payment, rf, entry_basket):
 )
 def test_checkout_form_address(shipping_method, asks_for_address):
     form = CheckoutForm(payment_method="stripe", shipping_method=shipping_method)
-    hidden = [
-        field.name for field in form.helper.layout.fields if hasattr(field, "name")
-    ]
-    assert ("shipping_address" not in hidden) == asks_for_address
+    assert ("address_line1" in form.fields) == asks_for_address
+    assert ("safe_place" in form.fields) == asks_for_address
 
 
 def test_order_status_no_shipping(client, entry_basket):

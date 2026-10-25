@@ -37,12 +37,23 @@
                 <dd>{{ order.name|default:"-" }}</dd>
                 <dt>Email</dt>
                 <dd><a href="mailto:{{ order.email }}">{{ order.email }}</a></dd>
+                <dt>Mobile number</dt>
+                <dd>{% if order.phone %}<a href="tel:{{ order.phone }}">{{ order.phone }}</a>{% else %}-{% endif %}</dd>
                 <dt>Shipping</dt>
                 <dd>{{ order.get_shipping_method_display }}</dd>
                 {% if order.needs_delivery %}
                     <dt>Address</dt>
-                    <dd>{{ order.shipping_address|linebreaksbr|default:"-" }}</dd>
+                    <dd>
+                        {{ order.shipping_address|linebreaksbr|default:"-" }}
+                        {% if order.outside_uk %}
+                            <p class="help-block help-warning shop-order__outside-uk">Outside the UK: check that shipping has been arranged with the customer (it isn't standard).</p>
+                        {% endif %}
+                    </dd>
+                    <dt>Safe place</dt>
+                    <dd>{{ order.safe_place|default:"-" }}</dd>
                 {% endif %}
+                <dt>Data processing consent</dt>
+                <dd>{% if order.consent_at %}Given {{ order.consent_at|date:"j M Y, H:i" }}{% else %}-{% endif %}</dd>
             </dl>
         </section>
 
