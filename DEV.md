@@ -202,6 +202,12 @@ Stripe account is connected to the platform (PINS's website) account, and
 payments are direct charges on it. No publishable key is needed (Checkout is
 hosted by Stripe).
 
+The Stripe integration is the
+[django-salesman-stripe-connect](https://github.com/rebkwok/django-salesman-stripe-connect)
+package (installed from GitHub at a fixed commit, see `pyproject.toml`), with
+the shop's customisations in `shop/payment.py`. To change it, change the
+package, push it, and update the commit in `pyproject.toml`.
+
 ## Webhooks
 
 Payments are direct charges on the connected (PINS) account, so the checkout
@@ -296,13 +302,13 @@ that listens for the checkout.session.completed event.)
 ```
 uv run pytest            # the unit tests, in parallel
 uv run pytest --cov      # with coverage
-uv run coverage report --include="shop/*,salesman_stripe_connect/*" --fail-under=100
+uv run coverage report --include="shop/*" --fail-under=100
 ```
 
 They need a database: DATABASE_URL (PostgreSQL as in CI, or e.g.
 `sqlite:////tmp/pins-test.sqlite3` for speed). The test settings are in
-`pyproject.toml` (`[tool.pytest]`). The shop and `salesman_stripe_connect` must
-have 100% coverage (checked in CI).
+`pyproject.toml` (`[tool.pytest]`). The shop must have 100% coverage (checked
+in CI).
 
 ## Browser (end-to-end) tests
 

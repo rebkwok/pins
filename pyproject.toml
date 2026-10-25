@@ -21,6 +21,7 @@ dependencies = [
     "facebook-sdk<=3.1.0",
     "wagtail-json-widget<=0.0.9",
     "django-salesman",
+    "django-salesman-stripe-connect",
     "django-storages[boto3]<=1.14.6",
     "django-recaptcha<=4.1.0",
     "wagtail-django-recaptcha<=2.2.0",
@@ -56,6 +57,7 @@ dependencies = [
 [tool.uv.sources]
 # Fork to allow django 6+
 django-salesman = { git = "https://github.com/rebkwok/django-salesman.git", rev="12a6cdb0d36bbd544590c151aa2e0422fb72489e" }
+django-salesman-stripe-connect = { git = "https://github.com/rebkwok/django-salesman-stripe-connect.git", rev="f692bb4b35e117d2ecf6b8949b81594b8500967d" }
 
 
 [tool.pytest]

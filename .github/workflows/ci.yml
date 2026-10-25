@@ -50,9 +50,9 @@ jobs:
         run: |
           uv run coverage report
 
-      - name: Check shop and salesman_stripe_connect coverage is 100%
+      - name: Check shop coverage is 100%
         run: |
-          uv run coverage report --include="shop/*,salesman_stripe_connect/*" --fail-under=100
+          uv run coverage report --include="shop/*" --fail-under=100
 
   # The browser (end-to-end) tests, with Playwright (shop/tests/e2e)
   e2e:
