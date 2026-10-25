@@ -32,6 +32,7 @@ from .admin_views import (
     DispatchersView,
 )
 from . import activity
+from .admin_activity import ShopActivityViewSet
 from .models import (
     PRODUCT_VARIANT_PANELS,
     Category,
@@ -359,7 +360,13 @@ class ShopSetupGroup(SnippetViewSetGroup):
 
     menu_label = SHOP_SETUP_MENU_LABEL
     menu_icon = "cogs"
-    items = (SaleViewSet, DiscountCodeViewSet, ShopSettingsViewSet, DispatchersViewSet)
+    items = (
+        SaleViewSet,
+        DiscountCodeViewSet,
+        ShopSettingsViewSet,
+        DispatchersViewSet,
+        ShopActivityViewSet,
+    )
     menu_order = 530
 
 

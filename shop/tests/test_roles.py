@@ -97,7 +97,13 @@ def test_shop_admin_menu(client):
     assert set(items) == {"orders", "shop-stock", "shop-setup", "images"}
     assert items["shop-stock"] == ["categories", "products", "product-variants"]
     # (they can see the dispatchers, but not change them)
-    assert items["shop-setup"] == ["sales", "discount-codes", "shop-settings", "dispatchers"]
+    assert items["shop-setup"] == [
+        "sales",
+        "discount-codes",
+        "shop-settings",
+        "dispatchers",
+        "shop-activity",
+    ]
 
 
 def test_orders_only_menu(client):

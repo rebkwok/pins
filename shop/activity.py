@@ -286,7 +286,9 @@ class Edited(ShopLogFormatter):
     label = "Edit (with changes)"
 
     def format_message(self, log_entry):
-        return f"Edited: {'; '.join(self.data(log_entry, 'changes', []))}"
+        changes = self.data(log_entry, "changes", [])
+        # (entries without changes aren't logged now, but may have been)
+        return f"Edited: {'; '.join(changes)}" if changes else "Edited"
 
 
 SHOP_LOG_ACTIONS[EDITED] = Edited
