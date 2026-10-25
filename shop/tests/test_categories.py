@@ -1,6 +1,7 @@
 """
-Categories: plain models (not Wagtail pages), with pages served by the shop page,
-managed in the Shop admin, and created from a product's category chooser.
+Categories: plain models (not Wagtail pages), shown on the shop page (all, or one
+selected), managed in the Shop admin, and created from a product's category
+chooser.
 """
 
 import html
@@ -12,7 +13,7 @@ from django.urls import reverse
 from model_bakery import baker
 from wagtail.models import Site
 
-from ..models import Category, reserved_category_slugs
+from ..models import Category
 from .factories import ShopPageFactory
 
 pytestmark = pytest.mark.django_db
@@ -84,27 +85,6 @@ def test_category_slug_unique(category):
     ]
 
 
-def test_category_reserved_slugs(served_shop_page):
-    # the shop's own pages, and the shop page's child pages
-    served_shop_page.add_child(instance=ShopPageFactory.build(title="About", slug="about"))
-    reserved = reserved_category_slugs()
-    assert {"basket", "checkout", "product", "order", "about"} <= reserved
-    with pytest.raises(ValidationError) as error:
-        full_clean(Category(title="Mugs", slug="basket"))
-    assert error.value.message_dict == {
-        "slug": ["The web address 'basket' is used by another shop page."]
-    }
-    with pytest.raises(ValidationError) as error:
-        full_clean(Category(title="About"))
-    assert error.value.message_dict == {
-        "title": ["The web address 'about' is used by another shop page."]
-    }
-
-
-def test_reserved_slugs_no_shop_page():
-    assert "basket" in reserved_category_slugs()
-
-
 def test_category_title_case_insensitive_constraint(category):
     from django.db import IntegrityError, transaction
 
@@ -113,20 +93,19 @@ def test_category_title_case_insensitive_constraint(category):
 
 
 def test_category_url(served_shop_page, category):
-    # (with the host, as the tests have more than one site)
-    assert category.url.endswith("/shop/test-category/")
-    assert category.get_absolute_url() == category.url
-    assert category.url_display() == f'<a href="{category.url}">{category.url}</a>'
-    assert category.get_url(None) == category.url
+    # the shop page with the category selected (with the host, as the tests
+    # have more than one site)
+    assert category.get_url().endswith("/shop/?category=test-category")
+    assert category.shop_link() == f'<a href="{category.get_url()}">View on the shop</a>'
 
 
 def test_category_url_no_shop_page():
     category = Category.objects.create(title="Mugs")
-    assert category.url is None
-    assert category.url_display() == "-"
+    assert category.get_url() is None
+    assert category.shop_link() == "-"
 
 
-# Category pages, served by the shop page
+# A category selected on the shop page
 
 
 @pytest.fixture
@@ -139,42 +118,44 @@ def mugs(served_shop_page):
     yield category
 
 
-def test_category_page(client, mugs):
-    resp = client.get("/shop/mugs-gifts/")
-    assert resp.status_code == 200
-    content = html.unescape(resp.content.decode())
-    assert "<title>" in content and "Mugs & Gifts" in content.split("</title>")[0]
-    assert "Lovely mugs" in content
+def test_category_selected(client, mugs):
+    content = html.unescape(client.get("/shop/", {"category": "mugs-gifts"}).content.decode())
     assert "Podenco mug" in content
-    # breadcrumbs: Home > Shop > Mugs & Gifts
-    assert '<a href="/shop/">Shop</a>' in content
-    assert '<li aria-current="page">Mugs & Gifts</li>' in content
+    # the category's description is shown when it's selected
+    assert "Lovely mugs" in content
+    assert "Lovely mugs" not in html.unescape(client.get("/shop/").content.decode())
 
 
-def test_category_page_empty(client, served_shop_page):
+def test_category_selected_empty(client, served_shop_page):
     Category.objects.create(title="Cards")
-    content = html.unescape(client.get("/shop/cards/").content.decode())
+    content = html.unescape(client.get("/shop/", {"category": "cards"}).content.decode())
     assert "There's nothing in this category at the moment." in content
 
 
-def test_category_page_not_found(client, served_shop_page):
-    assert client.get("/shop/no-such-category/").status_code == 404
+def test_no_category_pages(client, mugs):
+    # (categories are selected on the shop page instead)
+    assert client.get("/shop/mugs-gifts/").status_code == 404
 
 
-def test_shop_page_links_to_categories(client, mugs):
-    # (only categories with live products are shown)
+def test_category_headings(client, mugs):
+    # plain headings (not links); only categories with live products have buttons
+    other = Category.objects.create(title="Cards")
+    product = baker.make("shop.Product", name="Card", category=other, price=2)
+    baker.make("shop.ProductVariant", product=product, stock=5)
     Category.objects.create(title="Empty")
     content = html.unescape(client.get("/shop/").content.decode())
-    assert f'<a href="{mugs.url}">Mugs & Gifts</a>' in content
-    assert "/shop/empty/" not in content
+    assert '<h2 class="shop-category__title">Mugs & Gifts</h2>' in content
+    assert 'href="?category=mugs-gifts"' in content
+    assert "?category=empty" not in content
 
 
 def test_product_page_breadcrumbs(client, mugs):
+    # the category links to the shop page with it selected
     product = mugs.products.get()
     content = html.unescape(
         client.get(reverse("shop:product_detail", args=(product.id,))).content.decode()
     )
-    assert '<a href="/shop/mugs-gifts/">Mugs & Gifts</a>' in content
+    assert '<a href="/shop/?category=mugs-gifts">Mugs & Gifts</a>' in content
     assert '<li aria-current="page">Podenco mug</li>' in content
 
 
@@ -187,7 +168,7 @@ def test_categories_list(admin_client, served_shop_page, product):
     assert list(resp.context["object_list"]) == [product.category, other]
     content = resp.content.decode()
     assert "0 live (1 total)" in content
-    assert "/shop/cards/" in content
+    assert "/shop/?category=cards" in content
     # categories are dragged into their order on the shop page
     assert "Sort item order" in content
 

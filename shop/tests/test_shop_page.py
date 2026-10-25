@@ -1,6 +1,6 @@
 """
-The shop page's product cards (prices, stock notes) and its search, filters and
-sorting.
+The shop page's product cards (prices, stock notes), its search and its category
+buttons.
 """
 
 import html
@@ -73,9 +73,8 @@ def test_price_summary_sale(shop):
     )
     baker.make("shop.SaleProduct", sale=sale, product=products["Podenco mug"], discount=10)
     mug = Product.objects.get(name="Podenco mug")
-    assert mug.is_on_sale
     assert (mug.price_summary.price, mug.price_summary.was) == (Decimal("9.00"), Decimal("10"))
-    assert not Product.objects.get(name="Hoodie").is_on_sale
+    assert Product.objects.get(name="Hoodie").price_summary.was is None
 
 
 @pytest.mark.parametrize("stock,note", [(0, "Out of stock"), (3, "Only 3 left"), (5, "Only 5 left"), (6, "")])
@@ -98,10 +97,10 @@ def test_cards(client, shop):
     assert "Choose options" in content
 
 
-# Search, filters and sorting
+# Search and categories
 
 
-def test_featured_grouped_by_category(client, shop):
+def test_grouped_by_category(client, shop):
     page, products = shop
     resp = client.get("/shop/")
     groups = resp.context["product_groups"]
@@ -109,7 +108,6 @@ def test_featured_grouped_by_category(client, shop):
         ("Mugs", ["Podenco mug", "Small cup"]),
         ("Clothing", ["T-shirt", "Hoodie"]),
     ]
-    assert not resp.context["filtering"]
     assert [c.title for c in resp.context["filter_categories"]] == ["Mugs", "Clothing"]
 
 
@@ -127,51 +125,35 @@ def test_featured_grouped_by_category(client, shop):
 def test_search(client, shop, query, expected):
     resp = client.get("/shop/", {"q": query})
     assert names(resp) == expected
-    assert resp.context["filtering"]
 
 
 def test_no_matches(client, shop):
     content = html.unescape(client.get("/shop/", {"q": "nothing"}).content.decode())
     assert "No products match." in content
-    assert "Clear the search and filters" in content
+    assert '<a href="?">Clear the search</a>' in content
 
 
-def test_filters(client, shop):
-    assert names(client.get("/shop/", {"category": "clothing"})) == ["T-shirt", "Hoodie"]
-    assert "Small cup" not in names(client.get("/shop/", {"in_stock": "1"}))
-    assert names(client.get("/shop/", {"on_sale": "1"})) == []
-
-
-@pytest.mark.parametrize(
-    "sort,expected",
-    [
-        ("price", ["Small cup", "Podenco mug", "T-shirt", "Hoodie"]),
-        ("-price", ["Hoodie", "T-shirt", "Podenco mug", "Small cup"]),
-        ("name", ["Hoodie", "Podenco mug", "Small cup", "T-shirt"]),
-        ("rubbish", ["Podenco mug", "Small cup", "T-shirt", "Hoodie"]),
-    ],
-)
-def test_sort(client, shop, sort, expected):
-    resp = client.get("/shop/", {"sort": sort})
-    assert names(resp) == expected
-    # sorted: one list, not grouped by category
-    assert (resp.context["product_groups"] is None) == (sort != "rubbish")
+def test_category(client, shop):
+    resp = client.get("/shop/", {"category": "clothing"})
+    assert names(resp) == ["T-shirt", "Hoodie"]
+    assert resp.context["category"].title == "Clothing"
+    # a search within the category
+    assert names(client.get("/shop/", {"category": "clothing", "q": "cotton"})) == ["T-shirt"]
+    # an unknown category: nothing
+    resp = client.get("/shop/", {"category": "nope"})
+    assert names(resp) == []
+    assert resp.context["category"] is None
 
 
 def test_results_summary(client, shop):
-    # with a search, filter or sort: what's shown, and a way back to everything
-    assert "Clear the search and filters" not in client.get("/shop/").content.decode()
-    content = " ".join(
-        html.unescape(client.get("/shop/", {"q": "o", "sort": "price"}).content.decode()).split()
-    )
+    # with a search: what's shown, and a way to clear it (keeping the category)
+    assert "Clear the search" not in client.get("/shop/").content.decode()
+    assert "Clear the search" not in client.get("/shop/", {"category": "mugs"}).content.decode()
+    content = " ".join(html.unescape(client.get("/shop/", {"q": "o"}).content.decode()).split())
     # (not "Small cup")
-    assert '3 of 4 products shown. <a href="' in content
-    assert "Clear the search and filters" in content
-    content = " ".join(html.unescape(client.get("/shop/", {"in_stock": "1"}).content.decode()).split())
-    assert "3 of 4 products shown. <a" in content
-    # sorted only: everything is shown
-    content = " ".join(html.unescape(client.get("/shop/", {"sort": "name"}).content.decode()).split())
-    assert "4 of 4 products shown. <a" in content
+    assert '3 of 4 products shown. <a href="?">Clear the search</a>' in content
+    content = html.unescape(client.get("/shop/", {"q": "o", "category": "mugs"}).content.decode())
+    assert '<a href="?category=mugs">Clear the search</a>' in content
 
 
 def test_category_buttons_keep_search(client, shop):

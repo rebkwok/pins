@@ -1,6 +1,6 @@
 """
-The product card is used on the shop page, category pages and the product
-page. Check on each page that its htmx buttons refer to their own product's
+The product card is used on the shop page (all categories, or one) and the
+product page. Check on each page that its htmx buttons refer to their own product's
 fields, and that the elements the views update are present exactly once.
 """
 import re
@@ -76,7 +76,7 @@ def get_page(client, page, products):
     if page == "shop":
         url = "/shop/"
     elif page == "category":
-        url = "/shop/category/"
+        url = "/shop/?category=category"
     else:
         url = reverse("shop:product_detail", args=(products[0].id,))
     resp = client.get(url)
@@ -199,7 +199,7 @@ def test_product_card_alt_text(client, shop_pages):
     # the alt text isn't shown as a caption
     assert ">Mug front<" not in content
     # on listing pages, the image is decorative: the product's name follows it
-    content = client.get("/shop/category/").content.decode()
+    content = client.get("/shop/?category=category").content.decode()
     assert 'alt="Mug front"' not in content
     assert '<a href="/shop/product/' in content
 
@@ -219,7 +219,7 @@ def test_sale_banner_shown_during_sale(client, shop_pages, freezer):
     )
     SaleProduct.objects.create(sale=sale, product=shop_pages[0], discount=20)
 
-    for url in ["/shop/", "/shop/category/", reverse("shop:product_detail", args=(shop_pages[0].id,))]:
+    for url in ["/shop/", "/shop/?category=category", reverse("shop:product_detail", args=(shop_pages[0].id,))]:
         content = client.get(url).content.decode()
         assert "Summer sale!" in content, url
         assert "20% off mugs" in content

@@ -13,7 +13,6 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models, transaction
 from django.db.models import Q
 from django.db.models.functions import Lower
-from django.shortcuts import get_object_or_404
 from django.template.defaultfilters import pluralize
 from django.dispatch import Signal
 from django.urls import reverse
@@ -43,7 +42,6 @@ from wagtail.admin.panels import (
 )
 from wagtail.admin.panels.base import get_form_for_model
 from wagtail.contrib.forms.models import validate_to_address
-from wagtail.contrib.routable_page.models import RoutablePageMixin, path
 from wagtail.contrib.settings.models import (
     BaseGenericSetting,
     register_setting,
@@ -532,23 +530,6 @@ class BasketItem(BaseBasketItem):
 # PRODUCTS
 
 
-def reserved_category_slugs():
-    """
-    Slugs categories can't have, as their pages' addresses (/shop/<slug>/) would
-    be taken by the shop's own pages (e.g. /shop/basket/), or the shop page's
-    child pages
-    """
-    from .urls import urlpatterns
-
-    slugs = {str(pattern.pattern).split("/")[0] for pattern in urlpatterns}
-    slugs.update(
-        Page.objects.child_of(shop_page).values_list("slug", flat=True)
-        if (shop_page := ShopPage.objects.live().first())
-        else []
-    )
-    return slugs
-
-
 class CategoryProductsPanel(Panel):
     """
     On a category's page: its products, dragged into their order on the shop
@@ -605,25 +586,23 @@ class CategoryProductsPanel(Panel):
 
 class Category(models.Model):
     """
-    A category of products, with its own page on the shop (served by the shop
-    page, see ShopPage.category_view)
+    A category of products: products are grouped by category on the shop page,
+    which can show one category at a time (/shop/?category=<slug>)
     """
 
-    title = models.CharField(
-        max_length=255, help_text="Shown on the shop page, and as the category's page title."
-    )
+    title = models.CharField(max_length=255, help_text="Shown on the shop page.")
     slug = models.SlugField(
         max_length=255,
         unique=True,
         blank=True,
         verbose_name="Web address",
         help_text=(
-            "The end of the category page's web address, e.g. 'clothing' for "
-            "/shop/clothing/. Made from the title if left blank."
+            "The shop's web address with this category selected, e.g. 'clothing' "
+            "for /shop/?category=clothing. Made from the title if left blank."
         ),
     )
     description = RichTextField(
-        blank=True, help_text="Optional text shown at the top of the category's page."
+        blank=True, help_text="Optional text shown on the shop page when this category is selected."
     )
     # The order on the shop page (categories are reordered in the Categories list)
     sort_order = models.IntegerField(null=True, blank=True, editable=False)
@@ -661,10 +640,6 @@ class Category(models.Model):
         # (the slug field may not be on the form, e.g. when creating a category
         # from a product's category chooser)
         field = "title" if slug_from_title else "slug"
-        if self.slug in reserved_category_slugs():
-            raise ValidationError(
-                {field: f"The web address '{self.slug}' is used by another shop page."}
-            )
         if others.filter(slug=self.slug).exists():
             raise ValidationError(
                 {field: f"Another category already has the web address '{self.slug}'."}
@@ -704,27 +679,18 @@ class Category(models.Model):
         )
 
     def get_url(self, request=None):
-        """The category's page on the shop (None if there's no live shop page)"""
+        """The shop page with this category selected (None if there's no live shop page)"""
         shop_page = ShopPage.objects.live().first()
         if shop_page is None:
             return None
-        return shop_page.get_url(request) + shop_page.reverse_subpage(
-            "category", kwargs={"slug": self.slug}
-        )
+        return f"{shop_page.get_url(request)}?category={self.slug}"
 
-    @property
-    def url(self):
-        return self.get_url()
+    def shop_link(self):
+        """The shop page with this category selected, for the admin list"""
+        url = self.get_url()
+        return format_html('<a href="{}">View on the shop</a>', url) if url else "-"
 
-    def url_display(self):
-        """The category's page, for the admin list"""
-        url = self.url
-        return format_html('<a href="{}">{}</a>', url, url) if url else "-"
-
-    url_display.short_description = "Page"
-
-    def get_absolute_url(self):
-        return self.get_url()
+    shop_link.short_description = "On the shop"
 
 
 def _items_for_variants(item_model, variant_ids):
@@ -1492,11 +1458,6 @@ class Product(ClusterableModel):
         return self.variants.filter(live=True)
 
     @cached_property
-    def is_on_sale(self):
-        """Whether any of the product's live variants is on sale"""
-        return any(variant.get_sale_item() for variant in self.live_variants)
-
-    @cached_property
     def price_summary(self):
         """
         The product's price for the shop: its live variants' lowest price (with
@@ -1856,7 +1817,7 @@ class ProductVariant(Orderable):
         return str(self.id)
 
 
-class ShopPage(RoutablePageMixin, Page):
+class ShopPage(Page):
     introduction = models.TextField(help_text="Text to describe the page", blank=True)
     image = models.ForeignKey(
         "wagtailimages.Image",
@@ -1883,30 +1844,14 @@ class ShopPage(RoutablePageMixin, Page):
     def children(self):
         return self.categories()
 
-    SORTS = {
-        "": "Featured",
-        "price": "Price, low to high",
-        "-price": "Price, high to low",
-        "name": "Name",
-    }
-
     def get_context(self, request, *args, **kwargs):
         """
-        The shop's products, searched, filtered and sorted from the address:
-        ?q= (search), ?category=<slug>, ?in_stock=1, ?on_sale=1,
-        ?sort= (price, -price or name; featured if blank). Featured products are
-        grouped by category, in the shop's order; sorted products are listed
-        together.
+        The shop's products, grouped by category in the shop's order: searched
+        (?q=) and one category (?category=<slug>) from the address
         """
         context = super().get_context(request, *args, **kwargs)
-        params = request.GET
-        query = params.get("q", "").strip()
-        category_slug = params.get("category", "")
-        in_stock = params.get("in_stock") == "1"
-        on_sale = params.get("on_sale") == "1"
-        sort = params.get("sort", "")
-        if sort not in self.SORTS:
-            sort = ""
+        query = request.GET.get("q", "").strip()
+        category_slug = request.GET.get("category", "")
 
         products = (
             Product.objects.filter(live=True, variants__live=True)
@@ -1924,55 +1869,25 @@ class ShopPage(RoutablePageMixin, Page):
         if category_slug:
             products = products.filter(category__slug=category_slug)
         products = list(products)
-        if in_stock:
-            products = [product for product in products if not product.out_of_stock()]
-        if on_sale:
-            products = [product for product in products if product.is_on_sale]
-        if sort in ("price", "-price"):
-            products.sort(
-                key=lambda product: product.price_summary.price,
-                reverse=sort == "-price",
-            )
-        elif sort == "name":
-            products.sort(key=lambda product: product.name.lower())
 
         context.update(
             query=query,
+            category=Category.objects.filter(slug=category_slug).first() if category_slug else None,
             category_slug=category_slug,
-            in_stock=in_stock,
-            on_sale=on_sale,
-            sort=sort,
             total=total,
-            sorts=self.SORTS.items(),
-            filtering=bool(query or category_slug or in_stock or on_sale or sort),
             # (the categories with live products, for the category buttons)
             filter_categories=[
                 category for category in self.categories() if category.live_products.exists()
             ],
             products=products,
-            # featured: grouped by category
-            product_groups=(
-                [
-                    (category, list(category_products))
-                    for category, category_products in groupby(
-                        products, key=lambda product: product.category
-                    )
-                ]
-                if not sort
-                else None
-            ),
+            product_groups=[
+                (category, list(category_products))
+                for category, category_products in groupby(
+                    products, key=lambda product: product.category
+                )
+            ],
         )
         return context
-
-    @path("<slug:slug>/", name="category")
-    def category_view(self, request, slug):
-        """A category's page (its products)"""
-        category = get_object_or_404(Category, slug=slug)
-        return self.render(
-            request,
-            template="shop/category_page.html",
-            context_overrides={"category": category},
-        )
 
 
 NO_NOTIFY_ADDRESSES_WARNING = (

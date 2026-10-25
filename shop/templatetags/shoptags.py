@@ -50,11 +50,7 @@ def shop_breadcrumbs(context):
     elif page is not None and page.depth > 2:
         # (When on the home page, displaying breadcrumbs is irrelevant)
         items = page_items(page)
-        if context.get("category"):
-            # A category page, served by the shop page
-            items.append({"url": None, "label": context["category"].title})
-        else:
-            items[-1]["url"] = None
+        items[-1]["url"] = None
 
     return {"items": items, "request": context.request}
 

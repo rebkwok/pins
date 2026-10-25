@@ -17,21 +17,6 @@
                 <input type="search" id="shop-search" name="q" value="{{ query }}" placeholder="Search the shop" class="form-control">
                 <button type="submit" class="btn basket-btn">Search</button>
             </div>
-            <details class="shop-filters__more"{% if in_stock or on_sale or sort %} open{% endif %}>
-                <summary>Filter and sort</summary>
-                <div class="shop-filters__options">
-                    <label><input type="checkbox" name="in_stock" value="1"{% if in_stock %} checked{% endif %}> In stock only</label>
-                    <label><input type="checkbox" name="on_sale" value="1"{% if on_sale %} checked{% endif %}> On sale</label>
-                    <label>Sort
-                        <select name="sort" class="form-select">
-                            {% for value, label in sorts %}
-                                <option value="{{ value }}"{% if value == sort %} selected{% endif %}>{{ label }}</option>
-                            {% endfor %}
-                        </select>
-                    </label>
-                    <button type="submit" class="btn btn-outline-secondary">Apply</button>
-                </div>
-            </details>
         </form>
 
         {% if filter_categories|length > 1 %}
@@ -43,36 +28,31 @@
             </nav>
         {% endif %}
 
-        {% if filtering %}
-            {# what's shown, and a way back to everything #}
+        {% if query %}
             <p class="shop-results">
                 {% if products %}
                     {{ products|length }} of {{ total }} product{{ total|pluralize }} shown.
                 {% else %}
                     No products match.
                 {% endif %}
-                <a href="{{ page.url }}">Clear the search and filters</a>
+                <a href="{% shop_filter_url q='' %}">Clear the search</a>
             </p>
+        {% elif category_slug and not products %}
+            <p class="shop-results">There's nothing in this category at the moment.</p>
         {% endif %}
 
-        {% if not products %}
-        {% elif product_groups %}
-            {% for category, category_products in product_groups %}
-                <section class="shop-category">
-                    <h2 class="shop-category__title"><a href="{{ category.url }}">{{ category.title }}</a></h2>
-                    <div class="shop-grid">
-                        {% for product in category_products %}
-                            {% include "shop/includes/product-listing-card.html" %}
-                        {% endfor %}
-                    </div>
-                </section>
-            {% endfor %}
-        {% else %}
-            <div class="shop-grid">
-                {% for product in products %}
-                    {% include "shop/includes/product-listing-card.html" %}
-                {% endfor %}
-            </div>
-        {% endif %}
+        {% for category, category_products in product_groups %}
+            <section class="shop-category">
+                <h2 class="shop-category__title">{{ category.title }}</h2>
+                {% if category_slug and category.description %}
+                    <div class="shop-category__description">{{ category.description|richtext }}</div>
+                {% endif %}
+                <div class="shop-grid">
+                    {% for product in category_products %}
+                        {% include "shop/includes/product-listing-card.html" %}
+                    {% endfor %}
+                </div>
+            </section>
+        {% endfor %}
     </div>
 {% endblock content %}

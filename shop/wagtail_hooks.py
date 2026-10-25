@@ -85,7 +85,7 @@ class CategoryViewSet(ShopViewSet):
     icon = "folder-open-inverse"
     # Dragged into their order on the shop page
     sort_order_field = "sort_order"
-    list_display = ("title", "products_link", "url_display")
+    list_display = ("title", "products_link", "shop_link")
     search_fields = ("title",)
     chooser_viewset_class = CategoryChooserViewSet
 

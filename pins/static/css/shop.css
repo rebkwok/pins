@@ -504,63 +504,7 @@
   padding: 0 16px;
 }
 
-.shop-filters__more {
-  margin-top: 8px;
-}
 
-/* (not the advent calendar's styles for summary, in main-v1.3.css) */
-.shop-filters__more summary,
-.shop-filters__more[open] summary {
-  cursor: pointer;
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  height: auto;
-  width: auto;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--pins);
-}
-
-/* an arrow, turning down when open */
-.shop-filters__more summary::after {
-  content: "";
-  width: 8px;
-  height: 8px;
-  margin-left: 10px;
-  border-right: 2px solid currentcolor;
-  border-bottom: 2px solid currentcolor;
-  transform: rotate(-45deg);
-  transition: transform 0.15s ease;
-}
-
-.shop-filters__more[open] summary::after {
-  transform: rotate(45deg);
-  margin-top: -4px;
-}
-
-.shop-filters__more summary::-webkit-details-marker {
-  display: none;
-}
-
-.shop-filters__options {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 24px;
-  padding: 8px 0;
-}
-
-.shop-filters__options label {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.shop-filters__options select {
-  width: auto;
-}
 
 .shop-categories {
   display: flex;
@@ -587,11 +531,6 @@
 
 .shop-category__title {
   margin-top: 24px;
-}
-
-.shop-category__title a {
-  color: inherit;
-  text-decoration: none;
 }
 
 .shop-detail__empty {
@@ -709,4 +648,8 @@
 
 .shop-card__media [id^='added_']:empty {
   display: none;
+}
+
+.shop-category__description {
+  margin-bottom: 12px;
 }
