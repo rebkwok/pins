@@ -35,7 +35,8 @@ env = environ.Env(DEBUG=(bool, False),
                   LOCAL=(bool, False),
                   TESTING=(bool, False),
                   CI=(bool, False),
-                  LOCAL_S3=(bool, False)
+                  LOCAL_S3=(bool, False),
+                  LOG_LEVEL=(str, "INFO"),
                   )
 
 environ.Env.read_env(root('pins/.env'))  # reading .env file
@@ -367,6 +368,11 @@ else:  # pragma: no cover
 
 
 # #####LOGGING######
+# The level for the site's own apps' logs (and the log file): LOG_LEVEL in the
+# environment, e.g. DEBUG to see the shop's stock checks. Django's request logs
+# are always INFO.
+LOG_LEVEL = env("LOG_LEVEL").upper() or "INFO"
+
 if not TESTING and not env("LOCAL"):  # pragma: no cover
     LOG_FOLDER = env('LOG_FOLDER')
     LOG_FILE = os.path.join(LOG_FOLDER, 'pins.log')
@@ -384,7 +390,7 @@ if not TESTING and not env("LOCAL"):  # pragma: no cover
         },
         'handlers': {
             'file_app': {
-                'level': 'INFO',
+                'level': LOG_LEVEL,
                 'class': "logging.handlers.GroupWriteRotatingFileHandler",
                 'filename': LOG_FILE,
                 'maxBytes': 1024*1024*5,  # 5 MB
@@ -413,27 +419,27 @@ if not TESTING and not env("LOCAL"):  # pragma: no cover
             },
             'home': {
                 'handlers': ['console', 'file_app', 'mail_admins'],
-                'level': 'INFO',
+                'level': LOG_LEVEL,
                 'propagate': False,
             },
             'dogs': {
                 'handlers': ['console', 'file_app', 'mail_admins'],
-                'level': 'INFO',
+                'level': LOG_LEVEL,
                 'propagate': False,
             },
             'dashboard': {
                 'handlers': ['console', 'file_app', 'mail_admins'],
-                'level': 'INFO',
+                'level': LOG_LEVEL,
                 'propagate': False,
             },
             'search': {
                 'handlers': ['console', 'file_app', 'mail_admins'],
-                'level': 'INFO',
+                'level': LOG_LEVEL,
                 'propagate': False,
             },
             "shop": {
                 "handlers": ["console", "file_app", "mail_admins"],
-                "level": "INFO",
+                "level": LOG_LEVEL,
                 "propagate": False,
             },
         },
@@ -456,27 +462,27 @@ else:
             },
             'home': {
                 'handlers': ['console'],
-                'level': 'INFO',
+                'level': LOG_LEVEL,
                 'propagate': True,
             },
             'dogs': {
                 'handlers': ['console'],
-                'level': 'INFO',
+                'level': LOG_LEVEL,
                 'propagate': True,
             },
             'dashboard': {
                 'handlers': ['console'],
-                'level': 'INFO',
+                'level': LOG_LEVEL,
                 'propagate': True,
             },
             'search': {
                 'handlers': ['console'],
-                'level': 'INFO',
+                'level': LOG_LEVEL,
                 'propagate': True,
             },
             "shop": {
                 "handlers": ["console"],
-                "level": "INFO",
+                "level": LOG_LEVEL,
                 "propagate": True,
             }
         },

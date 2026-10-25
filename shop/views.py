@@ -192,14 +192,13 @@ def _can_increase_quantity(request, variant, value, in_basket=False):
             else None
         )
         current_quantity = item.quantity if item is not None else 0
-        logger.info("Current quantity %s", current_quantity)
-        logger.info("Available %s", variant.available)
-        logger.info("New quantity %s", value)
+        logger.debug(
+            "%s: %s in basket, %s available, new quantity %s",
+            variant, current_quantity, variant.available, value,
+        )
         return variant.has_stock_for(value, in_basket=current_quantity)
     else:
-        logger.info("Variant %s", variant)
-        logger.info("Available %s", variant.available)
-        logger.info("New quantity %s", value)
+        logger.debug("%s: %s available, new quantity %s", variant, variant.available, value)
         return variant.has_stock_for(value)
 
 
