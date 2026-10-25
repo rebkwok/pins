@@ -1,13 +1,17 @@
 {% comment %}
 The basket's discount code: a form to apply one, or notes about the applied
-code. An applied code is shown (with a button to remove it) in the basket's
+code, and a message after applying or removing one. An applied code is shown (with a button to remove it) in the basket's
 extra rows; if it isn't applied, it's shown here, with why. Replaced (by id)
 when the basket changes.
 {% endcomment %}
-<div id="basket-discount" class="col-md-12 mt-3"{% if oob %} hx-swap-oob="true"{% endif %}>
+<div id="basket-discount" class="basket-discount"{% if oob %} hx-swap-oob="true"{% endif %}>
+    {% if discount_code and discount_message %}
+        {# just applied (htmx): under the code's row in the totals #}
+        <p class="basket-discount__message basket-discount__message--{{ discount_message_level }}" role="status">{{ discount_message }}</p>
+    {% endif %}
     {% if discount_code %}
         {% if discount_problem %}
-            <form method="post" action="{% url 'shop:remove_discount_code' %}">
+            <form method="post" action="{% url 'shop:remove_discount_code' %}" hx-post="{% url 'shop:remove_discount_code' %}" hx-target="#basket-summary" hx-swap="outerHTML">
                 {% csrf_token %}
                 Discount code <strong>{{ discount_code }}</strong>
                 <button type="submit" class="btn btn-link p-0 ms-2 align-baseline">Remove</button>
@@ -20,13 +24,17 @@ when the basket changes.
             </p>
         {% endif %}
     {% else %}
-        <form method="post" action="{% url 'shop:apply_discount_code' %}" class="d-flex flex-wrap align-items-end gap-2">
+        <form method="post" action="{% url 'shop:apply_discount_code' %}" hx-post="{% url 'shop:apply_discount_code' %}" hx-target="#basket-summary" hx-swap="outerHTML">
             {% csrf_token %}
-            <div>
-                <label for="id_discount_code" class="form-label mb-1">Discount code</label>
+            <label for="id_discount_code" class="form-label mb-1">Discount code</label>
+            <div class="basket-discount__field">
                 <input type="text" name="code" id="id_discount_code" class="form-control" autocomplete="off" required>
+                <button type="submit" class="btn btn-outline-secondary">Apply</button>
             </div>
-            <button type="submit" class="btn btn-secondary">Apply</button>
         </form>
+        {% if discount_message %}
+            {# refused, or removed (htmx): under the field #}
+            <p class="basket-discount__message basket-discount__message--{{ discount_message_level }} mt-2" role="status">{{ discount_message }}</p>
+        {% endif %}
     {% endif %}
 </div>

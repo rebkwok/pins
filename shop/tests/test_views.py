@@ -231,14 +231,14 @@ def test_basket_view(rf, basket, product):
         ("deliver", "Delivery", ""),
         ("collect", "Collect in person", COLLECT_NOTE),
     ]
-    # delivery is selected (the basket's method was collect), and the total
-    # includes its shipping cost
-    assert resp.context_data["selected_shipping_method"] == "deliver"
-    assert Basket.objects.get(id=basket.id).shipping_method == "deliver"
-    assert resp.context_data["basket"]["total"] == "24.99"
+    # the basket's method (collect) is selected, and the total has no
+    # shipping cost
+    assert resp.context_data["selected_shipping_method"] == "collect"
+    assert Basket.objects.get(id=basket.id).shipping_method == "collect"
+    assert resp.context_data["basket"]["total"] == "20.00"
     content = " ".join(resp.rendered_content.split())
-    assert 'id="id_deliver" value="deliver" checked' in content
-    assert 'id="id_collect" value="collect" hx-post' in content
+    assert 'id="id_deliver" value="deliver" hx-post' in content
+    assert 'id="id_collect" value="collect" checked' in content
     # changing the method updates the basket
     assert f'hx-post="{reverse("shop:update_shipping_method")}"' in content
     # the note is shown with the collection option
@@ -263,6 +263,26 @@ def test_basket_view_delivery_default(rf, product, has_basket):
         request.session = {"BASKET_ID": basket.id}
     resp = basket_view(request)
     assert resp.context_data["selected_shipping_method"] == "deliver"
+
+
+@pytest.mark.parametrize(
+    "shipping_method,expected",
+    [
+        # the customer's choice is kept, e.g. after applying a discount code
+        ("collect", "collect"),
+        ("deliver", "deliver"),
+        # "No shipping needed" (from the checkout) becomes delivery
+        ("none", "deliver"),
+    ],
+)
+def test_basket_view_keeps_shipping_method(client, basket, shipping_method, expected):
+    basket.shipping_method = shipping_method
+    basket.save()
+    set_session_basket(client, basket)
+    resp = client.get(reverse("shop:basket"))
+    assert resp.context_data["selected_shipping_method"] == expected
+    assert Basket.objects.get(id=basket.id).shipping_method == expected
+    assert f'id="id_{expected}" value="{expected}" checked' in " ".join(resp.content.decode().split())
 
 
 def post_shipping_method(client, shipping_method):
@@ -548,7 +568,8 @@ def test_sole_delete_basket_item(rf, basket):
     request.session = {"BASKET_ID": basket.id}
 
     resp = delete_basket_item(request, basket_item.ref)
-    assert "Basket is empty." in resp.content.decode()
+    # the page is reloaded, showing the empty basket
+    assert resp.headers["HX-Refresh"] == "true"
     # refresh_from_db isn't enough to get the update basket here
     basket = Basket.objects.get(id=basket.id)
     assert basket.quantity == 0
@@ -660,7 +681,7 @@ def test_get_checkout_view(rf, basket):
     basket = Basket.objects.get(id=basket.id)
     assert basket.shipping_method == "deliver"
     content = resp.rendered_content
-    assert "Shipping method: Delivery" in content
+    assert '<p class="basket-options__help">Delivery</p>' in content
     assert "shop-shipping-reminder" not in content
 
 
@@ -673,8 +694,9 @@ def test_get_checkout_view_sale_prices(rf, basket, sale_with_items, freezer):
     )
     request.session = {"BASKET_ID": basket.id}
     content = checkout_view(request).rendered_content
-    assert '<span class="text-strikethrough text-danger">£20.00</span>' in content
-    assert "£16.00" in content
+    assert '<s class="text-danger">£<span id="subtotal_' in content
+    assert ">20.00</span></s>" in content
+    assert '£<span id="total_' in content and ">16.00</span>" in content
     assert "Sale: 20% off" in content
 
 
@@ -685,7 +707,7 @@ def test_get_checkout_view_collect(rf, basket):
     request.session = {"BASKET_ID": basket.id}
     content = checkout_view(request).rendered_content
     # a warning about collecting in person
-    assert "Shipping method: Collect in person" in content
+    assert '<p class="basket-options__help">Collect in person</p>' in content
     assert '<p class="shop-shipping-reminder">' in content
     assert "Reminder: collection must be arranged with PINS in advance." in content
     assert f'<a href="{reverse("shop:basket")}">Go back</a> to change delivery options.' in content

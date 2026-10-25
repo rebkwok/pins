@@ -1,0 +1,84 @@
+{% load wagtailimages_tags static %}
+{% comment %}
+A basket item: thumbnail, name and variant, quantity, price. On the basket page
+(editable) the quantity has -/+ buttons and the item can be removed (htmx:
+views.update_quantity and delete_basket_item, which replace the elements by
+id); on the checkout page it's a summary.
+{% endcomment %}
+<div id="row-{{ item.product_id }}" class="basket-item{% if editable %} basket-item--editable{% endif %}">
+    <div class="basket-item__image">
+        {% if item.image %}
+            {% image item.image fill-120x120-c100 alt="" %}
+        {% else %}
+            <img src="{% static 'images/logo.png' %}" alt="" class="basket-item__placeholder">
+        {% endif %}
+    </div>
+    <div class="basket-item__name">
+        <strong>{{ item.product_type }}</strong>
+        {% if item.variant_name %}<span class="basket-item__variant">{{ item.variant_name }}</span>{% endif %}
+        {% for extra_row in item.extra_rows %}
+            <span class="basket-item__note">{{ extra_row.label }}</span>
+        {% endfor %}
+    </div>
+    <div class="basket-item__price">
+        {% if item.extra_rows %}
+            <s class="text-danger">£<span id="subtotal_{{ item.product_id }}">{{ item.subtotal }}</span></s>
+        {% endif %}
+        £<span id="total_{{ item.product_id }}">{{ item.total }}</span>
+    </div>
+    {% if editable %}
+        <form class="shop-form basket-item__controls" action="" method="POST">
+            {% csrf_token %}
+            <div class="input-group quantity">
+                <button
+                    type="button"
+                    id="id_dec_wrapper_{{ item.product_id }}"
+                    class="btn btn-outline-secondary"
+                    aria-label="Fewer"
+                    hx-trigger="click"
+                    hx-target="#id_quantity_wrapper_{{ item.product_id }}"
+                    hx-get="{% url 'shop:decrease_quantity' item.product_id %}?ref=basket&product_id={{ item.product_id }}"
+                    hx-include="[id='id_quantity_{{ item.product_id }}']"
+                >-</button>
+                <span id="id_quantity_wrapper_{{ item.product_id }}">
+                    {% include "shop/includes/quantity_field.html" with product_id=item.product_id value=item.quantity %}
+                </span>
+                <button
+                    type="button"
+                    id="id_inc_wrapper_{{ item.product_id }}"
+                    class="btn btn-outline-secondary"
+                    aria-label="More"
+                    hx-trigger="click"
+                    hx-target="#id_quantity_wrapper_{{ item.product_id }}"
+                    hx-get="{% url 'shop:increase_quantity' item.product_id %}?ref=basket&product_id={{ item.product_id }}"
+                    hx-include="[id='id_quantity_{{ item.product_id }}']"
+                >+</button>
+                <input type="hidden"
+                    value="Update"
+                    hx-post="{% url 'shop:update_quantity' item.ref %}"
+                    hx-trigger="quantity-changed from:body"
+                    hx-sync="#id_inc_wrapper_{{ item.product_id }}:queue first"
+                >
+                <input type="hidden"
+                    value="Update"
+                    hx-post="{% url 'shop:update_quantity' item.ref %}"
+                    hx-trigger="quantity-changed from:body"
+                    hx-sync="#id_dec_wrapper_{{ item.product_id }}:queue first"
+                >
+            </div>
+            <button type="submit"
+                class="btn basket-item__remove"
+                value="X"
+                aria-label="Remove {{ item.product.name }}"
+                hx-post="{% url 'shop:delete_basket_item' item.ref %}"
+                hx-trigger="click"
+            >
+                <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
+            </button>
+            <input type="hidden" name="product_id" value="{{ item.product_id }}">
+        </form>
+        <div id="updated_{{ item.product_id }}" class="basket-item__message"></div>
+    {% else %}
+        <div class="basket-item__quantity">Quantity: <span id="quantity_{{ item.product_id }}">{{ item.quantity }}</span></div>
+    {% endif %}
+</div>

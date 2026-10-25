@@ -7,6 +7,12 @@ from .models import SHIPPING_DELIVER
 from .payment import PAYMENT_METHOD_BUTTON_TEXT
 
 
+
+class MainButton(Submit):
+    """The page's main action, in the shop's button style (not Bootstrap blue)"""
+
+    field_classes = "btn basket-btn shop-main-btn"
+
 class CheckoutForm(forms.Form):
     email = forms.EmailField()
     email1 = forms.EmailField(label="Email (again)")
@@ -46,7 +52,7 @@ class CheckoutForm(forms.Form):
             "email",
             "email1",
             shipping_address_layout,
-            Submit(
+            MainButton(
                 "submit",
                 "Place order" if free else PAYMENT_METHOD_BUTTON_TEXT[payment_method],
             ),

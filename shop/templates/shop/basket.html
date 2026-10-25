@@ -1,5 +1,5 @@
 {% extends "shop/base.html" %}
-{% load wagtailcore_tags wagtailimages_tags static %}
+{% load wagtailcore_tags wagtailimages_tags static shoptags %}
 
 {% block title %}Basket{% endblock %}
 
@@ -9,111 +9,31 @@
     
     
     <div class="container shop-basket">
-        <div class="row">
-            {% if basket.items %}
+        {% if basket.items %}
             {% if seconds_left is not None %}
-            <div class="basket-countdown-alert" id="basket-countdown-container">Basket will timeout in {% include "shop/includes/basket_countdown.html" %}</div>
+                <p class="basket-countdown-alert" id="basket-countdown-container">
+                    <i class="fa-regular fa-clock" aria-hidden="true"></i>
+                    Your basket is held for {% include "shop/includes/basket_countdown.html" %}
+                </p>
             {% endif %}
-            {% endif %}
-                {% if basket.items %}
-                <div class="col-md-12">
+            <div class="basket-layout">
+                <div class="basket-items">
                     {% for product_identifier, items in basket.items.items %}
-                        <div id="row-{{ product_identifier }}">
-                            <div class="row"><h2>{{ items.0.product_type }} ({{ items.0.category }})</h2></div>
+                        {# (removed by id when the product's last item is removed) #}
+                        <div id="row-{{ product_identifier }}" class="basket-product">
                             {% for item in items %}
-                            <div id="row-{{ item.product_id }}" class="row">
-                                <div class="col">{{ item.product.name }}</div>
-                                <div class="col">
-                                    <form class="shop-form" action="" method="POST">
-                                        {% csrf_token %}
-                                        <div class="input-group quantity mt-2 mb-1">
-                                            <div class="input-group-prepend">
-                                                <span 
-                                                    id="id_dec_wrapper_{{ item.product_id }}"
-                                                    class="input-group-text"
-                                                    hx-trigger="click"
-                                                    hx-target="#id_quantity_wrapper_{{ item.product_id }}"
-                                                    hx-get="{% url 'shop:decrease_quantity' item.product_id %}?ref=basket&product_id={{ item.product_id }}"
-                                                    hx-include="[id='id_quantity_{{ item.product_id }}']"  
-                                                >-</span>
-                                            </div>
-                                            <span id="id_quantity_wrapper_{{ item.product_id }}">
-                                                {% include "shop/includes/quantity_field.html" with product_id=item.product_id value=item.quantity %}
-                                            </span>
-                                            <div class="input-group-append">
-                                                <span 
-                                                    id="id_inc_wrapper_{{ item.product_id }}"
-                                                    class="input-group-text"
-                                                    hx-trigger="click"
-                                                    hx-target="#id_quantity_wrapper_{{ item.product_id }}"
-                                                    hx-get="{% url 'shop:increase_quantity' item.product_id %}?ref=basket&product_id={{ item.product_id }}"
-                                                    hx-include="[id='id_quantity_{{ item.product_id }}']"  
-                                                >+</span>
-                                            </div>
-                                            <input type="hidden" 
-                                                value="Update"
-                                                hx-post="{% url 'shop:update_quantity' item.ref %}"
-                                                hx-trigger="quantity-changed from:body"
-                                                hx-sync="#id_inc_wrapper_{{ item.product_id }}:queue first"
-                                            >
-                                            <input type="hidden" 
-                                                value="Update"
-                                                hx-post="{% url 'shop:update_quantity' item.ref %}"
-                                                hx-trigger="quantity-changed from:body"
-                                                hx-sync="#id_dec_wrapper_{{ item.product_id }}:queue first"
-                                            >
-                                            <button type="submit" 
-                                                class="btn basket-btn basket-btn-danger ml-4"
-                                                value="X"
-                                                aria-label="Remove {{ item.product.name }}"
-                                                hx-post="{% url 'shop:delete_basket_item' item.ref %}"
-                                                hx-trigger="click"
-                                            >
-                                                <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
-                                            </button>
-                                        </div>
-                                        <input type="hidden" name="product_id" value="{{ item.product_id }}">
-                                        <div id="updated_{{ item.product_id }}"></div>
-                                    </form>
-                                </div>
-                                <div class="col">
-                                    {% if item.extra_rows %}<span class="text-strikethrough text-danger">
-                                    £<span id="subtotal_{{ item.product_id }}">{{ item.subtotal }}</span></span>    
-                                    {% endif %}
-                                    £<span id="total_{{ item.product_id }}">{{ item.total }}</span>
-                                </div>
-                                <div class="col">
-                                {% if item.extra_rows %}
-                                    {% for extra_row in item.extra_rows %}
-                                        {{ extra_row.label }}<br>
-                                    {% endfor %}
-                                {% endif %}
-                                </div>
-                            </div>
+                                {% include "shop/includes/basket_item.html" with editable=True %}
                             {% endfor %}
                         </div>
                     {% endfor %}
+                    <p class="basket-continue"><a href="{% shop_url %}">Continue shopping</a></p>
                 </div>
-                <div class="col-md-12" id="basket-extra">
-                {% include "shop/includes/basket_extra.html" with extra_rows=basket.extra_rows %}
-                </div>
-                {% include "shop/includes/basket_discount.html" %}
-                <div class="col-md-12">
-                    <hr class="mt-4 mb-4">
-                    <div id="basket-total-and-payment">
-                        <h3>Total: £<span id="total">{{ basket.total }}</span></h3>
-                    <hr class="mt-2 mb-4">
-                    <div class="col-md-12">
-                    
-                    {% include "shop/includes/basket_checkout_options.html" %}
-                </div>
-                </div>
-            {% else %}
-            <div class="col-md-12">
-                <p>Basket is empty.</p>
+
+                {% include "shop/includes/basket_summary.html" %}
             </div>
-            {% endif %}
-        </div>
+        {% else %}
+            <p>Your basket is empty. <a href="{% shop_url %}">Continue shopping</a></p>
+        {% endif %}
     </div>
 {% endblock content %}
 

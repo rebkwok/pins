@@ -55,6 +55,13 @@ def shop_breadcrumbs(context):
     return {"items": items, "request": context.request}
 
 
+@register.simple_tag(takes_context=True)
+def shop_url(context):
+    """The shop page's address (e.g. for "Continue shopping")"""
+    shop_page = ShopPage.objects.live().first()
+    return shop_page.get_url(context.get("request")) if shop_page else "/"
+
+
 @register.filter
 def gbp(value):
     """An amount in pounds, e.g. £5.00, or -£5.00 for negative amounts"""

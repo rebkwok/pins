@@ -1,0 +1,20 @@
+{% comment %}
+The basket page's summary: shipping and discount rows, the discount code, the
+total, and the shipping/payment options with the checkout button. Replaced as a
+whole when a discount code is applied or removed (htmx: views.apply_discount_code,
+remove_discount_code), keeping the page's scroll position; its parts are also
+replaced by id when the basket changes.
+{% endcomment %}
+<aside id="basket-summary" class="basket-summary" aria-label="Order summary">
+    <div id="basket-extra">
+        {% include "shop/includes/basket_extra.html" with extra_rows=basket.extra_rows %}
+    </div>
+    {% include "shop/includes/basket_discount.html" %}
+    <div id="basket-total-and-payment">
+        <p class="basket-line basket-line--total">
+            <span>Total</span>
+            <span>£<span id="total">{{ basket.total }}</span></span>
+        </p>
+        {% include "shop/includes/basket_checkout_options.html" %}
+    </div>
+</aside>

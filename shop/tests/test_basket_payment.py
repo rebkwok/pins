@@ -234,7 +234,7 @@ def test_basket_view_payment_expired(basket_client, paying_basket, requests_mock
     requests_mock.get(SESSION_URL, json=session_data(paying_basket, status="expired"))
     resp = basket_client.get(reverse("shop:basket"))
     assert resp.templates[0].name == "shop/basket.html"
-    assert "Basket is empty" in resp.content.decode()
+    assert "Your basket is empty" in resp.content.decode()
     paying_basket.refresh_from_db()
     assert not paying_basket.payment_in_progress
 

@@ -222,12 +222,27 @@ def test_apply_code(basket_client, basket, code):
     content = html.unescape(basket_client.get(reverse("shop:basket")).content.decode())
     assert "Discount code PINS5OFF" in content
     assert "-£5.00" in content
-    # the basket page selects delivery: £20 + £4.99 shipping, less £5
-    assert 'id="total">19.99<' in content
+    # the basket's shipping method (collection) is kept: £20, less £5
+    assert 'id="total">15.00<' in content
+    assert 'id="id_collect" value="collect" checked' in " ".join(content.split())
     # the code is shown once, on its row in the totals, with a Remove button
-    assert content.count(reverse("shop:remove_discount_code")) == 1
+    assert content.count(f'action="{reverse("shop:remove_discount_code")}"') == 1
     assert "Discount code <strong>PINS5OFF</strong>" not in content
     assert 'name="code"' not in content
+
+
+def test_apply_code_free_keeps_collection(basket_client, basket, code):
+    # a code covering the order, with collection chosen: still collection
+    code.amount = 25
+    code.save()
+    basket.shipping_method = "collect"
+    basket.save()
+    apply(basket_client, "pins5off")
+    content = html.unescape(basket_client.get(reverse("shop:basket")).content.decode())
+    assert 'id="total">0.00<' in content
+    assert 'id="id_collect" value="collect" checked' in " ".join(content.split())
+    basket.refresh_from_db()
+    assert basket.shipping_method == "collect"
 
 
 @pytest.mark.parametrize(
@@ -288,6 +303,8 @@ def test_remove_code_no_basket(client):
 
 def test_basket_page_code_covers_basket(basket_client, discounted_basket, code):
     # £20 + £4.99 shipping
+    discounted_basket.shipping_method = "deliver"
+    discounted_basket.save()
     code.amount = Decimal("30.00")
     code.save()
     content = html.unescape(basket_client.get(reverse("shop:basket")).content.decode())
@@ -298,6 +315,8 @@ def test_basket_page_code_covers_basket(basket_client, discounted_basket, code):
 def test_basket_page_code_problem(basket_client, discounted_basket, code):
     # e.g. the basket has changed since the code was applied: £24.99 (with
     # shipping) less £24.80 leaves 19p
+    discounted_basket.shipping_method = "deliver"
+    discounted_basket.save()
     code.amount = Decimal("24.80")
     code.save()
     content = html.unescape(basket_client.get(reverse("shop:basket")).content.decode())
@@ -305,7 +324,7 @@ def test_basket_page_code_problem(basket_client, discounted_basket, code):
     assert 'id="total">24.99<' in content
     # it isn't in the totals, so it's shown (with its Remove button) with the reason
     assert "Discount code <strong>PINS5OFF</strong>" in content
-    assert content.count(reverse("shop:remove_discount_code")) == 1
+    assert content.count(f'action="{reverse("shop:remove_discount_code")}"') == 1
 
 
 def test_htmx_updates_include_discount(basket_client, discounted_basket):
@@ -316,7 +335,7 @@ def test_htmx_updates_include_discount(basket_client, discounted_basket):
         {"product_id": item.product_id, "quantity": 1},
     )
     content = resp.content.decode()
-    assert '<div id="basket-discount" class="col-md-12 mt-3" hx-swap-oob="true">' in content
+    assert '<div id="basket-discount" class="basket-discount" hx-swap-oob="true">' in content
     assert "<span id='total' hx-swap-oob='true'>5.00</span>" in content
     resp = basket_client.post(
         reverse("shop:update_shipping_method"), {"shipping-method": "deliver"}
@@ -346,6 +365,7 @@ def test_checkout_page_discount(basket_client, discounted_basket):
     assert "Discount code PINS5OFF" in content
     assert "-£5.00" in content
     assert 'value="Pay Now"' in content
+    assert "Clicking Pay Now takes you to Stripe to complete your payment." in content
     # it's removed on the basket page
     assert reverse("shop:remove_discount_code") not in content
 
@@ -356,6 +376,8 @@ def test_checkout_page_free(basket_client, discounted_basket, code):
     content = html.unescape(basket_client.get(checkout_url()).content.decode())
     assert "Your discount code covers the whole order, so there's nothing to pay." in content
     assert 'value="Place order"' in content
+    # nothing to pay, so not to Stripe
+    assert "Clicking Pay Now takes you to Stripe to complete your payment." not in content
 
 
 @pytest.mark.parametrize("method", ["get", "post"])
@@ -575,3 +597,61 @@ def test_admin_create_duplicate_code(admin_client, code):
     assert resp.status_code == 200
     assert "already exists" in html.unescape(resp.content.decode())
     assert DiscountCode.objects.count() == 1
+
+
+# Applying and removing codes with htmx: the basket page's summary is replaced
+# (keeping the page's scroll position), with the message under the code
+
+
+def htmx_post(client, url, data=None):
+    return client.post(url, data or {}, headers={"HX-Request": "true"})
+
+
+def test_apply_code_htmx(basket_client, basket, code):
+    resp = htmx_post(basket_client, reverse("shop:apply_discount_code"), {"code": "pins5off"})
+    content = " ".join(html.unescape(resp.content.decode()).split())
+    assert content.startswith('<aside id="basket-summary"')
+    assert (
+        '<p class="basket-discount__message basket-discount__message--success" role="status">'
+        "Discount code PINS5OFF applied.</p>"
+    ) in content
+    # the totals include it, with its Remove button (also htmx)
+    assert "-£5.00" in content
+    assert 'id="total">15.00<' in content
+    # (the message comes straight after the code's row in the totals)
+    assert content.index("-£5.00") < content.index("Discount code PINS5OFF applied.")
+    assert 'hx-post="/shop/basket/discount/remove/" hx-target="#basket-summary"' in content
+    # (not as a message on the next page)
+    assert messages_for(resp) == []
+
+
+def test_apply_code_htmx_refused(basket_client, basket, code):
+    resp = htmx_post(basket_client, reverse("shop:apply_discount_code"), {"code": "nope"})
+    content = html.unescape(resp.content.decode())
+    message = f'basket-discount__message--error mt-2" role="status">{DISCOUNT_CODE_INVALID}</p>'
+    assert message in content
+    # the field is still there, to try again, with the message under it
+    assert 'name="code"' in content
+    assert content.index('name="code"') < content.index(message)
+
+
+def test_remove_code_htmx(basket_client, discounted_basket):
+    resp = htmx_post(basket_client, reverse("shop:remove_discount_code"))
+    content = html.unescape(resp.content.decode())
+    assert 'role="status">Discount code removed.</p>' in content
+    assert 'name="code"' in content
+    discounted_basket.refresh_from_db()
+    assert discounted_basket.discount_code is None
+
+
+def test_discount_code_htmx_empty_basket(client, code):
+    # nothing to update: the page is reloaded, with the message
+    resp = htmx_post(client, reverse("shop:apply_discount_code"), {"code": "pins5off"})
+    assert resp.headers["HX-Refresh"] == "true"
+    assert messages_for(resp) == ["Your basket is empty."]
+
+
+def test_remove_code_htmx_no_basket(client):
+    resp = htmx_post(client, reverse("shop:remove_discount_code"))
+    assert resp.headers["HX-Refresh"] == "true"
+    assert messages_for(resp) == []

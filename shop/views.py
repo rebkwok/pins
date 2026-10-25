@@ -163,16 +163,22 @@ def get_basket_context(basket_data):
     """
     Template context for serialized basket data (or serialized order data).
     Groups the items by product (keyed by product identifier), adding the product
-    name and category to each item. Note this modifies basket_data.
+    name, category, variant name and a thumbnail image to each item. Note this modifies basket_data.
     """
     basket_quantity = sum(
         int(item_data["quantity"]) for item_data in basket_data.get("items", [])
     )
     items_by_product = {}
     for item_data in basket_data.get("items", []):
-        product = ProductVariant.objects.get(id=item_data["product_id"]).product
+        variant = ProductVariant.objects.get(id=item_data["product_id"])
+        product = variant.product
         item_data["product_type"] = product.name
         item_data["category"] = product.category.title
+        item_data["variant_name"] = variant.variant_full_name()
+        # a thumbnail: the variant's image, or the product's first
+        item_data["image"] = variant.image or next(
+            (carousel_image.image for carousel_image in product.images), None
+        )
         items_by_product.setdefault(product.identifier, []).append(item_data)
     basket_data["items"] = items_by_product
     return {"basket": basket_data, "basket_quantity": basket_quantity}
@@ -413,7 +419,7 @@ def update_quantity(request, ref):
                 <span id='quantity_{product_id}' hx-swap-oob='true'>{item.quantity}</span>
                 <span id='total' hx-swap-oob='true'>{basket_data['total']}</span>
                 <div id='updated_{product_id}' class='alert-success' hx-swap-oob='true'>Basket updated</div>
-                <div id='basket-extra' class='col-md-12' hx-swap-oob='true'>{basket_extra_html}</div>
+                <div id='basket-extra' hx-swap-oob='true'>{basket_extra_html}</div>
             """ + _discount_oob_html(request, basket)
     return HttpResponse(result_html)
 
@@ -446,8 +452,11 @@ def delete_basket_item(request, ref):
         resp_str = f"<div id='row-{product_id}' hx-swap-oob='true'></div>"
 
     if basket.quantity == 0:
-        # No items in the basket
-        resp_str += "<div id='basket-total-and-payment' hx-swap-oob='true'><p>Basket is empty.</p></div>"
+        # No items in the basket: reload the page, which shows the empty basket
+        # (without the countdown and discount code)
+        resp = HttpResponse()
+        resp.headers["HX-Refresh"] = "true"
+        return resp
     else:
         # Still items left, update the total, and the shipping options (e.g. if
         # nothing left needs shipping)
@@ -464,7 +473,7 @@ def delete_basket_item(request, ref):
         {"extra_rows": basket_data["extra_rows"]},
         request,
     )
-    resp_str += f"<div id='basket-extra' class='col-md-12' hx-swap-oob='true'>{basket_extra_html}</div>"
+    resp_str += f"<div id='basket-extra' hx-swap-oob='true'>{basket_extra_html}</div>"
     return HttpResponse(resp_str)
 
 
@@ -516,10 +525,15 @@ def basket_view(request):
                 },
             )
 
-    if existing_basket is not None and existing_basket.shipping_method != SHIPPING_DELIVER:
-        # The basket page starts with delivery selected (choosing another method
-        # updates the basket, see update_shipping_method), so the total includes
-        # its shipping cost
+    if (
+        existing_basket is not None
+        and existing_basket.shipping_method not in SHIPPING_METHODS
+    ):
+        # The basket page shows the basket's shipping method (delivery or
+        # collection, kept e.g. when a discount code is applied or the customer
+        # comes back from the checkout). "No shipping needed" (set at the
+        # checkout) becomes delivery, which is selected (and the total includes
+        # its cost) if something now needs shipping.
         existing_basket.shipping_method = SHIPPING_DELIVER
         existing_basket.save(update_fields=["shipping_method"])
     # Viewing the basket page doesn't create a basket
@@ -598,29 +612,60 @@ def _discount_oob_html(request, basket):
     )
 
 
+def _discount_code_response(request, basket, level, message):
+    """
+    After applying or removing a discount code: with htmx, the basket page's
+    summary (totals, code and options), with the message under the code, so the
+    page isn't reloaded (and keeps its scroll position); otherwise back to the
+    basket page, with the message. (With htmx, an empty basket or one being paid
+    for reloads the page, which shows why.)
+    """
+    if request.headers.get("HX-Request") != "true":
+        if message:
+            messages.add_message(request, level, message)
+        return HttpResponseRedirect(reverse("shop:basket"))
+    if basket is None or not basket.count or basket.payment_in_progress:
+        if message:
+            messages.add_message(request, level, message)
+        resp = HttpResponse()
+        resp.headers["HX-Refresh"] = "true"
+        return resp
+    context = {
+        **get_basket_context(serialize_basket(request, basket)),
+        **get_checkout_options_context(request, basket),
+        **get_discount_context(basket),
+        "discount_message": message,
+        "discount_message_level": "success" if level == messages.SUCCESS else "error",
+    }
+    return HttpResponse(
+        render_to_string("shop/includes/basket_summary.html", context, request)
+    )
+
+
 @require_POST
 def apply_discount_code(request):
     """Apply a discount code to the basket (from the basket page)"""
     basket = get_existing_basket(request)
     if basket is None or not basket.count:
-        messages.error(request, "Your basket is empty.")
-    elif basket.payment_in_progress:
-        messages.error(request, PAYMENT_IN_PROGRESS_MESSAGE)
-    else:
-        code = DiscountCode.find(request.POST.get("code"))
-        problem = DISCOUNT_CODE_INVALID if code is None else code.unavailable_reason(basket)
-        if problem is None:
-            basket.set_discount_code(code)
-            basket.update(request)
-            # e.g. it would leave too little to pay
-            problem = basket.discount_problem
-            if problem is not None:
-                basket.set_discount_code(None)
+        return _discount_code_response(request, basket, messages.ERROR, "Your basket is empty.")
+    if basket.payment_in_progress:
+        return _discount_code_response(
+            request, basket, messages.ERROR, PAYMENT_IN_PROGRESS_MESSAGE
+        )
+    code = DiscountCode.find(request.POST.get("code"))
+    problem = DISCOUNT_CODE_INVALID if code is None else code.unavailable_reason(basket)
+    if problem is None:
+        basket.set_discount_code(code)
+        basket.update(request)
+        # e.g. it would leave too little to pay
+        problem = basket.discount_problem
         if problem is not None:
-            messages.error(request, problem)
-        else:
-            messages.success(request, f"Discount code {code.code} applied.")
-    return HttpResponseRedirect(reverse("shop:basket"))
+            basket.set_discount_code(None)
+    if problem is not None:
+        return _discount_code_response(request, basket, messages.ERROR, problem)
+    return _discount_code_response(
+        request, basket, messages.SUCCESS, f"Discount code {code.code} applied."
+    )
 
 
 @require_POST
@@ -628,11 +673,13 @@ def remove_discount_code(request):
     """Remove the discount code from the basket (from the basket page)"""
     basket = get_existing_basket(request)
     if basket is not None and basket.payment_in_progress:
-        messages.error(request, PAYMENT_IN_PROGRESS_MESSAGE)
-    elif basket is not None:
-        basket.set_discount_code(None)
-        messages.info(request, "Discount code removed.")
-    return HttpResponseRedirect(reverse("shop:basket"))
+        return _discount_code_response(
+            request, basket, messages.ERROR, PAYMENT_IN_PROGRESS_MESSAGE
+        )
+    if basket is None:
+        return _discount_code_response(request, basket, messages.INFO, None)
+    basket.set_discount_code(None)
+    return _discount_code_response(request, basket, messages.INFO, "Discount code removed.")
 
 
 def get_checkout_options_context(request, basket):
@@ -693,7 +740,7 @@ def update_shipping_method(request):
     )
     return HttpResponse(
         f"<span id='total' hx-swap-oob='true'>{basket_data['total']}</span>"
-        f"<div id='basket-extra' class='col-md-12' hx-swap-oob='true'>{basket_extra_html}</div>"
+        f"<div id='basket-extra' hx-swap-oob='true'>{basket_extra_html}</div>"
         + _discount_oob_html(request, basket)
     )
 
@@ -812,6 +859,8 @@ def checkout_view(request):
     context = {
         **context,
         "form": form,
+        # Paying by card: the customer goes to Stripe's page to pay
+        "pay_with_stripe": payment_method == "stripe" and not free,
         **get_basket_context(serialize_basket(request, basket)),
         **get_discount_context(basket),
     }

@@ -107,7 +107,7 @@ def test_basket_page_mixed(rf, basket, entry):
     resp = basket_view(basket_request(rf, reverse("shop:basket"), basket))
     assert resp.context_data["requires_shipping"]
     content = resp.rendered_content
-    assert "Select shipping method" in content
+    assert "Delivery or collection" in content
     assert 'name="shipping-method"' in content
     assert "Nothing in your basket needs shipping." not in content
 
@@ -140,7 +140,7 @@ def test_checkout_no_shipping(rf, entry_basket, shipping_method):
     entry_basket.refresh_from_db()
     assert entry_basket.shipping_method == "none"
     content = resp.rendered_content
-    assert "Shipping method: No shipping needed" in content
+    assert '<p class="basket-options__help">No shipping needed</p>' in content
     assert "shop-shipping-reminder" not in content
     # no shipping address
     assert 'type="hidden" name="shipping_address" value="-"' in " ".join(content.split())
@@ -226,7 +226,7 @@ def test_delete_last_item_needing_shipping(client, basket, entry):
     basket.add(entry)
     variant = next(item.product for item in basket.get_items() if item.product != entry)
     content = " ".join(delete_item(client, basket, variant).split())
-    assert '<div id="basket-checkout-options" hx-swap-oob="true">' in content
+    assert '<div id="basket-checkout-options" class="basket-options" hx-swap-oob="true">' in content
     assert "Nothing in your basket needs shipping." in content
     assert 'name="shipping-method"' not in content
     # and the shipping cost is removed from the total
@@ -236,14 +236,13 @@ def test_delete_last_item_needing_shipping(client, basket, entry):
 def test_delete_item_still_needing_shipping(client, basket, entry):
     basket.add(entry)
     content = " ".join(delete_item(client, basket, entry).split())
-    assert '<div id="basket-checkout-options" hx-swap-oob="true">' in content
+    assert '<div id="basket-checkout-options" class="basket-options" hx-swap-oob="true">' in content
     # the shipping options are still shown, keeping the basket's choice
     assert 'name="shipping-method"' in content
     assert 'id="id_collect" value="collect" checked' in content
 
 
 def test_delete_last_item(client, entry_basket, entry):
-    # the empty basket message replaces the options
+    # the page is reloaded, showing the empty basket
     content = delete_item(client, entry_basket, entry)
-    assert "Basket is empty." in content
-    assert "basket-checkout-options" not in content
+    assert content == ""
