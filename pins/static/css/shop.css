@@ -1,7 +1,15 @@
+/* The shop's buttons and links: a darker shade of the PINS pink (--pins), so
+   white text on it, and it as text on white or the basket summary's cream,
+   are readable (5.1:1 on white; the lighter pink is 2.6:1, below the 4.5:1 the
+   accessibility standard asks for) */
+:root {
+  --pins-strong: #a35a47;
+}
+
 /* # SHOP */
 
 .shop-detail__introduction {
-  color: var(--pins);
+  color: var(--pins-strong);
   font-family: var(--font--primary);
   font-weight: 400;
   font-size: 1.125rem;
@@ -31,7 +39,7 @@
 
 /* #sale banner */
 .shop-sale-banner {
-  background-color: var(--pins);
+  background-color: var(--pins-strong);
   color: var(--dark);
   text-align: center;
   padding: 12px 0;
@@ -86,7 +94,7 @@
 }
 
 .product-listing-card__title {
-  color: var(--pins);
+  color: var(--pins-strong);
   margin-top: 0;
 }
 
@@ -99,7 +107,7 @@
 }
 
 .product-listing-card__meta-content {
-  color: var(--pins);
+  color: var(--pins-strong);
   font-size: 0.875rem;
   line-height: 1.57;
   vertical-align: top;
@@ -130,7 +138,7 @@
 {
   border: none;
   color: var(--white);
-  background-color: var(--pins);
+  background-color: var(--pins-strong);
   font-weight: 700;
   padding: 10px 15px;
   display: inline-block;
@@ -141,7 +149,7 @@
 
 .shop-form input[type='submit']:hover,
 .shop-form button[type='submit'].basket-btn-danger:hover {
-  background-color: var(--pins);
+  background-color: var(--pins-strong);
 }
 
 .shop-form input[type='submit'].basket-btn,
@@ -499,7 +507,7 @@
 .shop-filters__search .btn {
   min-height: 44px;
   color: var(--white);
-  background-color: var(--pins);
+  background-color: var(--pins-strong);
   border: none;
   padding: 0 16px;
 }
@@ -518,14 +526,14 @@
   align-items: center;
   min-height: 44px;
   padding: 0 16px;
-  border: 1px solid var(--pins);
+  border: 1px solid var(--pins-strong);
   border-radius: 22px;
-  color: var(--pins);
+  color: var(--pins-strong);
   text-decoration: none;
 }
 
 .shop-categories a[aria-current='true'] {
-  background-color: var(--pins);
+  background-color: var(--pins-strong);
   color: var(--white);
 }
 
@@ -556,7 +564,7 @@
     justify-content: center;
     min-height: 44px;
     color: var(--white);
-    background-color: var(--pins);
+    background-color: var(--pins-strong);
     border: none;
   }
 }
@@ -880,7 +888,7 @@
   font-size: 1.05rem;
   font-weight: 600;
   color: var(--white);
-  background-color: var(--pins);
+  background-color: var(--pins-strong);
   border: none;
   border-radius: 4px;
 }
@@ -1014,7 +1022,7 @@
 .btn.shop-main-btn:hover,
 .btn.shop-main-btn:focus-visible {
   color: var(--white);
-  background-color: var(--pins);
+  background-color: var(--pins-strong);
   filter: brightness(0.95);
 }
 
@@ -1030,7 +1038,7 @@
   min-height: 44px;
   padding: 0 12px;
   color: var(--white);
-  background-color: var(--pins);
+  background-color: var(--pins-strong);
   border: none;
   border-radius: 4px;
 }
@@ -1038,7 +1046,7 @@
 .btn.shop-basket-link:hover,
 .btn.shop-basket-link:focus-visible {
   color: var(--white);
-  background-color: var(--pins);
+  background-color: var(--pins-strong);
   filter: brightness(0.95);
 }
 
@@ -1053,7 +1061,7 @@
   font-size: 0.85rem;
   font-weight: 600;
   line-height: 1.5;
-  color: var(--pins);
+  color: var(--pins-strong);
   background: var(--white);
 }
 
@@ -1086,17 +1094,17 @@
    darker on hover, only where there's a mouse */
 .btn.basket-btn {
   --bs-btn-color: var(--white);
-  --bs-btn-bg: var(--pins);
-  --bs-btn-border-color: var(--pins);
+  --bs-btn-bg: var(--pins-strong);
+  --bs-btn-border-color: var(--pins-strong);
   --bs-btn-hover-color: var(--white);
-  --bs-btn-hover-bg: var(--pins);
-  --bs-btn-hover-border-color: var(--pins);
+  --bs-btn-hover-bg: var(--pins-strong);
+  --bs-btn-hover-border-color: var(--pins-strong);
   --bs-btn-active-color: var(--white);
-  --bs-btn-active-bg: var(--pins);
-  --bs-btn-active-border-color: var(--pins);
+  --bs-btn-active-bg: var(--pins-strong);
+  --bs-btn-active-border-color: var(--pins-strong);
   --bs-btn-disabled-color: var(--white);
-  --bs-btn-disabled-bg: var(--pins);
-  --bs-btn-disabled-border-color: var(--pins);
+  --bs-btn-disabled-bg: var(--pins-strong);
+  --bs-btn-disabled-border-color: var(--pins-strong);
 }
 
 .btn.basket-btn:active {
@@ -1122,7 +1130,7 @@
 a.btn.basket-btn:hover,
 a.btn.shop-basket-link:hover {
   color: var(--white);
-  background-color: var(--pins);
+  background-color: var(--pins-strong);
 }
 
 /* The checkout form's sections */
@@ -1138,4 +1146,31 @@ a.btn.shop-basket-link:hover {
 
 .shop-uk-note {
   margin-bottom: 12px;
+}
+
+/* Links on the shop's pages: the darker pink; underlined within text (so
+   they're not told apart by colour alone) */
+.basket-continue a,
+.shop-results a,
+.shop-uk-note a,
+.basket-options__help a,
+.basket-details label a,
+.shop-category__description a,
+.shop-product p a,
+.order-details a {
+  color: var(--pins-strong);
+}
+
+.shop-uk-note a,
+.basket-options__help a,
+.basket-details label a,
+.shop-category__description a,
+.shop-product p a {
+  text-decoration: underline;
+}
+
+/* (the default grey is a little too light on the summary's background) */
+.basket-summary .btn-outline-secondary {
+  --bs-btn-color: #4a4a4a;
+  --bs-btn-border-color: #6c757d;
 }
