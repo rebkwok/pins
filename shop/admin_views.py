@@ -9,10 +9,12 @@ from django.views.generic import TemplateView
 from wagtail.admin import messages
 from wagtail.admin.views.generic.base import WagtailAdminTemplateMixin
 from wagtail.admin.views.generic.ordering import ReorderView
+from wagtail.log_actions import log
 from wagtail.permission_policies import ModelPermissionPolicy
 
 from common.users import real_users_q
 
+from . import activity
 from .models import DISPATCHERS_GROUP, Product, dispatcher_name
 
 User = get_user_model()
@@ -39,8 +41,19 @@ class CategoryProductsReorderView(ReorderView):
         )
 
     def post(self, request, *args, **kwargs):
-        get_object_or_404(self.get_queryset(), pk=kwargs["pk"])
-        return super().post(request, *args, **kwargs)
+        product = get_object_or_404(self.get_queryset(), pk=kwargs["pk"])
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == 200:
+            position = request.GET.get("position")
+            log(
+                product.category,
+                activity.CATEGORY_REORDERED,
+                data={
+                    "product": product.name,
+                    "position": int(position) + 1 if position and position.isdigit() else "",
+                },
+            )
+        return response
 
 
 class AddDispatcherForm(forms.Form):
@@ -126,6 +139,7 @@ class DispatchersView(WagtailAdminTemplateMixin, TemplateView):
         if "remove" in request.POST:
             user = get_object_or_404(User, pk=request.POST["remove"], groups=group)
             user.groups.remove(group)
+            log(user, activity.DISPATCHER_REMOVED)
             message = f"{dispatcher_name(user)} isn't a dispatcher any more."
             product_count = user.dispatched_products.count()
             if product_count:
@@ -144,5 +158,6 @@ class DispatchersView(WagtailAdminTemplateMixin, TemplateView):
             return self.render_to_response(self.get_context_data(form=form))
         user = form.cleaned_data["user"]
         user.groups.add(group)
+        log(user, activity.DISPATCHER_ADDED)
         messages.success(request, f"{dispatcher_name(user)} is now a dispatcher.")
         return redirect("shop_dispatchers:index")

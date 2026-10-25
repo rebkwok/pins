@@ -181,8 +181,11 @@ class Order(OrderAmountsMixin, BaseOrder):
         user, update the order's status, and email the customer.
         Returns the items marked shipped.
         """
+        from . import activity
+
         shipped = self._set_items_status(items, OrderItem.SHIPPED, user)
         if shipped:
+            activity.log_items(self, activity.ORDER_SHIPPED, shipped, user=user)
             items_shipped.send(sender=Order, order=self, items=shipped)
         return shipped
 
@@ -194,7 +197,12 @@ class Order(OrderAmountsMixin, BaseOrder):
         need to be told, and refunded, separately).
         Returns the items changed.
         """
-        return self._set_items_status(items, OrderItem.NOT_SENT, user)
+        from . import activity
+
+        changed = self._set_items_status(items, OrderItem.NOT_SENT, user)
+        if changed:
+            activity.log_items(self, activity.ORDER_NOT_SENT, changed, user=user)
+        return changed
 
     def update_shipping_status(self):
         """

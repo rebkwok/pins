@@ -178,6 +178,29 @@
                 <button type="submit" class="button button-secondary">Add note</button>
             </form>
         </section>
+
+        <section class="shop-order__section">
+            <h2 class="w-h3">Activity</h2>
+            {% if activity %}
+                <table class="listing shop-order__activity">
+                    <thead>
+                        <tr><th>When</th><th>Who</th><th>What</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in activity %}
+                            <tr>
+                                <td>{{ entry.timestamp|date:"j M Y, H:i" }}</td>
+                                {# (entries from the Stripe webhook and checkout have no user) #}
+                                <td>{% if entry.user_id %}{{ entry.user_display_name }}{% else %}Customer / Stripe{% endif %}</td>
+                                <td>{{ entry.message }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>No activity yet.</p>
+            {% endif %}
+        </section>
     </div>
 {% endblock %}
 

@@ -28,10 +28,12 @@ from wagtail.admin.views.generic import IndexView
 from wagtail.admin.views.generic.base import WagtailAdminTemplateMixin
 from wagtail.admin.views.mixins import SpreadsheetExportMixin
 from wagtail.admin.viewsets.model import ModelViewSet
+from wagtail.log_actions import registry as log_registry
 from wagtail.permission_policies import ModelPermissionPolicy
 
 from common.users import real_users_q
 
+from . import activity
 from .models import DISPATCHERS_GROUP, Order, OrderItem, Product, ProductVariant
 from .payment import PayByStripe
 from .templatetags.shoptags import gbp
@@ -395,6 +397,10 @@ class OrderDetailView(OrderViewMixin, TemplateView):
             and any(item.shipping_status == OrderItem.TO_SEND for item in items),
             payments=order.payments.order_by("date_created"),
             notes=order.notes.order_by("date_created"),
+            # who did what to the order (activity.py), oldest first
+            activity=log_registry.get_logs_for_instance(order)
+            .select_related("user")
+            .order_by("timestamp", "pk"),
             note_form=kwargs.get("note_form") or OrderNoteForm(),
             can_complete=order.can_complete,
             complete_after_shipping=order.can_change_status(Order.Status.COMPLETED)
@@ -412,7 +418,9 @@ class OrderDetailView(OrderViewMixin, TemplateView):
             return self.render_to_response(self.get_context_data(note_form=form))
         # (not order.notes.create(): notes are a modelcluster relation, which
         # doesn't save)
-        OrderNote.objects.create(order=self.order, message=form.cleaned_data["message"])
+        message = form.cleaned_data["message"]
+        OrderNote.objects.create(order=self.order, message=message)
+        activity.log_order(self.order, activity.ORDER_NOTE, message=message)
         messages.success(request, "Note added.")
         return redirect(self.order_url)
 
@@ -481,12 +489,14 @@ class OrderStatusView(OrderActionMixin, TemplateView):
             return redirect(self.order_url)
         order.status = self.new_status
         order.save()
+        activity.log_order(order, self.log_action)
         messages.success(request, self.done_message.format(order=order))
         return redirect(self.order_url)
 
 
 class OrderCompleteView(OrderStatusView):
     new_status = Order.Status.COMPLETED
+    log_action = activity.ORDER_COMPLETED
     action_label = "Mark as completed"
     done_message = "Order {order.ref} is completed, and the customer has been emailed."
 
@@ -507,6 +517,7 @@ class OrderCompleteView(OrderStatusView):
 
 class OrderCancelView(OrderStatusView):
     new_status = Order.Status.CANCELLED
+    log_action = activity.ORDER_CANCELLED
     action_label = "Cancel order"
     done_message = "Order {order.ref} has been cancelled."
 

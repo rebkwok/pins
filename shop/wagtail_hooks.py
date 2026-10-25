@@ -30,6 +30,7 @@ from .admin_views import (
     CategoryProductsReorderView,
     DispatchersView,
 )
+from . import activity
 from .models import (
     PRODUCT_VARIANT_PANELS,
     Category,
@@ -283,6 +284,12 @@ def register_category_products_reorder_url():
             name="shop_category_products_reorder",
         )
     ]
+
+
+@hooks.register("register_log_actions")
+def register_shop_log_actions(actions):
+    # The shop's activity log entries (orders, dispatchers, ...)
+    activity.register(actions)
 
 
 @hooks.register("insert_global_admin_js")

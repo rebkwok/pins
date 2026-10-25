@@ -15,8 +15,10 @@ from salesman.core.utils import get_salesman_model
 from salesman.orders.signals import status_changed
 from salesman_stripe_connect import signals as stripe_signals
 
+from . import activity
 from .models import (
     OrderItem,
+    OrderPayment,
     ProductImage,
     ProductVariant,
     ShopSettings,
@@ -394,3 +396,44 @@ def protect_ordered_variants(sender, instance, **kwargs):
             set(order_items),
         )
 
+
+
+# The activity log (see activity.py): what happens to orders outside our admin
+# views (from checkout and the Stripe webhook), or in both
+
+
+@receiver(post_save, sender=Order)
+def log_order_placed(sender, instance, created, **kwargs):
+    if created:
+        activity.log_order(instance, activity.ORDER_PLACED, total=activity.amount_data(instance.total))
+
+
+@receiver(post_save, sender=OrderPayment)
+def log_order_paid(sender, instance, created, **kwargs):
+    # (refunds are recorded as negative payments, and logged when recorded)
+    if created and instance.amount > 0:
+        activity.log_order(
+            instance.order, activity.ORDER_PAID, amount=activity.amount_data(instance.amount)
+        )
+
+
+@receiver(stripe_signals.refund_recorded)
+def log_refund(sender, order, amount, fully_refunded, **kwargs):
+    # from the orders admin (with its user), or from the Stripe dashboard (by the
+    # webhook, with no user)
+    activity.log_order(
+        order,
+        activity.ORDER_REFUNDED,
+        amount=activity.amount_data(amount),
+        fully_refunded=fully_refunded,
+    )
+
+
+@receiver(stripe_signals.dispute_created)
+def log_dispute_created(sender, order, message, **kwargs):
+    activity.log_order(order, activity.ORDER_DISPUTED, message=message)
+
+
+@receiver(stripe_signals.dispute_closed)
+def log_dispute_closed(sender, order, message, **kwargs):
+    activity.log_order(order, activity.ORDER_DISPUTE_CLOSED, message=message)
