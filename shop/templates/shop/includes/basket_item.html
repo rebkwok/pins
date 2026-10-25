@@ -41,7 +41,7 @@ id); on the checkout page it's a summary.
                     hx-include="[id='id_quantity_{{ item.product_id }}']"
                 >-</button>
                 <span id="id_quantity_wrapper_{{ item.product_id }}">
-                    {% include "shop/includes/quantity_field.html" with product_id=item.product_id value=item.quantity %}
+                    {% include "shop/includes/quantity_field.html" with product_id=item.product_id value=item.quantity max_value=item.max_quantity %}
                 </span>
                 <button
                     type="button"
@@ -53,19 +53,20 @@ id); on the checkout page it's a summary.
                     hx-get="{% url 'shop:increase_quantity' item.product_id %}?ref=basket&product_id={{ item.product_id }}"
                     hx-include="[id='id_quantity_{{ item.product_id }}']"
                 >+</button>
-                <input type="hidden"
-                    value="Update"
-                    hx-post="{% url 'shop:update_quantity' item.ref %}"
-                    hx-trigger="quantity-changed from:body"
-                    hx-sync="#id_inc_wrapper_{{ item.product_id }}:queue first"
-                >
-                <input type="hidden"
-                    value="Update"
-                    hx-post="{% url 'shop:update_quantity' item.ref %}"
-                    hx-trigger="quantity-changed from:body"
-                    hx-sync="#id_dec_wrapper_{{ item.product_id }}:queue first"
-                >
             </div>
+            {# (outside the input group, so the + button keeps its rounded corners) #}
+            <input type="hidden"
+                value="Update"
+                hx-post="{% url 'shop:update_quantity' item.ref %}"
+                hx-trigger="quantity-changed from:body"
+                hx-sync="#id_inc_wrapper_{{ item.product_id }}:queue first"
+            >
+            <input type="hidden"
+                value="Update"
+                hx-post="{% url 'shop:update_quantity' item.ref %}"
+                hx-trigger="quantity-changed from:body"
+                hx-sync="#id_dec_wrapper_{{ item.product_id }}:queue first"
+            >
             <button type="submit"
                 class="btn basket-item__remove"
                 value="X"

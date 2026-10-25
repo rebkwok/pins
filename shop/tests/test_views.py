@@ -390,8 +390,8 @@ def test_add_to_basket_out_of_stock(rf, basket, product):
         in content
     )
     options = " ".join(content.split())
-    assert f'<option value="{variant1.id}" disabled> Small (out of stock) </option>' in options
-    assert f'<option value="{variant2.id}"> Medium (only 2 left) </option>' in options
+    assert f'<option value="{variant1.id}" data-available="0" disabled> Small (out of stock) </option>' in options
+    assert f'<option value="{variant2.id}" data-available="2"> Medium (only 2 left) </option>' in options
 
     # add to basket so variant2 now also out of stock
     request = rf.post(
@@ -456,7 +456,10 @@ def test_add_to_basket_cant_increase(rf, product):
     content = resp.content.decode()
     # no items in basket
     assert '<i class="fa-solid fa-basket-shopping"></i>  (0)' in content
-    assert "Quantity requested is not available" in content
+    # how many are available, with the stock note and quantity up to date
+    assert "Only 1 available</div>" in content
+    assert "Only 1 left" in content
+    assert 'value="1" max="1"' in content
 
 
 ### Update quantity from basket

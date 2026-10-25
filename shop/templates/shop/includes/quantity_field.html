@@ -1,1 +1,1 @@
-<input type="number" min="1" inputmode="numeric" class="form-control quantity" aria-label="Quantity" id="id_quantity_{{ product_id }}" name="quantity" value="{{ value }}">
+<input type="number" min="1" inputmode="numeric" class="form-control quantity" aria-label="Quantity" id="id_quantity_{{ product_id }}" name="quantity" value="{{ value }}"{% if max_value %} max="{{ max_value }}"{% endif %}>

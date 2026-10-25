@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% load wagtailcore_tags %}
+{% load wagtailcore_tags static %}
 
 {% load navigation_tags shoptags %}
 
@@ -19,4 +19,5 @@
 
 {% block extra_js %}
         <script src="https://kit.fontawesome.com/363beb2d4c.js" crossorigin="anonymous"></script>
+        <script src="{% static 'shop/js/quantity_buttons.js' %}" defer></script>
 {% endblock %}

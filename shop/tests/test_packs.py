@@ -185,7 +185,10 @@ def test_add_packs(rf, cards, single, pack):
 
 def test_add_too_many_packs(rf, cards, single, pack):
     content = post_add(rf, cards, pack, 3)
-    assert "Quantity requested is not available" in content
+    # 13 singles: 2 packs of 5
+    assert "Only 2 available</div>" in content
+    # the quantity is lowered to what's available, with that as its max
+    assert 'value="2" max="2"' in content
     assert stock(cards) == 13
 
 
@@ -203,14 +206,17 @@ def test_increase_quantity_button(rf, cards, single, pack):
         request = rf.get(url, {"product_id": pack.id, "quantity": value, "ref": ref})
         return increase_quantity(basket_session(request, basket), cards.id).content.decode()
 
-    # from 1 to 2 packs is fine; 3 isn't
-    assert "Can't increase quantity" not in increase(1)
-    assert "Can't increase quantity" in increase(2)
-    # in the basket, with 2 packs already taken from stock (3 left)
+    # from 1 to 2 packs is fine; 3 isn't (shown by the product's form)
+    assert "available</div>" not in increase(1)
+    assert f"<div id='added_{cards.id}' class='alert-danger' hx-swap-oob='true'>Only 2 available</div>" in increase(2)
+    # in the basket, with 2 packs already taken from stock (3 left): shown
+    # under the item, and the field's max is the 2 in the basket
     basket = baker.make(Basket)
     basket.add(pack, quantity=2)
-    assert "Can't increase quantity" in increase(2, basket, ref="basket")
-    assert "Can't increase quantity" not in increase(1, basket, ref="basket")
+    content = increase(2, basket, ref="basket")
+    assert f"<div id='updated_{cards.id}' class='alert-danger' hx-swap-oob='true'>Only 2 available</div>" in content
+    assert 'value="2" max="2"' in content
+    assert "available</div>" not in increase(1, basket, ref="basket")
 
 
 def test_update_quantity_in_basket(client, cards, single, pack):

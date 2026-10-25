@@ -175,6 +175,8 @@ def get_basket_context(basket_data):
         item_data["product_type"] = product.name
         item_data["category"] = product.category.title
         item_data["variant_name"] = variant.variant_full_name()
+        # the most it can be changed to (its stock was taken when added)
+        item_data["max_quantity"] = variant.available + int(item_data["quantity"])
         # a thumbnail: the variant's image, or the product's first
         item_data["image"] = variant.image or next(
             (carousel_image.image for carousel_image in product.images), None
@@ -237,7 +239,14 @@ def decrease_quantity(request, product_id):
         return _quantity_unavailable_response(request, product_id)
     if value > 1:
         value -= 1
-    return _change_quantity(request, product_id, value)
+    variant = ProductVariant.objects.filter(id=variant_id).first()
+    return _change_quantity(
+        request,
+        product_id,
+        value,
+        max_value=_max_quantity(request, variant, in_basket),
+        in_basket=in_basket,
+    )
 
 
 @require_GET
@@ -261,21 +270,94 @@ def increase_quantity(request, product_id):
     can_increase = _can_increase_quantity(request, variant, value + 1, in_basket)
     if can_increase:
         value += 1
-    return _change_quantity(request, product_id, value, can_increase=can_increase)
+    max_value = _max_quantity(request, variant, in_basket)
+    return _change_quantity(
+        request,
+        product_id,
+        value,
+        can_increase=can_increase,
+        max_value=max_value,
+        in_basket=in_basket,
+        variant=variant,
+    )
 
 
-def _change_quantity(request, product_id, new_value, can_increase=True):
+def _selectable_id(variant):
+    """
+    The variant's id, to keep it selected in the variant options; None if none
+    are left (its option is disabled, so the first available one is selected)
+    """
+    return variant.id if variant.available > 0 else None
+
+
+def _variant_options_oob_html(request, variant):
+    """
+    The product's variant options with up-to-date stock (e.g. "Only 1 left"),
+    keeping this variant selected, to replace them on the shop and product
+    pages; if the product is now out of stock, its quantity and add to basket
+    buttons are removed.
+    """
+    product = variant.product
+    variant_html = render_to_string(
+        "shop/includes/select_variant_field.html",
+        {"product": product, "selected_variant_id": _selectable_id(variant)},
+        request,
+    )
+    html = (
+        f"<div id='id_select_variant_wrapper_{product.id}' hx-swap-oob='true'>"
+        f"{variant_html}</div>"
+    )
+    if product.out_of_stock():
+        html += f"<div id='change_quantity_wrapper_{product.id}' hx-swap-oob='true'></div>"
+    return html
+
+
+def _max_quantity(request, variant, in_basket):
+    """
+    The most of the variant that can be chosen: what's available, plus what's
+    already in the basket (in the basket, where its stock has been taken); None
+    if unknown. (Used to disable the + button, see quantity_buttons.js.)
+    """
+    if variant is None:
+        return None
+    if not in_basket:
+        return variant.available
+    basket = get_existing_basket(request)
+    item = basket.find(BasketItem.get_product_ref(variant)) if basket is not None else None
+    return variant.available + (item.quantity if item is not None else 0)
+
+
+def _change_quantity(
+    request,
+    product_id,
+    new_value,
+    can_increase=True,
+    max_value=None,
+    in_basket=False,
+    variant=None,
+):
     context = {"product_id": product_id, "value": new_value}
+    if in_basket or not can_increase:
+        # On the shop and product pages, the variant gives the max (which
+        # changes with the variant chosen), unless it couldn't be increased: the
+        # stock has changed since the page loaded
+        context["max_value"] = max_value
     resp_str = render_to_string("shop/includes/quantity_field.html", context, request)
     resp_str += f"""
         <div id='added_{product_id}' hx-swap-oob='true'></div>
         <div id='updated_{product_id}' hx-swap-oob='true'></div>
     """
     if not can_increase:
+        # Where the page shows messages: under the item in the basket, by the
+        # product's form on the shop and product pages
+        message_id = "updated" if in_basket else "added"
+        available = "None" if not max_value else f"Only {max_value}"
         resp_str += (
-            f"<div id='updated_{product_id}' class='alert-info' hx-swap-oob='true'>"
-            "Can't increase quantity</div>"
+            f"<div id='{message_id}_{product_id}' class='alert-danger' hx-swap-oob='true'>"
+            f"{available} available</div>"
         )
+        if not in_basket and variant is not None:
+            resp_str += _variant_options_oob_html(request, variant)
         resp = HttpResponse(resp_str)
         return resp
     resp = HttpResponse(resp_str)
@@ -332,10 +414,11 @@ def add_to_basket(request, product_id):
                 Added! <a href='{reverse("shop:basket")}'>Go to basket</a>
             </div>
         """
-        # update variant dropdown, including out of stock message
+        # update variant dropdown, including out of stock message, keeping
+        # the variant selected (if there are any left)
         variant_html = render_to_string(
             "shop/includes/select_variant_field.html",
-            {"product": variant.product},
+            {"product": variant.product, "selected_variant_id": _selectable_id(variant)},
             request,
         )
         resp_str += f"<div id='id_select_variant_wrapper_{ product_id }' hx-swap-oob='true'>{variant_html}</div>"
@@ -357,10 +440,25 @@ def add_to_basket(request, product_id):
         logger.info(
             "Can't add %s x %s to basket: %s available", quantity, variant, variant.available
         )
+        # e.g. taken by another basket since the page loaded: say how many are
+        # available, with the stock and the quantity (its max) up to date
+        available = max(variant.available, 0)
         resp_str = f"<div>{_basket_icon_html(request, get_existing_basket_quantity(request))}</div>"
-        resp_str += f"""
-        <div id='added_{product_id}' class='alert-danger mt-2' hx-swap-oob='true'>Quantity requested is not available</div>
-        """
+        resp_str += (
+            f"<div id='added_{product_id}' class='alert-danger mt-2' hx-swap-oob='true'>"
+            f"{f'Only {available}' if available else 'None'} available</div>"
+        )
+        resp_str += _variant_options_oob_html(request, variant)
+        if available:
+            quantity_html = render_to_string(
+                "shop/includes/quantity_field.html",
+                {"product_id": product_id, "value": min(quantity, available), "max_value": available},
+                request,
+            )
+            resp_str += (
+                f"<span id='id_quantity_wrapper_{product_id}' hx-swap-oob='true'>"
+                f"{quantity_html}</span>"
+            )
 
     return HttpResponse(resp_str)
 

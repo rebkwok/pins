@@ -94,3 +94,156 @@ def test_stripe_note(basket_client):
     note = "Clicking Pay Now takes you to Stripe to complete your payment."
     assert note in get(basket_client, CHECKOUT_URL)
     assert note not in get(basket_client, CHECKOUT_URL.replace("stripe", "pay-in-advance"))
+
+
+# The quantity buttons' limits (quantity_buttons.js disables + at the max)
+
+
+def test_basket_quantity_max(basket_client, basket):
+    # 2 in the basket, 5 more available: up to 7
+    variant = basket.get_items()[0].product
+    resp = basket_client.get(reverse("shop:basket"))
+    (item,) = resp.context["basket"]["items"][variant.product.identifier]
+    assert item["max_quantity"] == variant.available + 2
+    assert f'value="2" max="{variant.available + 2}"' in resp.content.decode()
+    # changing the quantity in the basket keeps the max
+    for view in ["decrease_quantity", "increase_quantity"]:
+        content = basket_client.get(
+            reverse(f"shop:{view}", args=(variant.product.id,)),
+            {"product_id": variant.id, "quantity": 2, "ref": "basket"},
+        ).content.decode()
+        assert f'max="{variant.available + 2}"' in content
+
+
+def test_shop_quantity_no_max(client, basket):
+    # on the shop and product pages, the variant gives the max (its
+    # data-available), as it can change with the variant chosen
+    variant = basket.get_items()[0].product
+    content = client.get(
+        reverse("shop:increase_quantity", args=(variant.product.id,)),
+        {"product_id": variant.id, "quantity": 1},
+    ).content.decode()
+    assert "max=" not in content
+    content = client.get(reverse("shop:product_detail", args=(variant.product.id,))).content.decode()
+    assert f'value="{variant.id}" data-available="{variant.available}"' in content
+
+
+def test_none_available(client, basket):
+    variant = basket.get_items()[0].product
+    variant.stock = 0
+    variant.save()
+    content = client.get(
+        reverse("shop:increase_quantity", args=(variant.product.id,)),
+        {"product_id": variant.id, "quantity": 1},
+    ).content.decode()
+    assert "class='alert-danger' hx-swap-oob='true'>None available</div>" in content
+
+
+def test_refused_quantity_max(client, basket):
+    # stock has changed since the page loaded: the field gets the real max
+    variant = basket.get_items()[0].product
+    variant.stock = 1
+    variant.save()
+    content = client.get(
+        reverse("shop:increase_quantity", args=(variant.product.id,)),
+        {"product_id": variant.id, "quantity": 1},
+    ).content.decode()
+    assert 'value="1" max="1"' in content
+    assert "Only 1 available</div>" in content
+
+
+def test_decrease_quantity_unknown_variant_in_basket(client, basket):
+    # (e.g. deleted): the quantity still changes, with no max
+    product = basket.get_items()[0].product.product
+    content = client.get(
+        reverse("shop:decrease_quantity", args=(product.id,)),
+        {"product_id": 99999, "quantity": 3, "ref": "basket"},
+    ).content.decode()
+    assert 'value="2">' in content
+    assert "max=" not in content
+
+
+def increase(client, variant, quantity, **params):
+    return " ".join(
+        client.get(
+            reverse("shop:increase_quantity", args=(variant.product.id,)),
+            {"product_id": variant.id, "quantity": quantity, **params},
+        ).content.decode().split()
+    )
+
+
+def test_refused_updates_variant_options(client, product):
+    # stock taken since the page loaded: the options show the real stock,
+    # keeping the chosen variant
+    small = baker.make("shop.ProductVariant", product=product, variant_name="Small", stock=10)
+    large = baker.make("shop.ProductVariant", product=product, variant_name="Large", stock=1)
+    content = increase(client, large, 1)
+    assert "Only 1 available</div>" in content
+    assert f"<div id='id_select_variant_wrapper_{product.id}' hx-swap-oob='true'>" in content
+    assert f'<option value="{large.id}" data-available="1" selected> Large (only 1 left) </option>' in content
+    assert f'<option value="{small.id}" data-available="10">' in content
+    # still in stock: the buttons stay
+    assert f"<div id='change_quantity_wrapper_{product.id}' hx-swap-oob='true'></div>" not in content
+
+
+def test_refused_single_variant_note(client, basket):
+    variant = basket.get_items()[0].product
+    variant.stock = 1
+    variant.save()
+    content = increase(client, variant, 1)
+    assert '<p class="shop-card__stock">Only 1 left</p>' in content
+
+
+def test_refused_now_out_of_stock(client, basket):
+    # none left: "Out of stock", without the quantity and add buttons
+    variant = basket.get_items()[0].product
+    variant.stock = 0
+    variant.save()
+    content = increase(client, variant, 1)
+    assert "Out of stock</p>" in content
+    assert f"<div id='change_quantity_wrapper_{variant.product.id}' hx-swap-oob='true'></div>" in content
+
+
+def test_refused_in_basket_no_variant_options(basket_client, basket):
+    variant = basket.get_items()[0].product
+    content = increase(basket_client, variant, 2 + variant.available, ref="basket")
+    assert "available</div>" in content
+    assert "id_select_variant_wrapper" not in content
+
+
+def test_add_refused_now_out_of_stock(client, product):
+    # e.g. the last ones were added in another tab: "None available", "Out of
+    # stock", and no quantity or add buttons
+    small = baker.make("shop.ProductVariant", product=product, variant_name="Small", stock=0)
+    content = " ".join(
+        client.post(
+            reverse("shop:add_to_basket", args=(product.id,)),
+            {"product_id": small.id, "quantity": 2},
+        ).content.decode().split()
+    )
+    assert "None available</div>" in content
+    assert "Out of stock</p>" in content
+    assert f"<div id='change_quantity_wrapper_{product.id}' hx-swap-oob='true'></div>" in content
+    assert "id_quantity_wrapper" not in content
+
+
+def test_added_variant_stays_selected(client, product):
+    small = baker.make("shop.ProductVariant", product=product, variant_name="Small", stock=10)
+    large = baker.make("shop.ProductVariant", product=product, variant_name="Large", stock=3)
+
+    def add(variant, quantity):
+        return " ".join(
+            client.post(
+                reverse("shop:add_to_basket", args=(product.id,)),
+                {"product_id": variant.id, "quantity": quantity},
+            ).content.decode().split()
+        )
+
+    content = add(large, 1)
+    assert "Added!" in content
+    assert f'<option value="{large.id}" data-available="2" selected>' in content
+    # the last ones: their option is disabled, so it isn't kept selected
+    content = add(large, 2)
+    assert f'<option value="{large.id}" data-available="0" disabled>' in content
+    assert " selected" not in content.split("id_select_variant_wrapper")[1].split("</select>")[0]
+    assert f'<option value="{small.id}" data-available="10">' in content

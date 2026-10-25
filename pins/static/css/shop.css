@@ -905,3 +905,58 @@
 .basket-discount__message--error {
   color: #842029;
 }
+
+/* The quantity -/+ buttons: no hover colour on touch screens (where it would
+   stick after a tap); a brief colour while pressed */
+.input-group.quantity .btn {
+  --bs-btn-color: #444;
+  --bs-btn-bg: #fff;
+  --bs-btn-border-color: #6c757d;
+  --bs-btn-hover-color: #444;
+  --bs-btn-hover-bg: #fff;
+  --bs-btn-hover-border-color: #6c757d;
+  --bs-btn-active-color: #444;
+  --bs-btn-active-bg: #e9e4da;
+  --bs-btn-active-border-color: #6c757d;
+}
+
+@media (hover: hover) {
+  .input-group.quantity .btn {
+    --bs-btn-hover-bg: #f3f0ea;
+  }
+}
+
+/* (the quantity field is in a wrapper, which Bootstrap's input group doesn't
+   square off) */
+.input-group.quantity .form-control.quantity {
+  border-radius: 0;
+}
+
+/* Messages after adding to the basket or changing a quantity: green, or red if
+   it couldn't be done (on the product page and in the basket; on the shop page
+   they're over the card's image) */
+.shop-product [id^='added_']:not(:empty),
+.basket-item > [id^='updated_']:not(:empty) {
+  margin-top: 6px;
+  font-size: 0.9rem;
+}
+
+.shop-product [id^='added_'].alert-success,
+.basket-item > [id^='updated_'].alert-success {
+  color: #0f5132;
+}
+
+.shop-product [id^='added_'].alert-danger,
+.basket-item > [id^='updated_'].alert-danger {
+  color: #842029;
+}
+
+.shop-product [id^='added_'] a {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.basket-item > [id^='updated_'].alert-info {
+  color: #444;
+}
