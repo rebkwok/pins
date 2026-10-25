@@ -49,6 +49,8 @@ dependencies = [
         "model-bakery<=1.24.2",
         "ipdb<=0.13.13",
         "requests-mock>=1.12.1",
+        "pytest-playwright>=0.10.0",
+        "axe-playwright-python>=0.1.8",
 ]
 
 [tool.uv.sources]
@@ -57,7 +59,9 @@ django-salesman = { git = "https://github.com/rebkwok/django-salesman.git", rev=
 
 
 [tool.pytest]
-    addopts = ["--reuse-db", "-n" , "auto"]
+    # (the browser tests, marked e2e, are run separately: pytest -m e2e)
+    addopts = ["--reuse-db", "-n" , "auto", "-m", "not e2e"]
+    markers = ["e2e: browser (end-to-end) tests, with Playwright; run with -m e2e"]
     DJANGO_SETTINGS_MODULE = "pins.settings"
 
     env = [
