@@ -21,9 +21,29 @@ from wagtail.models import ModelLogEntry
 
 from . import activity
 from .admin_views import SHOP_ADMIN_MENU_LABEL, DispatchersView
-from .models import Category, DiscountCode, Order, Product, ProductVariant, Sale, ShopSettings
+from .models import (
+    Category,
+    DiscountCode,
+    Order,
+    Product,
+    ProductVariant,
+    Sale,
+    ShippingRate,
+    ShopFAQ,
+    ShopSettings,
+)
 
-SHOP_MODELS = (Product, ProductVariant, Category, Sale, DiscountCode, Order, ShopSettings)
+SHOP_MODELS = (
+    Product,
+    ProductVariant,
+    Category,
+    Sale,
+    DiscountCode,
+    ShippingRate,
+    ShopFAQ,
+    Order,
+    ShopSettings,
+)
 DISPATCHER_ACTIONS = (activity.DISPATCHER_ADDED, activity.DISPATCHER_REMOVED)
 
 # Who can see the page: shop admins (who manage the shop's stock)

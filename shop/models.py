@@ -746,6 +746,107 @@ class Category(models.Model):
     shop_link.short_description = "On the shop"
 
 
+class ShippingRate(models.Model):
+    """
+    A delivery cost that products are given (e.g. "Small items", £3.50). A
+    delivered basket's shipping is the highest rate of its items that need
+    shipping, charged once. One rate is the default, which new products start
+    with.
+    """
+
+    name = models.CharField(
+        max_length=100, unique=True, help_text="e.g. Small items, Standard."
+    )
+    amount = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        validators=[MinValueValidator(0)],
+        verbose_name="Cost",
+    )
+    default = models.BooleanField(
+        default=False,
+        help_text=(
+            "New products start with this rate. Ticking it here unticks the "
+            "current default."
+        ),
+    )
+
+    panels = [FieldPanel("name"), FieldPanel("amount"), FieldPanel("default")]
+
+    class Meta:
+        ordering = ["amount", "name"]
+
+    def __str__(self):
+        return f"{self.name} (£{self.amount:,.2f})"
+
+    def clean(self):
+        super().clean()
+        was_default = (
+            self.pk is not None
+            and ShippingRate.objects.filter(pk=self.pk, default=True).exists()
+        )
+        if was_default and not self.default:
+            raise ValidationError(
+                {
+                    "default": (
+                        "There must be a default rate: tick \"Default\" on another "
+                        "rate instead."
+                    )
+                }
+            )
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            others = ShippingRate.objects.exclude(pk=self.pk)
+            if self.default:
+                others.filter(default=True).update(default=False)
+            elif not others.filter(default=True).exists():
+                # The first rate is the default
+                self.default = True
+            super().save(*args, **kwargs)
+
+    @classmethod
+    def get_default(cls):
+        return cls.objects.filter(default=True).first()
+
+    def cost(self):
+        return f"£{self.amount:,.2f}"
+
+    cost.short_description = "Cost"
+    cost.admin_order_field = "amount"
+
+    def products_count(self):
+        return self.products.count()
+
+    products_count.short_description = "Products"
+
+
+class ShopFAQ(models.Model):
+    """A question and answer on the shop's FAQs page (/shop/faqs/)"""
+
+    question = models.CharField(max_length=255)
+    answer = RichTextField()
+    # The order on the FAQs page (reordered in the FAQs list)
+    sort_order = models.IntegerField(null=True, blank=True, editable=False)
+
+    panels = [FieldPanel("question"), FieldPanel("answer")]
+
+    class Meta:
+        ordering = ["sort_order", "pk"]
+        verbose_name = "shop FAQ"
+        verbose_name_plural = "shop FAQs"
+
+    def __str__(self):
+        return self.question
+
+    def save(self, *args, **kwargs):
+        if self.sort_order is None:
+            # New FAQs go last
+            last = ShopFAQ.objects.aggregate(last=models.Max("sort_order"))["last"]
+            self.sort_order = 0 if last is None else last + 1
+        super().save(*args, **kwargs)
+
+
 def _items_for_variants(item_model, variant_ids):
     # Basket and order items refer to their variant with a generic foreign key
     return item_model.objects.filter(
@@ -1209,6 +1310,12 @@ class ProductAdminForm(RelativeStockFormMixin, WagtailAdminModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._init_stock_shown()
+        shipping_rate_field = self.fields.get("shipping_rate")
+        if shipping_rate_field is not None and self.instance.pk is None:
+            # New products start with the default rate
+            default_rate = ShippingRate.get_default()
+            if default_rate is not None:
+                self.initial.setdefault("shipping_rate", default_rate.pk)
         dispatcher_field = self.fields.get("dispatcher")
         if dispatcher_field is not None:
             # Users' names, not usernames
@@ -1361,6 +1468,18 @@ class Product(ClusterableModel):
             "method or address, and has no shipping cost."
         ),
     )
+    shipping_rate = models.ForeignKey(
+        ShippingRate,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="products",
+        help_text=(
+            "The delivery cost for this product (rates are set in Shop admin > "
+            "Shipping rates). If a basket has products with different rates, the "
+            "highest is charged, once."
+        ),
+    )
 
     panels = [
         MultiFieldPanel(
@@ -1412,6 +1531,7 @@ class Product(ClusterableModel):
         MultiFieldPanel(
             [
                 FieldPanel("requires_shipping"),
+                FieldPanel("shipping_rate", widget=forms.Select),
                 DispatcherWarningPanel(),
                 FieldPanel("dispatcher"),
                 FieldPanel("notify_dispatcher"),
@@ -1424,6 +1544,9 @@ class Product(ClusterableModel):
         return self.name
 
     def save(self, *args, **kwargs):
+        if self.requires_shipping and self.shipping_rate_id is None:
+            # e.g. imported products: the default rate
+            self.shipping_rate = ShippingRate.get_default()
         if self.pk and self.sort_order is not None:
             # moved to another category: last in the new one
             old_category = (
@@ -1475,6 +1598,10 @@ class Product(ClusterableModel):
             ]
 
     def clean(self):
+        if self.requires_shipping and self.shipping_rate_id is None:
+            raise ValidationError(
+                {"shipping_rate": "Choose a shipping rate for a product that needs shipping."}
+            )
         if self.notify_dispatcher:
             if self.dispatcher_id is None:
                 raise ValidationError(
@@ -1490,6 +1617,17 @@ class Product(ClusterableModel):
                 )
 
     @property
+    def delivery_cost(self):
+        """
+        The product's shipping rate's amount (the default rate's if it has none),
+        or None if it doesn't need shipping (or there are no rates)
+        """
+        if not self.requires_shipping:
+            return None
+        rate = self.shipping_rate or ShippingRate.get_default()
+        return rate.amount if rate is not None else None
+
+    @property
     def dispatcher_warning(self):
         """
         A warning if the product's dispatcher isn't in the Dispatchers group any
@@ -1501,6 +1639,15 @@ class Product(ClusterableModel):
                 "any more. Choose another dispatcher."
             )
         return None
+
+    def shipping_display(self):
+        """The product's delivery cost, for the admin list"""
+        cost = self.delivery_cost
+        if cost is None:
+            return "Not shipped" if not self.requires_shipping else "-"
+        return f"£{cost:,.2f}"
+
+    shipping_display.short_description = "Shipping"
 
     def dispatcher_display(self):
         """
@@ -2038,22 +2185,11 @@ class ShopSettings(BaseGenericSetting):
             "dispatchers) go."
         ),
     )
-    shipping_cost = models.DecimalField(
-        max_digits=6,
-        decimal_places=2,
-        default=Decimal("4.99"),
-        validators=[MinValueValidator(0)],
-        help_text=(
-            "Added to orders that are delivered (not to orders that are collected, "
-            "or have nothing that needs shipping)."
-        ),
-    )
 
     panels = [
         NotifyAddressesWarningPanel(),
         FieldPanel("notify_email_addresses"),
         FieldPanel("reply_to"),
-        FieldPanel("shipping_cost"),
     ]
 
     class Meta:

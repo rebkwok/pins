@@ -1,5 +1,5 @@
 {% extends "shop/base.html" %}
-{% load wagtailcore_tags %}
+{% load wagtailcore_tags shoptags %}
 
 {% block title %}{{ product.category.title }} - {{ product.name }}{% endblock %}
 
@@ -13,6 +13,14 @@
             </div>
             <div class="col-12 col-md-6">
                 {% include "shop/includes/product_price.html" %}
+                {% with delivery_cost=product.delivery_cost %}
+                    {% if delivery_cost is not None %}
+                        <p class="shop-product__delivery">
+                            UK delivery {% if delivery_cost %}{{ delivery_cost|gbp }}{% else %}free{% endif %}.
+                            <a href="{% url 'shop:faqs' %}">Delivery and other FAQs</a>
+                        </p>
+                    {% endif %}
+                {% endwith %}
                 {% include "shop/includes/product_form.html" %}
                 <div id="added_{{ product.id }}"></div>
                 {% if product.description %}

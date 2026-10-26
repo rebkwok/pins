@@ -10,6 +10,7 @@ from .views import (
     checkout_view,
     decrease_quantity,
     delete_basket_item,
+    faqs_view,
     increase_quantity,
     new_order_view,
     order_status_view,
@@ -32,6 +33,7 @@ urlpatterns = [
     path("basket/update/<str:ref>", update_quantity, name="update_quantity"),
     path("basket/delete/<str:ref>", delete_basket_item, name="delete_basket_item"),
     path("basket/", basket_view, name="basket"),
+    path("faqs/", faqs_view, name="faqs"),
     path("basket/discount/", apply_discount_code, name="apply_discount_code"),
     path(
         "basket/discount/remove/", remove_discount_code, name="remove_discount_code"

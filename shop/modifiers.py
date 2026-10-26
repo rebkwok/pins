@@ -8,23 +8,36 @@ from .models import (
     DISCOUNT_ROW,
     MIN_CARD_PAYMENT,
     Sale,
-    ShopSettings,
+    ShippingRate,
 )
 
 
 class ShippingCostModifier(BasketModifier):
     """
-    Add the flat shipping cost (in the shop settings) to baskets that are
-    delivered.
+    Add the shipping cost to baskets that are delivered: the highest shipping
+    rate of the basket's products that need shipping, charged once.
     """
 
     identifier = "shipping-cost"
 
     def process_basket(self, basket, request):
         if basket.needs_delivery and basket.count:
-            # (cached on the request, if there is one)
-            shipping_cost = ShopSettings.load(request_or_site=request).shipping_cost
-            self.add_extra_row(basket, request, label="Shipping", amount=shipping_cost)
+            self.add_extra_row(
+                basket, request, label="Shipping", amount=basket_shipping_cost(basket)
+            )
+
+
+def basket_shipping_cost(basket):
+    """
+    The highest shipping rate of the basket's products that need shipping (the
+    default rate for a product without one, or nothing if there are no rates)
+    """
+    rates = []
+    for item in basket.get_items():
+        product = item.product.product if item.product is not None else None
+        if product is not None and product.requires_shipping:
+            rates.append(product.shipping_rate or ShippingRate.get_default())
+    return max((rate.amount for rate in rates if rate is not None), default=Decimal(0))
 
 
 class SaleModifier(BasketModifier):

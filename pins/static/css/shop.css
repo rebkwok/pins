@@ -1157,7 +1157,9 @@ a.btn.shop-basket-link:hover {
 .basket-details label a,
 .shop-category__description a,
 .shop-product p a,
-.order-details a {
+.order-details a,
+.shop-detail__faqs a,
+.shop-faqs a {
   color: var(--pins-strong);
 }
 
@@ -1165,8 +1167,35 @@ a.btn.shop-basket-link:hover {
 .basket-options__help a,
 .basket-details label a,
 .shop-category__description a,
-.shop-product p a {
+.shop-product p a,
+.shop-faq__answer a,
+.shop-faqs__more a {
   text-decoration: underline;
+}
+
+/* The product's delivery cost, under its price */
+.shop-product__delivery {
+  font-size: 0.9rem;
+  color: #555;
+}
+
+/* The shop FAQs page */
+.shop-faqs {
+  margin-bottom: 40px;
+}
+
+/* (a readable line length) */
+.shop-faqs__list {
+  max-width: 48rem;
+}
+
+.shop-faq {
+  margin-bottom: 24px;
+}
+
+.shop-faq__question {
+  font-size: 1.4rem;
+  margin-bottom: 8px;
 }
 
 /* (the default grey is a little too light on the summary's background) */

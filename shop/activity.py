@@ -314,10 +314,6 @@ SHOP_LOG_ACTIONS[SETTINGS_EDITED] = SettingsEdited
 
 def settings_value(field, value):
     """A setting's value, for a log message"""
-    from django.db import models
-
     if value in (None, ""):
         return "(blank)"
-    if isinstance(field, models.DecimalField):
-        return gbp(value)
     return Truncator(str(value)).chars(MAX_VALUE_LENGTH)

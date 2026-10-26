@@ -20,6 +20,7 @@ def shop_breadcrumbs(context):
         "order": "Order Status",
         "basket": "Basket",
         "checkout": "Checkout",
+        "faqs": "FAQs",
     }
 
     page = context.get("self")

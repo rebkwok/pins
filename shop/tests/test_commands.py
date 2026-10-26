@@ -9,7 +9,7 @@ from django.core.management import CommandError, call_command
 from wagtail.images.models import Image
 from wagtail.models import Collection, Page, Site
 
-from ..models import Category, Product, ProductVariant, Sale, ShopPage
+from ..models import Category, Product, ProductVariant, Sale, ShippingRate, ShopPage
 
 from salesman.core.utils import get_salesman_model
 
@@ -84,7 +84,15 @@ def test_seed_shop(seed_settings):
     assert not Product.objects.get(name="Raffle ticket").requires_shipping
     assert Product.objects.get(name="Podenco mug").requires_shipping
     assert not Sale.objects.exists()
-    assert output.startswith("Created 11:")
+    # the cards and notebook are small items; the rest have the default rate
+    small_items = ShippingRate.objects.get(name="Small items")
+    assert small_items.amount == Decimal("3.50")
+    assert set(small_items.products.values_list("name", flat=True)) == {
+        "Christmas cards (pack of 10)",
+        "Notebook",
+    }
+    assert Product.objects.get(name="Podenco mug").shipping_rate == ShippingRate.get_default()
+    assert output.startswith("Created 12:")
     assert "Skipped (already exist) 0" in output
 
 

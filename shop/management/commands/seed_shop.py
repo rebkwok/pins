@@ -20,6 +20,7 @@ from shop.models import (
     ProductVariant,
     Sale,
     SaleProduct,
+    ShippingRate,
     ShopPage,
     get_shop_collection,
 )
@@ -28,7 +29,10 @@ IMAGE_COLLECTION = "Shop seed images"
 
 # Categories, in display order, with their products. Each product has its images
 # (title, colour and optional size of a generated image) and variants, which can
-# also have images.
+# also have images. Products have the default shipping rate unless they say
+# otherwise.
+SMALL_ITEMS = ("Small items", Decimal("3.50"))
+
 SHOP_DATA = [
     {
         "title": "Calendars & Cards",
@@ -61,12 +65,14 @@ SHOP_DATA = [
                 "name": "Christmas cards (pack of 10)",
                 "price": "8.50",
                 "description": "Ten cards with envelopes.",
+                "shipping_rate": SMALL_ITEMS,
                 "variants": [{"stock": 40}],
             },
             {
                 "name": "Notebook",
                 "price": "5.00",
                 "description": "A5 notebook (out of stock).",
+                "shipping_rate": SMALL_ITEMS,
                 "variants": [{"stock": 0}],
             },
         ],
@@ -222,6 +228,7 @@ class Command(BaseCommand):
             price=Decimal(data["price"]),
             description=f"<p>{data['description']}</p>",
             requires_shipping=data.get("requires_shipping", True),
+            shipping_rate=self.get_shipping_rate(data.get("shipping_rate")),
             shares_stock=data.get("shares_stock", False),
             stock=data.get("stock", 0),
         )
@@ -237,6 +244,18 @@ class Command(BaseCommand):
                 variant["image"] = self.get_image(*variant["image"])
             ProductVariant.objects.create(product=product, sort_order=sort_order, **variant)
         self.created.append(f"product '{product.name}'")
+
+    def get_shipping_rate(self, rate):
+        """The (name, amount) shipping rate, made if it doesn't exist; None for the default"""
+        if rate is None:
+            return None
+        name, amount = rate
+        shipping_rate, created = ShippingRate.objects.get_or_create(
+            name=name, defaults={"amount": amount}
+        )
+        if created:
+            self.created.append(f"shipping rate '{name}'")
+        return shipping_rate
 
     def get_image(self, title, colour, size=(800, 800)):
         collection = self.get_collection()

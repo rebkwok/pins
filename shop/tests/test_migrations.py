@@ -259,3 +259,42 @@ def test_rename_orders_only_group_migration(migrations):
     # and back
     apps = migrations([("shop", "0027_order_checkout_details")])
     assert apps.get_model("auth", "Group").objects.filter(name="Orders only").exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_shipping_rates_migration(migrations):
+    apps = migrations([("shop", "0029_shipping_rates_and_faqs")])
+    # (transactional tests flush the database)
+    apps.get_model("shop", "ShippingRate").objects.all().delete()
+    apps.get_model("shop", "ShopFAQ").objects.all().delete()
+    Group = apps.get_model("auth", "Group")
+    shop_admins, _ = Group.objects.get_or_create(name="Shop admins")
+    ShopSettings = apps.get_model("shop", "ShopSettings")
+    ShopSettings.objects.all().delete()
+    ShopSettings.objects.create(shipping_cost="5.25")
+    Category = apps.get_model("shop", "Category")
+    Product = apps.get_model("shop", "Product")
+    category = Category.objects.create(title="Mugs", slug="mugs")
+    mug = Product.objects.create(category=category, name="Mug", price=1)
+    raffle = Product.objects.create(category=category, name="Raffle", price=1, requires_shipping=False)
+
+    apps = migrations([("shop", "0030_shipping_rates_and_faqs_data")])
+    ShippingRate = apps.get_model("shop", "ShippingRate")
+    Product = apps.get_model("shop", "Product")
+    # Standard, at the settings' shipping cost, is the default, for the
+    # products that need shipping
+    standard = ShippingRate.objects.get()
+    assert (standard.name, str(standard.amount), standard.default) == ("Standard", "5.25", True)
+    assert Product.objects.get(pk=mug.pk).shipping_rate_id == standard.pk
+    assert Product.objects.get(pk=raffle.pk).shipping_rate_id is None
+    assert apps.get_model("shop", "ShopFAQ").objects.count() == 5
+    assert set(
+        apps.get_model("auth", "Group").objects.get(name="Shop admins")
+        .permissions.filter(codename__endswith="shippingrate")
+        .values_list("codename", flat=True)
+    ) == {"add_shippingrate", "change_shippingrate", "delete_shippingrate", "view_shippingrate"}
+
+    # the settings' shipping cost is removed, and back
+    migrations([("shop", "0031_remove_shopsettings_shipping_cost")])
+    apps = migrations([("shop", "0029_shipping_rates_and_faqs")])
+    assert apps.get_model("shop", "ShopSettings").objects.exists()

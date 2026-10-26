@@ -47,6 +47,8 @@ from .models import (
     Sale,
     SaleCategory,
     SaleProduct,
+    ShippingRate,
+    ShopFAQ,
     VariantStockHelpPanel,
     protected_variants_message,
 )
@@ -163,6 +165,7 @@ class ProductViewSet(ShopViewSet):
     list_display = (
         "name",
         "category_link",
+        "shipping_display",
         "dispatcher_display",
         BooleanColumn("live"),
         "variants_link",
@@ -173,7 +176,7 @@ class ProductViewSet(ShopViewSet):
     edit_view_class = ProductEditView
 
     def get_queryset(self, request):
-        return Product.objects.select_related("category").order_by(
+        return Product.objects.select_related("category", "shipping_rate").order_by(
             *PRODUCT_ORDERING
         )
 
@@ -228,6 +231,26 @@ class DiscountCodeViewSet(ShopViewSet):
     list_display = ("code", "amount", "status", "description", "date_created")
     list_filter = ("active",)
     search_fields = ("code", "description")
+
+
+class ShippingRateViewSet(ShopViewSet):
+    model = ShippingRate
+    shop_menu_label = SHOP_ADMIN_MENU_LABEL
+    icon = "mail"
+    menu_label = "Shipping rates"
+    list_display = ("name", "cost", BooleanColumn("default"), "products_count")
+    search_fields = ("name",)
+
+
+class ShopFAQViewSet(ShopViewSet):
+    model = ShopFAQ
+    shop_menu_label = SHOP_ADMIN_MENU_LABEL
+    icon = "help"
+    menu_label = "Shop FAQs"
+    # Dragged into their order on the FAQs page
+    sort_order_field = "sort_order"
+    list_display = ("question",)
+    search_fields = ("question",)
 
 
 class DispatchersMenuItem(MenuItem):
@@ -398,6 +421,8 @@ class ShopAdminGroup(SnippetViewSetGroup):
     items = (
         SaleViewSet,
         DiscountCodeViewSet,
+        ShippingRateViewSet,
+        ShopFAQViewSet,
         ShopSettingsViewSet,
         ShopActivityViewSet,
     )
@@ -502,6 +527,34 @@ def protect_variants(request, instances):
             variants.extend(instance.variants.all())
     if variants:
         return _protected_variants_response(request, variants, instances[0])
+
+
+@hooks.register("before_delete_snippet")
+def protect_shipping_rates(request, instances):
+    """The default rate, and rates used by products, can't be deleted"""
+    for rate in instances:
+        if not isinstance(rate, ShippingRate):
+            continue
+        if rate.default:
+            message = (
+                f"{rate.name} is the default rate, so can't be deleted: make another "
+                "rate the default first."
+            )
+        elif rate.products.exists():
+            count = rate.products.count()
+            message = (
+                f"{rate.name} can't be deleted: {count} product{pluralize(count)} "
+                f"{pluralize(count, 'uses,use')} it. Give "
+                f"{pluralize(count, 'it,them')} another rate first."
+            )
+        else:
+            continue
+        messages.error(request, message)
+        return redirect(
+            AdminURLFinder(request.user).get_edit_url(rate)
+            if len(instances) == 1
+            else reverse("wagtailsnippets_shop_shippingrate:list")
+        )
 
 
 @hooks.register("before_delete_snippet")

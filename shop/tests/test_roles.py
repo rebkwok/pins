@@ -99,7 +99,14 @@ def test_shop_admin_menu(client):
     # (and no Images: they add images from products' pages)
     assert set(items) == {"orders", "dispatcher-activity", "shop-stock", "shop-admin"}
     assert items["shop-stock"] == ["categories", "products", "product-variants"]
-    assert items["shop-admin"] == ["sales", "discount-codes", "shop-settings", "shop-activity"]
+    assert items["shop-admin"] == [
+        "sales",
+        "discount-codes",
+        "shipping-rates",
+        "shop-faqs",
+        "shop-settings",
+        "shop-activity",
+    ]
 
 
 def test_shop_manager_menu(client):
@@ -137,6 +144,8 @@ def test_superuser_menu(client):
         ("wagtailsnippets_shop_product:list", True),
         ("wagtailsnippets_shop_category:list", True),
         ("wagtailsnippets_shop_discountcode:list", True),
+        ("wagtailsnippets_shop_shippingrate:list", True),
+        ("wagtailsnippets_shop_shopfaq:list", True),
         ("shop_orders:index", True),
         ("wagtailimages:index", True),
         ("shop_dispatchers:index", True),

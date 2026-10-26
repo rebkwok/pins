@@ -2,7 +2,7 @@ from decimal import Decimal
 import pytest
 from model_bakery import baker
 
-from ..models import Sale, SaleProduct, ShopSettings
+from ..models import Product, Sale, SaleProduct, ShippingRate
 
 pytestmark = pytest.mark.django_db
 
@@ -26,16 +26,60 @@ def test_basket_shipping_modifier(basket):
     assert basket.total == Decimal("24.99")
 
 
-def test_basket_shipping_modifier_cost_setting(basket):
-    # the shipping cost in the shop settings
-    shop_settings = ShopSettings.load()
-    shop_settings.shipping_cost = Decimal("5.50")
-    shop_settings.save()
+def add_product(basket, rate=None, requires_shipping=True):
+    product = baker.make(
+        Product, price=1, shipping_rate=rate, requires_shipping=requires_shipping
+    )
+    basket.add(baker.make("shop.ProductVariant", product=product, stock=5))
+
+
+def shipping(basket):
     basket.shipping_method = "deliver"
     basket.save()
     basket.update(request=None)
-    assert basket.extra_rows["shipping-cost"].data["amount"] == "5.50"
-    assert basket.total == Decimal("25.50")
+    return basket.extra_rows["shipping-cost"].data["amount"]
+
+
+def test_basket_shipping_highest_rate(basket):
+    # the basket's product has the default rate (Standard, £4.99)
+    small = ShippingRate.objects.create(name="Small items", amount=Decimal("3.50"))
+    large = ShippingRate.objects.create(name="Large items", amount=Decimal("7.00"))
+    basket.clear()
+    add_product(basket, small)
+    assert shipping(basket) == "3.50"
+    add_product(basket, small)
+    # once, not per item
+    assert shipping(basket) == "3.50"
+    add_product(basket, large)
+    assert shipping(basket) == "7.00"
+    assert basket.total == Decimal("10.00")
+
+
+def test_basket_shipping_ignores_products_not_shipped(basket):
+    small = ShippingRate.objects.create(name="Small items", amount=Decimal("3.50"))
+    basket.clear()
+    add_product(basket, small)
+    # (a product that doesn't need shipping keeps any rate it had)
+    add_product(basket, ShippingRate.get_default(), requires_shipping=False)
+    assert shipping(basket) == "3.50"
+
+
+def test_basket_shipping_product_without_rate(basket):
+    # e.g. a product saved before it had a rate: the default rate
+    ShippingRate.objects.update(amount=Decimal("5.50"))
+    Product.objects.update(shipping_rate=None)
+    # (reloaded, as its items are cached with their products)
+    assert shipping(reload(basket)) == "5.50"
+
+
+def test_basket_shipping_no_rates(basket):
+    Product.objects.update(shipping_rate=None)
+    ShippingRate.objects.all().delete()
+    assert shipping(reload(basket)) == "0.00"
+
+
+def reload(basket):
+    return type(basket).objects.get(pk=basket.pk)
 
 
 def test_basket_shipping_modifier_empty_basket(basket):

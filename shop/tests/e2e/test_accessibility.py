@@ -53,6 +53,7 @@ def shop_pages(live_server, shop, order):
         "basket": reverse("shop:basket"),
         "checkout": reverse("shop:checkout") + "?payment-method=stripe&shipping-method=deliver",
         "order status": reverse("shop:order_status", args=(order.token,)),
+        "faqs": reverse("shop:faqs"),
     }
 
 
@@ -78,6 +79,7 @@ def test_admin_pages(page, live_server, admin_user, shop, paid_order):
         "dispatcher activity": reverse("shop_dispatchers:index"),
         "shop activity": reverse("shop_activity:index"),
         "product": reverse("wagtailsnippets_shop_product:edit", args=(shop["mug"].pk,)),
+        "shipping rates": reverse("wagtailsnippets_shop_shippingrate:list"),
     }.items():
         page.goto(live_server.url + url)
         expect(page.locator("main")).to_be_visible()

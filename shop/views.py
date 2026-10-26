@@ -18,7 +18,7 @@ from salesman.checkout.serializers import CheckoutSerializer
 from salesman.conf import app_settings as salesman_settings
 from salesman.core.utils import get_salesman_model
 
-from .forms import UK_ONLY_NOTE, CheckoutForm
+from .forms import CONTACT_URL, UK_ONLY_NOTE, CheckoutForm
 from .basket_serializers import BasketSerializer
 from .models import (
     DISCOUNT_CODE_IN_USE,
@@ -34,6 +34,7 @@ from .models import (
     OrderItem,
     Product,
     ProductVariant,
+    ShopFAQ,
 )
 from .payment import PAYMENT_METHOD_DESCRIPTIONS, PayByStripe
 
@@ -986,6 +987,16 @@ def new_order_view(request, token):
 @require_GET
 def order_status_view(request, token):
     return _order_status(request, token)
+
+
+@require_GET
+def faqs_view(request):
+    """The shop's FAQs (edited in Shop admin > Shop FAQs)"""
+    return render(
+        request,
+        "shop/faqs.html",
+        {"faqs": ShopFAQ.objects.all(), "contact_url": CONTACT_URL},
+    )
 
 
 def _customer_item_status(order, shipping_status):

@@ -180,6 +180,7 @@ def product_form_data(product, variants, **data):
         "description": json.dumps({"blocks": [], "entityMap": {}}),
         "live": "on",
         "requires_shipping": "on",
+        "shipping_rate": str(product.shipping_rate_id or ""),
         **PRODUCT_FORM_DEFAULTS,
         "stock_shown": "0",
         "variants-TOTAL_FORMS": str(len(variants)),
@@ -300,13 +301,14 @@ def test_shop_settings_edited(client, admin):
     # (the settings' own address: the one without its id redirects to it)
     settings = ShopSettings.load()
     url = reverse("wagtailsettings:edit", args=("shop", "shopsettings", settings.pk))
-    data = {"notify_email_addresses": "shop@pins.test", "reply_to": "", "shipping_cost": "5.50"}
+    data = {"notify_email_addresses": "shop@pins.test", "reply_to": "replies@pins.test"}
     assert client.post(url, data).status_code == 302
     # one entry (Wagtail's, with what changed)
     (entry,) = entries(settings)
     assert (entry.action, entry.user) == (activity.SETTINGS_EDITED, admin)
     assert entry.message == (
-        "Edited: Email new orders to: (blank) → shop@pins.test; Shipping cost: £4.99 → £5.50"
+        "Edited: Email new orders to: (blank) → shop@pins.test; "
+        "Reply-to address: (blank) → replies@pins.test"
     )
     # saving without changes: Wagtail's own entry
     client.post(url, data)
@@ -318,7 +320,7 @@ def test_shop_settings_saved_outside_admin(admin):
     from ..models import ShopSettings
 
     settings = ShopSettings.load()
-    settings.shipping_cost = Decimal("6.00")
+    settings.reply_to = "replies@pins.test"
     settings.save()
     assert entries(settings) == []
 
