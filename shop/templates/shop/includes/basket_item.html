@@ -58,13 +58,13 @@ id); on the checkout page it's a summary.
             <input type="hidden"
                 value="Update"
                 hx-post="{% url 'shop:update_quantity' item.ref %}"
-                hx-trigger="quantity-changed from:body"
+                hx-trigger="quantity-changed-{{ item.product_id }} from:body"
                 hx-sync="#id_inc_wrapper_{{ item.product_id }}:queue first"
             >
             <input type="hidden"
                 value="Update"
                 hx-post="{% url 'shop:update_quantity' item.ref %}"
-                hx-trigger="quantity-changed from:body"
+                hx-trigger="quantity-changed-{{ item.product_id }} from:body"
                 hx-sync="#id_dec_wrapper_{{ item.product_id }}:queue first"
             >
             <button type="submit"

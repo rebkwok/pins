@@ -368,7 +368,10 @@ def _change_quantity(
         resp = HttpResponse(resp_str)
         return resp
     resp = HttpResponse(resp_str)
-    resp.headers["HX-Trigger"] = "quantity-changed"
+    # In the basket, this item's update forms post the new quantity: after the
+    # swap, so the quantity field has its new value (an HX-Trigger event fires
+    # before the swap, so they could post the old quantity)
+    resp.headers["HX-Trigger-After-Swap"] = f"quantity-changed-{product_id}"
     return resp
 
 

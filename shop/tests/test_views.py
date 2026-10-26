@@ -154,7 +154,7 @@ def test_increase_quantity_can_increase(rf, basket, product):
     request.session = {"BASKET_ID": basket.id}
 
     response = increase_quantity(request, product.id)
-    assert response.headers["HX-Trigger"] == "quantity-changed"
+    assert response.headers["HX-Trigger-After-Swap"] == f"quantity-changed-{variant.id}"
     assert 'value="2"' in response.content.decode()
 
 
@@ -173,7 +173,7 @@ def test_increase_quantity_cannot_increase(rf, basket, product):
     request.session = {"BASKET_ID": basket.id}
 
     response = increase_quantity(request, product.id)
-    assert "HX-Trigger" not in response.headers
+    assert "HX-Trigger-After-Swap" not in response.headers
     assert 'value="2"' in response.content.decode()
 
 
@@ -192,7 +192,7 @@ def test_increase_quantity_from_basket(rf, basket, product):
     request.session = {"BASKET_ID": basket.id}
 
     response = increase_quantity(request, product.id)
-    assert response.headers["HX-Trigger"] == "quantity-changed"
+    assert response.headers["HX-Trigger-After-Swap"] == f"quantity-changed-{variant.id}"
     assert 'value="2"' in response.content.decode()
 
 
@@ -211,7 +211,7 @@ def test_decrease_quantity(rf, basket, product, current_quantity, expected):
     request.session = {"BASKET_ID": basket.id}
 
     response = decrease_quantity(request, product.id)
-    assert response.headers["HX-Trigger"] == "quantity-changed"
+    assert response.headers["HX-Trigger-After-Swap"] == f"quantity-changed-{variant.id}"
     assert f'value="{expected}"' in response.content.decode()
 
 
