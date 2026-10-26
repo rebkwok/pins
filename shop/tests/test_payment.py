@@ -99,8 +99,6 @@ def test_get_stripe_session_data(rf, basket, freezer):
     basket = basket_from_checkout(basket)
     data = PayByStripe().get_session_data(basket, rf.post("/"))
     assert data["metadata"] == {"shipping_method": "collect"}
-    # cards only (including Apple Pay and Google Pay)
-    assert data["payment_method_types"] == ["card"]
     # 31 mins from now
     assert data["expires_at"] == int(datetime(2024, 1, 1, 10, 31, tzinfo=UTC).timestamp())
     assert data["customer_email"] == "test@test.com"

@@ -123,12 +123,6 @@ class PayByStripe(StripeConnectPayment):
     def get_session_data(self, obj, request):
         session_data = super().get_session_data(obj, request)
         session_data["metadata"] = {"shipping_method": obj.shipping_method}
-        # Cards only (Apple Pay and Google Pay are card payments in Checkout,
-        # so are still offered). Otherwise Checkout offers whatever is turned on
-        # in PINS's Stripe account, which could include methods that complete
-        # days later (e.g. bank debits): those orders would never be created,
-        # as the webhook doesn't handle checkout.session.async_payment_*.
-        session_data["payment_method_types"] = ["card"]
         return session_data
 
     def get_session_expiry(self, obj):
