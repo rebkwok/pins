@@ -95,7 +95,7 @@ def test_product_cards(client, shop_pages, page):
         # elements targeted by the views (including out-of-band swaps) and by
         # hx-include are on the page exactly once
         for element_id in [
-            f"id_product_{product.id}",
+            f"id_variant_{product.id}",
             f"id_quantity_{product.id}",
             f"id_quantity_wrapper_{product.id}",
             f"id_select_variant_wrapper_{product.id}",
@@ -110,7 +110,7 @@ def test_product_cards(client, shop_pages, page):
             (button,) = [el for el in parser.htmx_elements if el.get("hx-get") == url]
             assert button["hx-target"] == f"#id_quantity_wrapper_{product.id}"
             included_ids = re.findall(r"\[id='([^']+)'\]", button["hx-include"])
-            assert included_ids == [f"id_quantity_{product.id}", f"id_product_{product.id}"]
+            assert included_ids == [f"id_quantity_{product.id}", f"id_variant_{product.id}"]
 
         # add to basket posts the card's form, which contains the product's fields
         add_url = reverse("shop:add_to_basket", args=(product.id,))

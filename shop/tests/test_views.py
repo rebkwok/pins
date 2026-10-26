@@ -144,17 +144,16 @@ def test_increase_quantity_can_increase(rf, basket, product):
     variant = product.variants.first()
     variant.stock = 2
     variant.save()
-    # salesman requires that the parameter name when submitting a product to the
-    # basket is "product_id"; a basket product is actually a product variant
     url = (
         reverse("shop:increase_quantity", args=(product.id,))
-        + f"?product_id={variant.id}&quantity=1"
+        + f"?variant_id={variant.id}&quantity=1"
     )
     request = rf.get(url)
     request.session = {"BASKET_ID": basket.id}
 
     response = increase_quantity(request, product.id)
-    assert response.headers["HX-Trigger-After-Swap"] == f"quantity-changed-{variant.id}"
+    # (named after the id in the URL: the product's, on the shop page)
+    assert response.headers["HX-Trigger-After-Swap"] == f"quantity-changed-{product.id}"
     assert 'value="2"' in response.content.decode()
 
 
@@ -163,11 +162,9 @@ def test_increase_quantity_cannot_increase(rf, basket, product):
     variant = product.variants.first()
     variant.stock = 0
     variant.save()
-    # salesman requires that the parameter name when submitting a product to the
-    # basket is "product_id"; a basket product is actually a product variant
     url = (
         reverse("shop:increase_quantity", args=(product.id,))
-        + f"?product_id={variant.id}&quantity=2"
+        + f"?variant_id={variant.id}&quantity=2"
     )
     request = rf.get(url)
     request.session = {"BASKET_ID": basket.id}
@@ -182,16 +179,16 @@ def test_increase_quantity_from_basket(rf, basket, product):
     variant = product.variants.first()
     variant.stock = 0
     variant.save()
-    # salesman requires that the parameter name when submitting a product to the
-    # basket is "product_id"; a basket product is actually a product variant
+    # (in the basket, the URL has the item's variant's id)
     url = (
-        reverse("shop:increase_quantity", args=(product.id,))
-        + f"?product_id={variant.id}&quantity=1&ref=basket"
+        reverse("shop:increase_quantity", args=(variant.id,))
+        + f"?variant_id={variant.id}&quantity=1&ref=basket"
     )
     request = rf.get(url)
     request.session = {"BASKET_ID": basket.id}
 
-    response = increase_quantity(request, product.id)
+    response = increase_quantity(request, variant.id)
+    # the item's update forms listen for this event
     assert response.headers["HX-Trigger-After-Swap"] == f"quantity-changed-{variant.id}"
     assert 'value="2"' in response.content.decode()
 
@@ -201,17 +198,16 @@ def test_decrease_quantity(rf, basket, product, current_quantity, expected):
     variant = product.variants.first()
     variant.stock = 0
     variant.save()
-    # salesman requires that the parameter name when submitting a product to the
-    # basket is "product_id"; a basket product is actually a product variant
     url = (
         reverse("shop:decrease_quantity", args=(product.id,))
-        + f"?product_id={variant.id}&quantity={current_quantity}"
+        + f"?variant_id={variant.id}&quantity={current_quantity}"
     )
     request = rf.get(url)
     request.session = {"BASKET_ID": basket.id}
 
     response = decrease_quantity(request, product.id)
-    assert response.headers["HX-Trigger-After-Swap"] == f"quantity-changed-{variant.id}"
+    # (named after the id in the URL: the product's, on the shop page)
+    assert response.headers["HX-Trigger-After-Swap"] == f"quantity-changed-{product.id}"
     assert f'value="{expected}"' in response.content.decode()
 
 
@@ -339,8 +335,7 @@ def test_add_to_basket(rf, product):
         reverse("shop:add_to_basket", args=(product.id,)),
         {
             "quantity": 3,
-            "product_id": variant.id,
-            "product_type": "shop.ProductVariant",
+            "variant_id": variant.id,
         },
     )
     request.session = {"BASKET_ID": basket_id}
@@ -357,7 +352,7 @@ def test_add_to_basket(rf, product):
         in content
     )
     # (the product's only variant: no drop-down)
-    assert f'name="product_id" id="id_product_{product.id}" value="{variant.id}"' in content
+    assert f'name="variant_id" id="id_variant_{product.id}" value="{variant.id}"' in content
     assert "Only 1 left" in content
 
 
@@ -374,8 +369,7 @@ def test_add_to_basket_out_of_stock(rf, basket, product):
         reverse("shop:add_to_basket", args=(product.id,)),
         {
             "quantity": 2,
-            "product_id": variant1.id,
-            "product_type": "shop.ProductVariant",
+            "variant_id": variant1.id,
         },
     )
     request.session = {"BASKET_ID": basket.id}
@@ -398,8 +392,7 @@ def test_add_to_basket_out_of_stock(rf, basket, product):
         reverse("shop:add_to_basket", args=(product.id,)),
         {
             "quantity": 2,
-            "product_id": variant2.id,
-            "product_type": "shop.ProductVariant",
+            "variant_id": variant2.id,
         },
     )
     request.session = {"BASKET_ID": basket.id}
@@ -416,25 +409,6 @@ def test_add_to_basket_out_of_stock(rf, basket, product):
     assert '<p class="shop-card__stock shop-card__stock--out">Out of stock</p>' in content
 
 
-def test_add_to_basket_without_product_type(rf, product):
-    # The product type is always a product variant, so isn't needed in the POST
-    variant = baker.make(
-        "shop.ProductVariant", product=product, variant_name="Small", price=10, stock=4
-    )
-    request = rf.post(
-        reverse("shop:add_to_basket", args=(product.id,)),
-        {"quantity": 3, "product_id": variant.id},
-    )
-    request.session = {}
-    request.user = AnonymousUser()
-    resp = add_to_basket(request, product.id)
-
-    assert "Added!" in resp.content.decode()
-    basket = Basket.objects.get()
-    assert basket.quantity == 3
-    assert request.session["BASKET_ID"] == basket.id
-
-
 def test_add_to_basket_cant_increase(rf, product):
     # setup empty basket
     basket_id = baker.make(Basket).id
@@ -447,8 +421,7 @@ def test_add_to_basket_cant_increase(rf, product):
         reverse("shop:add_to_basket", args=(product.id,)),
         {
             "quantity": 2,
-            "product_id": variant.id,
-            "product_type": "shop.ProductVariant",
+            "variant_id": variant.id,
         },
     )
     request.session = {"BASKET_ID": basket_id}
@@ -473,7 +446,7 @@ def test_update_quantity(rf, basket):
     variant_id = basket_item.product.id
 
     # product ID in post is the product variant
-    data = {"quantity": 3, "product_id": variant_id}
+    data = {"quantity": 3, "variant_id": variant_id}
     request = rf.post(
         reverse("shop:update_quantity", args=(basket_item.ref,)), data=data
     )
@@ -499,7 +472,7 @@ def test_update_quantity_checks_stock(rf, basket, new_quantity, updated, expecte
     basket_item = basket.items.first()
     variant = basket_item.product
     assert variant.stock == 3
-    data = {"quantity": new_quantity, "product_id": variant.id}
+    data = {"quantity": new_quantity, "variant_id": variant.id}
     request = rf.post(
         reverse("shop:update_quantity", args=(basket_item.ref,)), data=data
     )
@@ -518,13 +491,13 @@ def test_update_quantity_checks_stock(rf, basket, new_quantity, updated, expecte
         assert "Quantity requested is not available" in resp.content.decode()
 
 
-def test_update_quantity_wrong_product(rf, basket, product):
-    # The posted product_id must be the basket item's product
+def test_update_quantity_wrong_variant(rf, basket, product):
+    # The posted variant_id must be the basket item's variant
     basket_item = basket.items.first()
     other_variant = baker.make(
         "shop.ProductVariant", product=product, variant_name="Large", stock=100
     )
-    data = {"quantity": 50, "product_id": other_variant.id}
+    data = {"quantity": 50, "variant_id": other_variant.id}
     request = rf.post(
         reverse("shop:update_quantity", args=(basket_item.ref,)), data=data
     )
@@ -542,7 +515,7 @@ def test_update_quantity_nothing_to_update(rf, basket):
     variant_id = basket_item.product.id
     # product ID in post is the product variant
     # update to same quantity
-    data = {"quantity": 2, "product_id": variant_id}
+    data = {"quantity": 2, "variant_id": variant_id}
     request = rf.post(
         reverse("shop:update_quantity", args=(basket_item.ref,)), data=data
     )
@@ -564,7 +537,7 @@ def test_sole_delete_basket_item(rf, basket):
     basket_item = basket.items.first()
     variant_id = basket_item.product.id
     # product ID in post is the product variant
-    data = {"product_id": variant_id}
+    data = {"variant_id": variant_id}
     request = rf.post(
         reverse("shop:delete_basket_item", args=(basket_item.ref,)), data=data
     )
@@ -597,7 +570,7 @@ def test_delete_basket_item_other_variants_left(rf, basket):
     assert basket.total == 35
 
     # product ID in post is the product variant
-    data = {"product_id": variant.id}
+    data = {"variant_id": variant.id}
     request = rf.post(
         reverse("shop:delete_basket_item", args=(basket_item.ref,)), data=data
     )
@@ -632,7 +605,7 @@ def test_delete_basket_item_other_products_left(rf, basket, category):
     assert basket.total == 25
 
     # product ID in post is the product variant
-    data = {"product_id": variant.id}
+    data = {"variant_id": variant.id}
     request = rf.post(
         reverse("shop:delete_basket_item", args=(basket_item.ref,)), data=data
     )
@@ -659,7 +632,7 @@ def test_delete_basket_item_unknown_ref(rf, basket):
     basket_item = basket.items.first()
     request = rf.post(
         reverse("shop:delete_basket_item", args=("unknown",)),
-        {"product_id": basket_item.product.id},
+        {"variant_id": basket_item.product.id},
     )
     request.session = {"BASKET_ID": basket.id}
     request.user = AnonymousUser()

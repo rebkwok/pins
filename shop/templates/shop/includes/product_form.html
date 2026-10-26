@@ -16,10 +16,10 @@
                     hx-trigger="click"
                     hx-target="#id_quantity_wrapper_{{ product.id }}"
                     hx-get="{% url 'shop:decrease_quantity' product.id %}"
-                    hx-include="[id='id_quantity_{{ product.id }}'],[id='id_product_{{ product.id }}']"
+                    hx-include="[id='id_quantity_{{ product.id }}'],[id='id_variant_{{ product.id }}']"
                 >-</button>
                 <span id="id_quantity_wrapper_{{ product.id }}">
-                    {% include "shop/includes/quantity_field.html" with product_id=product.id value=1 %}
+                    {% include "shop/includes/quantity_field.html" with form_id=product.id value=1 %}
                 </span>
                 <button
                     type="button"
@@ -28,7 +28,7 @@
                     hx-trigger="click"
                     hx-target="#id_quantity_wrapper_{{ product.id }}"
                     hx-get="{% url 'shop:increase_quantity' product.id %}"
-                    hx-include="[id='id_quantity_{{ product.id }}'],[id='id_product_{{ product.id }}']"
+                    hx-include="[id='id_quantity_{{ product.id }}'],[id='id_variant_{{ product.id }}']"
                 >+</button>
             </div>
             <input
@@ -41,5 +41,4 @@
             >
         </div>
     {% endif %}
-    <input type="hidden" name="product_type" value="shop.ProductVariant">
 </form>

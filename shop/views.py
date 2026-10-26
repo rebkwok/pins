@@ -130,7 +130,7 @@ def _quantity_unavailable_response(request, product_id):
     """Response to the shop page +/- buttons when the item is no longer available"""
     quantity_html = render_to_string(
         "shop/includes/quantity_field.html",
-        {"product_id": product_id, "value": 1},
+        {"form_id": product_id, "value": 1},
         request,
     )
     return HttpResponse(quantity_html + _item_unavailable_html(request, product_id))
@@ -231,10 +231,11 @@ class ProductDetailView(DetailView):
 
 
 @require_GET
-def decrease_quantity(request, product_id):
-    # product_id in the URL is the PRODUCT
-    # product_id in GET is the variant
-    variant_id = _get_int(request.GET, "product_id")
+def decrease_quantity(request, form_id):
+    # form_id: the id the form's elements are named with (e.g. the quantity
+    # field to replace): the product's id on the shop and product pages, the
+    # variant's id in the basket
+    variant_id = _get_int(request.GET, "variant_id")
     value = _get_int(request.GET, "quantity", default=1, min_value=1)
     in_basket = request.GET.get("ref") == "basket"
     # Items that are already in the basket can still be changed if they're no
@@ -242,13 +243,14 @@ def decrease_quantity(request, product_id):
     if not in_basket and not _is_available(
         ProductVariant.objects.filter(id=variant_id).first()
     ):
-        return _quantity_unavailable_response(request, product_id)
+        # (on the shop and product pages, the form is the product's)
+        return _quantity_unavailable_response(request, form_id)
     if value > 1:
         value -= 1
     variant = ProductVariant.objects.filter(id=variant_id).first()
     return _change_quantity(
         request,
-        product_id,
+        form_id,
         value,
         max_value=_max_quantity(request, variant, in_basket),
         in_basket=in_basket,
@@ -256,11 +258,9 @@ def decrease_quantity(request, product_id):
 
 
 @require_GET
-def increase_quantity(request, product_id):
-    # product_id in the URL is the PRODUCT
-    # product_id in GET is the variant
-    # We need to increase the variant; the +/- buttons on the shop page refer to product
-    variant_id = _get_int(request.GET, "product_id")
+def increase_quantity(request, form_id):
+    # form_id: the id the form's elements are named with (see decrease_quantity)
+    variant_id = _get_int(request.GET, "variant_id")
     variant = ProductVariant.objects.filter(id=variant_id).first()
     # value represents the CURRENT value of the quantity field (pre-increase)
     value = _get_int(request.GET, "quantity", default=1, min_value=1)
@@ -268,7 +268,8 @@ def increase_quantity(request, product_id):
     # Items that are already in the basket can still be changed if they're no
     # longer live, but they can't be added from the shop page
     if not in_basket and not _is_available(variant):
-        return _quantity_unavailable_response(request, product_id)
+        # (on the shop and product pages, the form is the product's)
+        return _quantity_unavailable_response(request, form_id)
     if variant is None:
         raise Http404
     # We click on this button to increase the quantity from its current value
@@ -279,7 +280,7 @@ def increase_quantity(request, product_id):
     max_value = _max_quantity(request, variant, in_basket)
     return _change_quantity(
         request,
-        product_id,
+        form_id,
         value,
         can_increase=can_increase,
         max_value=max_value,
@@ -336,14 +337,14 @@ def _max_quantity(request, variant, in_basket):
 
 def _change_quantity(
     request,
-    product_id,
+    form_id,
     new_value,
     can_increase=True,
     max_value=None,
     in_basket=False,
     variant=None,
 ):
-    context = {"product_id": product_id, "value": new_value}
+    context = {"form_id": form_id, "value": new_value}
     if in_basket or not can_increase:
         # On the shop and product pages, the variant gives the max (which
         # changes with the variant chosen), unless it couldn't be increased: the
@@ -351,8 +352,8 @@ def _change_quantity(
         context["max_value"] = max_value
     resp_str = render_to_string("shop/includes/quantity_field.html", context, request)
     resp_str += f"""
-        <div id='added_{product_id}' hx-swap-oob='true'></div>
-        <div id='updated_{product_id}' hx-swap-oob='true'></div>
+        <div id='added_{form_id}' hx-swap-oob='true'></div>
+        <div id='updated_{form_id}' hx-swap-oob='true'></div>
     """
     if not can_increase:
         # Where the page shows messages: under the item in the basket, by the
@@ -360,7 +361,7 @@ def _change_quantity(
         message_id = "updated" if in_basket else "added"
         available = "None" if not max_value else f"Only {max_value}"
         resp_str += (
-            f"<div id='{message_id}_{product_id}' class='alert-danger' hx-swap-oob='true'>"
+            f"<div id='{message_id}_{form_id}' class='alert-danger' hx-swap-oob='true'>"
             f"{available} available</div>"
         )
         if not in_basket and variant is not None:
@@ -371,15 +372,14 @@ def _change_quantity(
     # In the basket, this item's update forms post the new quantity: after the
     # swap, so the quantity field has its new value (an HX-Trigger event fires
     # before the swap, so they could post the old quantity)
-    resp.headers["HX-Trigger-After-Swap"] = f"quantity-changed-{product_id}"
+    resp.headers["HX-Trigger-After-Swap"] = f"quantity-changed-{form_id}"
     return resp
 
 
 @require_POST
 def add_to_basket(request, product_id):
-    # product_id in the URL is the PRODUCT
-    # product_id in POST is the variant
-    variant_id = _get_int(request.POST, "product_id")
+    # product_id: the product's id (its form's elements are named with it)
+    variant_id = _get_int(request.POST, "variant_id")
     quantity = _get_int(request.POST, "quantity", min_value=1)
     if _payment_in_progress(request):
         resp_str = f"<div>{_basket_icon_html(request, get_existing_basket_quantity(request))}</div>"
@@ -440,7 +440,7 @@ def add_to_basket(request, product_id):
             # set quantity back to 1
             quantity_to_add_html = render_to_string(
                 "shop/includes/quantity_field.html",
-                {"product_id": product_id, "value": 1},
+                {"form_id": product_id, "value": 1},
                 request,
             )
             resp_str += f"""
@@ -462,7 +462,7 @@ def add_to_basket(request, product_id):
         if available:
             quantity_html = render_to_string(
                 "shop/includes/quantity_field.html",
-                {"product_id": product_id, "value": min(quantity, available), "max_value": available},
+                {"form_id": product_id, "value": min(quantity, available), "max_value": available},
                 request,
             )
             resp_str += (
@@ -476,17 +476,16 @@ def add_to_basket(request, product_id):
 @require_POST
 def update_quantity(request, ref):
     # Called from basket
-    # Here product ID is the variant ID
-    product_id = _get_int(request.POST, "product_id")
+    variant_id = _get_int(request.POST, "variant_id")
     new_quantity = _get_int(request.POST, "quantity", min_value=1)
     if _payment_in_progress(request):
-        return _payment_in_progress_item_response(product_id)
-    basket, item = _find_basket_item(request, ref, product_id)
+        return _payment_in_progress_item_response(variant_id)
+    basket, item = _find_basket_item(request, ref, variant_id)
     current_quantity = item.quantity
 
     if current_quantity == new_quantity:
         # nothing to do
-        result_html = f"<div id='updated_{product_id}' class='alert-info' hx-swap-oob='true'></div>"
+        result_html = f"<div id='updated_{variant_id}' class='alert-info' hx-swap-oob='true'></div>"
     else:
         with transaction.atomic():
             # Lock the variant and its product (whose stock it may share) until
@@ -508,7 +507,7 @@ def update_quantity(request, ref):
 
         if not can_update:
             result_html = (
-                f"<div id='updated_{product_id}' class='alert-danger' hx-swap-oob='true'>"
+                f"<div id='updated_{variant_id}' class='alert-danger' hx-swap-oob='true'>"
                 "Quantity requested is not available</div>"
             )
         else:
@@ -522,11 +521,11 @@ def update_quantity(request, ref):
             subtotal = item_data.get("subtotal", 0)
             total = item_data.get("total", 0)
             result_html = f"""
-                <span id='subtotal_{product_id}' hx-swap-oob='true'>{subtotal}</span>
-                <span id='total_{product_id}' hx-swap-oob='true'>{total}</span>
-                <span id='quantity_{product_id}' hx-swap-oob='true'>{item.quantity}</span>
+                <span id='subtotal_{variant_id}' hx-swap-oob='true'>{subtotal}</span>
+                <span id='total_{variant_id}' hx-swap-oob='true'>{total}</span>
+                <span id='quantity_{variant_id}' hx-swap-oob='true'>{item.quantity}</span>
                 <span id='total' hx-swap-oob='true'>{basket_data['total']}</span>
-                <div id='updated_{product_id}' class='alert-success' hx-swap-oob='true'>Basket updated</div>
+                <div id='updated_{variant_id}' class='alert-success' hx-swap-oob='true'>Basket updated</div>
                 <div id='basket-extra' hx-swap-oob='true'>{basket_extra_html}</div>
             """ + _discount_oob_html(request, basket)
     return HttpResponse(result_html)
@@ -534,14 +533,13 @@ def update_quantity(request, ref):
 
 @require_POST
 def delete_basket_item(request, ref):
-    # This is the product variant ID
-    product_id = _get_int(request.POST, "product_id")
+    variant_id = _get_int(request.POST, "variant_id")
     if _payment_in_progress(request):
-        return _payment_in_progress_item_response(product_id)
+        return _payment_in_progress_item_response(variant_id)
 
-    basket, _ = _find_basket_item(request, ref, product_id)
+    basket, _ = _find_basket_item(request, ref, variant_id)
     # The serialised basket identifies products (NOT variants) with their identifier
-    variant = ProductVariant.objects.filter(id=product_id).first()
+    variant = ProductVariant.objects.filter(id=variant_id).first()
     product_identifier = variant.product.identifier if variant else None
     basket.remove(ref)
     basket_data = serialize_basket(request, basket)
@@ -557,7 +555,7 @@ def delete_basket_item(request, ref):
         resp_str = f"<div id='row-{product_identifier}' hx-swap-oob='true'></div>"
     else:
         # Some items for this product, just hide the single variant row
-        resp_str = f"<div id='row-{product_id}' hx-swap-oob='true'></div>"
+        resp_str = f"<div id='row-{variant_id}' hx-swap-oob='true'></div>"
 
     if basket.quantity == 0:
         # No items in the basket: reload the page, which shows the empty basket
@@ -585,15 +583,15 @@ def delete_basket_item(request, ref):
     return HttpResponse(resp_str)
 
 
-def _find_basket_item(request, ref, product_id):
+def _find_basket_item(request, ref, variant_id):
     """
     The request's basket and its item with this ref. Raises 404 if there isn't
-    one, or if it isn't for the posted product (variant) id, which is used to
-    identify the elements to update in the response.
+    one, or if it isn't for the posted variant id (salesman's item.product_id),
+    which is used to identify the elements to update in the response.
     """
     basket = get_existing_basket(request)
     item = basket.find(ref) if basket is not None else None
-    if item is None or item.product_id != product_id:
+    if item is None or item.product_id != variant_id:
         raise Http404
     return basket, item
 
@@ -604,9 +602,9 @@ def _basket_icon_html(request, quantity):
     )
 
 
-def _payment_in_progress_item_response(product_id):
+def _payment_in_progress_item_response(variant_id):
     return HttpResponse(
-        f"<div id='updated_{product_id}' class='alert-danger' hx-swap-oob='true'>"
+        f"<div id='updated_{variant_id}' class='alert-danger' hx-swap-oob='true'>"
         f"{PAYMENT_IN_PROGRESS_MESSAGE}</div>"
     )
 

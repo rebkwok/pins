@@ -48,8 +48,8 @@ def browser_context_args(browser_context_args, request):
 
 def choose_option(form, option):
     """Choose the variant whose option text includes option (e.g. "Black, S")"""
-    value = form.locator("select[name=product_id] option", has_text=option).get_attribute("value")
-    form.locator("select[name=product_id]").select_option(value)
+    value = form.locator("select[name=variant_id] option", has_text=option).get_attribute("value")
+    form.locator("select[name=variant_id]").select_option(value)
 
 
 @pytest.fixture(autouse=True)

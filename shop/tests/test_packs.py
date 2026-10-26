@@ -169,7 +169,7 @@ def test_dropdown_pack_out_of_stock(client, cards, single, pack):
 def post_add(rf, cards, variant, quantity, basket=None):
     request = rf.post(
         reverse("shop:add_to_basket", args=(cards.id,)),
-        {"product_id": variant.id, "quantity": quantity},
+        {"variant_id": variant.id, "quantity": quantity},
     )
     return add_to_basket(basket_session(request, basket), cards.id).content.decode()
 
@@ -203,7 +203,7 @@ def test_add_last_items_out_of_stock(rf, cards, single, pack):
 def test_increase_quantity_button(rf, cards, single, pack):
     def increase(value, basket=None, ref=""):
         url = reverse("shop:increase_quantity", args=(cards.id,))
-        request = rf.get(url, {"product_id": pack.id, "quantity": value, "ref": ref})
+        request = rf.get(url, {"variant_id": pack.id, "quantity": value, "ref": ref})
         return increase_quantity(basket_session(request, basket), cards.id).content.decode()
 
     # from 1 to 2 packs is fine; 3 isn't (shown by the product's form)
@@ -228,10 +228,10 @@ def test_update_quantity_in_basket(client, cards, single, pack):
     item = basket.items.get()
     url = reverse("shop:update_quantity", args=(item.ref,))
     # 8 left: 2 more packs is fine (3 in all), 3 more isn't
-    content = client.post(url, {"product_id": pack.id, "quantity": 4}).content.decode()
+    content = client.post(url, {"variant_id": pack.id, "quantity": 4}).content.decode()
     assert "Quantity requested is not available" in content
     assert stock(cards) == 8
-    content = client.post(url, {"product_id": pack.id, "quantity": 2}).content.decode()
+    content = client.post(url, {"variant_id": pack.id, "quantity": 2}).content.decode()
     assert "Basket updated" in content
     assert stock(cards) == 3
 

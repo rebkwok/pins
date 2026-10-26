@@ -3,7 +3,9 @@
 A basket item: thumbnail, name and variant, quantity, price. On the basket page
 (editable) the quantity has -/+ buttons and the item can be removed (htmx:
 views.update_quantity and delete_basket_item, which replace the elements by
-id); on the checkout page it's a summary.
+id); on the checkout page it's a summary. item.product_id is salesman's name
+for what's in the basket: the variant's id (the item's elements are named with
+it).
 {% endcomment %}
 <div id="row-{{ item.product_id }}" class="basket-item{% if editable %} basket-item--editable{% endif %}">
     <div class="basket-item__image">
@@ -37,11 +39,11 @@ id); on the checkout page it's a summary.
                     aria-label="Fewer"
                     hx-trigger="click"
                     hx-target="#id_quantity_wrapper_{{ item.product_id }}"
-                    hx-get="{% url 'shop:decrease_quantity' item.product_id %}?ref=basket&product_id={{ item.product_id }}"
+                    hx-get="{% url 'shop:decrease_quantity' item.product_id %}?ref=basket&variant_id={{ item.product_id }}"
                     hx-include="[id='id_quantity_{{ item.product_id }}']"
                 >-</button>
                 <span id="id_quantity_wrapper_{{ item.product_id }}">
-                    {% include "shop/includes/quantity_field.html" with product_id=item.product_id value=item.quantity max_value=item.max_quantity %}
+                    {% include "shop/includes/quantity_field.html" with form_id=item.product_id value=item.quantity max_value=item.max_quantity %}
                 </span>
                 <button
                     type="button"
@@ -50,7 +52,7 @@ id); on the checkout page it's a summary.
                     aria-label="More"
                     hx-trigger="click"
                     hx-target="#id_quantity_wrapper_{{ item.product_id }}"
-                    hx-get="{% url 'shop:increase_quantity' item.product_id %}?ref=basket&product_id={{ item.product_id }}"
+                    hx-get="{% url 'shop:increase_quantity' item.product_id %}?ref=basket&variant_id={{ item.product_id }}"
                     hx-include="[id='id_quantity_{{ item.product_id }}']"
                 >+</button>
             </div>
@@ -76,7 +78,7 @@ id); on the checkout page it's a summary.
             >
                 <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
             </button>
-            <input type="hidden" name="product_id" value="{{ item.product_id }}">
+            <input type="hidden" name="variant_id" value="{{ item.product_id }}">
         </form>
         <div id="updated_{{ item.product_id }}" class="basket-item__message"></div>
     {% else %}

@@ -88,7 +88,7 @@ def test_shop_page_and_quantity(client, entries, entry):
     # more than the stock (0): no limit, no message
     content = client.get(
         reverse("shop:increase_quantity", args=(entries.id,)),
-        {"product_id": entry.id, "quantity": 99},
+        {"variant_id": entry.id, "quantity": 99},
     ).content.decode()
     assert 'value="100"' in content
     assert "available</div>" not in content
@@ -108,7 +108,7 @@ def test_shop_page_options(client, entries, entry):
 def test_add_to_basket(client, entries, entry):
     resp = client.post(
         reverse("shop:add_to_basket", args=(entries.id,)),
-        {"product_id": entry.id, "quantity": 250},
+        {"variant_id": entry.id, "quantity": 250},
     )
     content = resp.content.decode()
     assert "Added!" in content
@@ -123,7 +123,7 @@ def test_add_to_basket(client, entries, entry):
     # (in the basket, its quantity can still be increased)
     content = client.get(
         reverse("shop:increase_quantity", args=(entries.id,)),
-        {"product_id": entry.id, "quantity": 250, "ref": "basket"},
+        {"variant_id": entry.id, "quantity": 250, "ref": "basket"},
     ).content.decode()
     assert 'value="251">' in content
     assert basket.items.count() == 1

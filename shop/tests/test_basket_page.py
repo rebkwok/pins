@@ -111,7 +111,7 @@ def test_basket_quantity_max(basket_client, basket):
     for view in ["decrease_quantity", "increase_quantity"]:
         content = basket_client.get(
             reverse(f"shop:{view}", args=(variant.product.id,)),
-            {"product_id": variant.id, "quantity": 2, "ref": "basket"},
+            {"variant_id": variant.id, "quantity": 2, "ref": "basket"},
         ).content.decode()
         assert f'max="{variant.available + 2}"' in content
 
@@ -122,7 +122,7 @@ def test_shop_quantity_no_max(client, basket):
     variant = basket.get_items()[0].product
     content = client.get(
         reverse("shop:increase_quantity", args=(variant.product.id,)),
-        {"product_id": variant.id, "quantity": 1},
+        {"variant_id": variant.id, "quantity": 1},
     ).content.decode()
     assert "max=" not in content
     content = client.get(reverse("shop:product_detail", args=(variant.product.id,))).content.decode()
@@ -135,7 +135,7 @@ def test_none_available(client, basket):
     variant.save()
     content = client.get(
         reverse("shop:increase_quantity", args=(variant.product.id,)),
-        {"product_id": variant.id, "quantity": 1},
+        {"variant_id": variant.id, "quantity": 1},
     ).content.decode()
     assert "class='alert-danger' hx-swap-oob='true'>None available</div>" in content
 
@@ -147,7 +147,7 @@ def test_refused_quantity_max(client, basket):
     variant.save()
     content = client.get(
         reverse("shop:increase_quantity", args=(variant.product.id,)),
-        {"product_id": variant.id, "quantity": 1},
+        {"variant_id": variant.id, "quantity": 1},
     ).content.decode()
     assert 'value="1" max="1"' in content
     assert "Only 1 available</div>" in content
@@ -158,7 +158,7 @@ def test_decrease_quantity_unknown_variant_in_basket(client, basket):
     product = basket.get_items()[0].product.product
     content = client.get(
         reverse("shop:decrease_quantity", args=(product.id,)),
-        {"product_id": 99999, "quantity": 3, "ref": "basket"},
+        {"variant_id": 99999, "quantity": 3, "ref": "basket"},
     ).content.decode()
     assert 'value="2">' in content
     assert "max=" not in content
@@ -168,7 +168,7 @@ def increase(client, variant, quantity, **params):
     return " ".join(
         client.get(
             reverse("shop:increase_quantity", args=(variant.product.id,)),
-            {"product_id": variant.id, "quantity": quantity, **params},
+            {"variant_id": variant.id, "quantity": quantity, **params},
         ).content.decode().split()
     )
 
@@ -219,7 +219,7 @@ def test_add_refused_now_out_of_stock(client, product):
     content = " ".join(
         client.post(
             reverse("shop:add_to_basket", args=(product.id,)),
-            {"product_id": small.id, "quantity": 2},
+            {"variant_id": small.id, "quantity": 2},
         ).content.decode().split()
     )
     assert "None available</div>" in content
@@ -236,7 +236,7 @@ def test_added_variant_stays_selected(client, product):
         return " ".join(
             client.post(
                 reverse("shop:add_to_basket", args=(product.id,)),
-                {"product_id": variant.id, "quantity": quantity},
+                {"variant_id": variant.id, "quantity": quantity},
             ).content.decode().split()
         )
 

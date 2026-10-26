@@ -30,8 +30,7 @@ def basket_client(client, basket):
 
 def add_data(variant, **params):
     return {
-        "product_id": variant.id,
-        "product_type": "shop.ProductVariant",
+        "variant_id": variant.id,
         "quantity": 1,
         **params,
     }
@@ -60,13 +59,13 @@ def test_product_detail_non_numeric_id(client):
         {"quantity": "abc"},
         {"quantity": "0"},
         {"quantity": "-1"},
-        {"product_id": "abc"},
-        {"product_id": ""},
+        {"variant_id": "abc"},
+        {"variant_id": ""},
     ],
 )
 def test_decrease_quantity_invalid(client, product, variant, params):
     url = reverse("shop:decrease_quantity", args=(product.id,))
-    resp = client.get(url, {"product_id": variant.id, "quantity": 2, **params})
+    resp = client.get(url, {"variant_id": variant.id, "quantity": 2, **params})
     assert resp.status_code == 400
 
 
@@ -79,9 +78,9 @@ def test_decrease_quantity_post_not_allowed(client, product):
     "params,status_code",
     [
         ({}, 400),
-        ({"product_id": "abc"}, 400),
+        ({"variant_id": "abc"}, 400),
         # unknown variant in the basket; on the shop page it's shown as unavailable
-        ({"product_id": 1234, "ref": "basket"}, 404),
+        ({"variant_id": 1234, "ref": "basket"}, 404),
     ],
 )
 def test_increase_quantity_invalid_variant(client, product, params, status_code):
@@ -91,7 +90,7 @@ def test_increase_quantity_invalid_variant(client, product, params, status_code)
 
 def test_increase_quantity_invalid_quantity(client, product, variant):
     url = reverse("shop:increase_quantity", args=(product.id,))
-    resp = client.get(url, {"product_id": variant.id, "quantity": "abc"})
+    resp = client.get(url, {"variant_id": variant.id, "quantity": "abc"})
     assert resp.status_code == 400
 
 
@@ -100,7 +99,7 @@ def test_increase_quantity_invalid_quantity(client, product, variant):
 
 @pytest.mark.parametrize(
     "params",
-    [{"product_id": "abc"}, {"quantity": "abc"}, {"quantity": 0}, {"quantity": -1}],
+    [{"variant_id": "abc"}, {"quantity": "abc"}, {"quantity": 0}, {"quantity": -1}],
 )
 def test_add_to_basket_invalid(client, product, variant, params):
     url = reverse("shop:add_to_basket", args=(product.id,))
@@ -130,7 +129,7 @@ def assert_item_unavailable(resp, product, controls_hidden=True):
 
 def test_add_to_basket_unknown_variant(client, product, variant):
     url = reverse("shop:add_to_basket", args=(product.id,))
-    resp = client.post(url, add_data(variant, product_id=1234))
+    resp = client.post(url, add_data(variant, variant_id=1234))
     # the product's other variant is still available
     assert_item_unavailable(resp, product, controls_hidden=False)
 
@@ -162,7 +161,7 @@ def test_add_to_basket_not_live_other_variants_available(client, product, varian
     # variant options are updated
     assert f"<div id='id_select_variant_wrapper_{product.id}' hx-swap-oob='true'>" in content
     # (now the only live variant: no drop-down)
-    assert f'id="id_product_{product.id}" value="{other_variant.id}"' in content
+    assert f'id="id_variant_{product.id}" value="{other_variant.id}"' in content
     assert f'value="{variant.id}"' not in content
 
 
@@ -174,11 +173,11 @@ def test_change_quantity_not_live(client, product, variant, view, not_live):
     obj.save()
     url = reverse(f"shop:{view}", args=(product.id,))
     # On the shop page, the product card is updated and quantity reset to 1
-    resp = client.get(url, {"product_id": variant.id, "quantity": 2})
+    resp = client.get(url, {"variant_id": variant.id, "quantity": 2})
     content = assert_item_unavailable(resp, product)
     assert f'id="id_quantity_{product.id}" name="quantity" value="1"' in content
     # On the basket page, the quantity can still be changed
-    resp = client.get(url, {"product_id": variant.id, "quantity": 2, "ref": "basket"})
+    resp = client.get(url, {"variant_id": variant.id, "quantity": 2, "ref": "basket"})
     assert resp.status_code == 200
     assert "no longer available" not in resp.content.decode()
 
@@ -193,12 +192,12 @@ def test_product_card_buttons_include_own_fields(rf, product, variant):
     html = render_to_string(
         "shop/includes/product-listing-card.html", {"product": product}, rf.get("/")
     )
-    assert f'id="id_product_{product.id}"' in html
+    assert f'id="id_variant_{product.id}"' in html
     include = (
-        "hx-include=\"[id='id_quantity_{id}'],[id='id_product_{id}']\""
+        "hx-include=\"[id='id_quantity_{id}'],[id='id_variant_{id}']\""
     ).format(id=product.id)
     assert html.count(include) == 2
-    assert "[name='product_id']" not in html
+    assert "[name='variant_id']" not in html
 
 
 def test_basket_item_not_live_can_be_updated(basket_client, basket):
@@ -211,13 +210,13 @@ def test_basket_item_not_live_can_be_updated(basket_client, basket):
     assert variant.stock == 3
 
     url = reverse("shop:update_quantity", args=(item.ref,))
-    resp = basket_client.post(url, {"product_id": variant.id, "quantity": 4})
+    resp = basket_client.post(url, {"variant_id": variant.id, "quantity": 4})
     assert "Basket updated" in resp.content.decode()
     variant.refresh_from_db()
     assert variant.stock == 1
 
     url = reverse("shop:delete_basket_item", args=(item.ref,))
-    basket_client.post(url, {"product_id": variant.id})
+    basket_client.post(url, {"variant_id": variant.id})
     variant.refresh_from_db()
     assert variant.stock == 5
 
@@ -234,7 +233,7 @@ def test_add_to_basket_get_not_allowed(client, product):
 def test_update_quantity_invalid(basket_client, basket, quantity):
     item = basket.items.first()
     url = reverse("shop:update_quantity", args=(item.ref,))
-    resp = basket_client.post(url, {"product_id": item.product.id, "quantity": quantity})
+    resp = basket_client.post(url, {"variant_id": item.product.id, "quantity": quantity})
     assert resp.status_code == 400
     assert Basket.objects.get(id=basket.id).quantity == 2
 
@@ -242,7 +241,7 @@ def test_update_quantity_invalid(basket_client, basket, quantity):
 def test_update_quantity_unknown_item(basket_client, basket):
     item = basket.items.first()
     url = reverse("shop:update_quantity", args=("unknown-ref",))
-    resp = basket_client.post(url, {"product_id": item.product.id, "quantity": 1})
+    resp = basket_client.post(url, {"variant_id": item.product.id, "quantity": 1})
     assert resp.status_code == 404
 
 
@@ -252,11 +251,11 @@ def test_update_quantity_get_not_allowed(basket_client, basket):
 
 
 @pytest.mark.parametrize(
-    "product_id,status_code", [("abc", 400), ("", 400), (1234, 404)]
+    "variant_id,status_code", [("abc", 400), ("", 400), (1234, 404)]
 )
-def test_delete_basket_item_invalid(basket_client, basket, product_id, status_code):
+def test_delete_basket_item_invalid(basket_client, basket, variant_id, status_code):
     url = reverse("shop:delete_basket_item", args=(basket.items.first().ref,))
-    resp = basket_client.post(url, {"product_id": product_id})
+    resp = basket_client.post(url, {"variant_id": variant_id})
     assert resp.status_code == status_code
     assert basket.items.exists()
 

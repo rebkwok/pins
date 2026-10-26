@@ -98,8 +98,7 @@ def test_logged_out_visitor_can_shop(client, site_home_page, product):
     resp = client.post(
         reverse("shop:add_to_basket", args=(product.id,)),
         {
-            "product_id": variant.id,
-            "product_type": "shop.ProductVariant",
+            "variant_id": variant.id,
             "quantity": 2,
         },
     )
@@ -154,8 +153,7 @@ def test_visitor_logs_in_after_adding_to_basket(client, site_home_page, product)
     client.post(
         reverse("shop:add_to_basket", args=(product.id,)),
         {
-            "product_id": variant.id,
-            "product_type": "shop.ProductVariant",
+            "variant_id": variant.id,
             "quantity": 2,
         },
     )

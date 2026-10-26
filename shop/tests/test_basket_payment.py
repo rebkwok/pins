@@ -164,8 +164,7 @@ def test_add_to_basket_locked(basket_client, paying_basket, product):
     resp = basket_client.post(
         reverse("shop:add_to_basket", args=(product.id,)),
         {
-            "product_id": variant.id,
-            "product_type": "shop.ProductVariant",
+            "variant_id": variant.id,
             "quantity": 1,
         },
     )
@@ -177,7 +176,7 @@ def test_update_quantity_locked(basket_client, paying_basket):
     item = paying_basket.items.first()
     resp = basket_client.post(
         reverse("shop:update_quantity", args=(item.ref,)),
-        {"product_id": item.product.id, "quantity": 1},
+        {"variant_id": item.product.id, "quantity": 1},
     )
     assert "can't be changed while a payment is in progress" in resp.content.decode()
     assert Basket.objects.get(id=paying_basket.id).quantity == 2
@@ -187,7 +186,7 @@ def test_delete_basket_item_locked(basket_client, paying_basket):
     item = paying_basket.items.first()
     resp = basket_client.post(
         reverse("shop:delete_basket_item", args=(item.ref,)),
-        {"product_id": item.product.id},
+        {"variant_id": item.product.id},
     )
     assert "can't be changed while a payment is in progress" in resp.content.decode()
     assert paying_basket.items.exists()

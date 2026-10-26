@@ -18,7 +18,7 @@ def test_browse_and_add(page, live_server, shop):
     expect(page.get_by_role("heading", name="Clothing")).to_be_visible()
     tshirt = card(page, "PINS T-shirt")
     expect(tshirt).to_contain_text("£18.00")
-    expect(tshirt.locator("select[name=product_id]")).to_contain_text("Black, S (only 2 left)")
+    expect(tshirt.locator("select[name=variant_id]")).to_contain_text("Black, S (only 2 left)")
     # the out-of-stock option can't be chosen
     expect(tshirt.locator("option", has_text="Black, M")).to_be_disabled()
     # a category's button shows just its products

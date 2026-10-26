@@ -9,7 +9,7 @@
         if (input.max) {
             return Number(input.max);
         }
-        const variant = input.form && input.form.querySelector("[name=product_id]");
+        const variant = input.form && input.form.querySelector("[name=variant_id]");
         const option = variant && variant.tagName === "SELECT" ? variant.selectedOptions[0] : variant;
         if (option && option.dataset.available !== undefined) {
             return Number(option.dataset.available);
@@ -50,7 +50,7 @@
     }
 
     function updateInBasket(form) {
-        const variant = form.querySelector("[name=product_id]");
+        const variant = form.querySelector("[name=variant_id]");
         let text = "";
         let total = 0;
         if (variant && variant.tagName === "SELECT") {
@@ -87,7 +87,7 @@
     // choosing another variant (its own limit replaces any max the server
     // gave for the previous one), or typing a quantity
     document.addEventListener("change", function (event) {
-        if (event.target.matches("select[name=product_id]")) {
+        if (event.target.matches("select[name=variant_id]")) {
             const input = event.target.form.querySelector("input.quantity");
             if (input) {
                 input.removeAttribute("max");

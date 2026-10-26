@@ -334,7 +334,7 @@ def test_htmx_updates_include_discount(basket_client, discounted_basket):
     item = discounted_basket.items.get()
     resp = basket_client.post(
         reverse("shop:update_quantity", args=(item.ref,)),
-        {"product_id": item.product_id, "quantity": 1},
+        {"variant_id": item.product_id, "quantity": 1},
     )
     content = resp.content.decode()
     assert '<div id="basket-discount" class="basket-discount" hx-swap-oob="true">' in content
@@ -350,7 +350,7 @@ def test_htmx_delete_includes_discount(basket_client, discounted_basket, product
     discounted_basket.add(variant)
     item = discounted_basket.items.get(product_id=variant.id)
     resp = basket_client.post(
-        reverse("shop:delete_basket_item", args=(item.ref,)), {"product_id": variant.id}
+        reverse("shop:delete_basket_item", args=(item.ref,)), {"variant_id": variant.id}
     )
     assert 'id="basket-discount"' in resp.content.decode()
 
@@ -676,7 +676,7 @@ def test_removing_last_item_removes_code(basket_client, discounted_basket, produ
     # the last one, from the basket page: it's removed
     basket_client.post(
         reverse("shop:delete_basket_item", args=(second.ref,)),
-        {"product_id": second.product.id},
+        {"variant_id": second.product.id},
     )
     basket = Basket.objects.get(id=discounted_basket.id)
     assert basket.discount_code is None

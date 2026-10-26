@@ -217,7 +217,7 @@ def delete_item(client, basket, variant):
     session["BASKET_ID"] = basket.id
     session.save()
     return client.post(
-        reverse("shop:delete_basket_item", args=(item.ref,)), {"product_id": variant.id}
+        reverse("shop:delete_basket_item", args=(item.ref,)), {"variant_id": variant.id}
     ).content.decode()
 
 
