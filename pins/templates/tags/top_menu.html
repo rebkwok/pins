@@ -2,9 +2,11 @@
 {% get_site_root as site_root %}
 
 {% for menuitem in menuitems %}
-    <li class="presentation {{ menuitem.title|lower|cut:" " }}{% if menuitem.active %} active{% endif %}{% if menuitem.show_dropdown %} has-submenu{% endif %}">
+    <li class="presentation {{ menuitem.title|lower|cut:" " }}{% if menuitem.active %} active{% endif %}{% if menuitem.show_dropdown %} has-submenu dropdown{% endif %}">
         {% if menuitem.show_dropdown %}
-            <a href="{% pageurl menuitem %}" class="allow-toggle">{{ menuitem.title }} <span><a class="caret-custom dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false"></a></span></a>
+            {# The page, and a button showing its child pages #}
+            <a href="{% pageurl menuitem %}" class="allow-toggle">{{ menuitem.title }}</a>
+            <button type="button" class="caret-custom dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{{ menuitem.title }} pages"></button>
             {% top_menu_children parent=menuitem %}
             {# Used to display child menu items #}
         {% else %}

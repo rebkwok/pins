@@ -16,7 +16,7 @@
             <ul class="dog-list">
                 {% for dog in dogs %}
                     <li>
-                        {% include "includes/card/listing-card.html" with page=dog %}
+                        {% include "includes/card/listing-card.html" with page=dog heading_level=2 %}
                     </li>
                 {% endfor %}
             </ul>

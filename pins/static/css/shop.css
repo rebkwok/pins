@@ -1,10 +1,6 @@
-/* The shop's buttons and links: a darker shade of the PINS pink (--pins), so
-   white text on it, and it as text on white or the basket summary's cream,
-   are readable (5.1:1 on white; the lighter pink is 2.6:1, below the 4.5:1 the
-   accessibility standard asks for) */
-:root {
-  --pins-strong: #a35a47;
-}
+/* The shop's buttons and links use --pins-strong (main-v1.3.css), the darker
+   shade of the PINS pink, so white text on it, and it as text on white or the
+   basket summary's cream, are readable */
 
 /* # SHOP */
 
@@ -1171,6 +1167,15 @@ a.btn.shop-basket-link:hover {
 .shop-faq__answer a,
 .shop-faqs__more a {
   text-decoration: underline;
+}
+
+/* Links on their own, not within text (the site underlines links in
+   paragraphs) */
+.basket-continue a,
+.shop-results a,
+.shop-detail__faqs a,
+.order-details a {
+  text-decoration: none;
 }
 
 /* The product's delivery cost, under its price */

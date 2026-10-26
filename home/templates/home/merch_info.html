@@ -40,9 +40,9 @@
     </div>
     <div class="row image-gallery-container">
         <ul class="merch-image-gallery">
-            <li><a data-toggle="modal" data-target="#hoodie-white"><img src={% static "images/merch/hoodie_white_pins_logo.png" %} /></a></li>
-            <li><a data-toggle="modal" data-target="#hoodie-grey"><img src={% static "images/merch/hoodie_grey_pins_logo.png" %} /></a></li>
-            <li><a data-toggle="modal" data-target="#hoodie-black"><img src={% static "images/merch/hoodie_black_pins_logo.png" %} /></a></li>
+            <li><a href="#hoodie-white" data-bs-toggle="modal"><img src="{% static "images/merch/hoodie_white_pins_logo.png" %}" alt="White hoodie with the PINS logo" /></a></li>
+            <li><a href="#hoodie-grey" data-bs-toggle="modal"><img src="{% static "images/merch/hoodie_grey_pins_logo.png" %}" alt="Grey hoodie with the PINS logo" /></a></li>
+            <li><a href="#hoodie-black" data-bs-toggle="modal"><img src="{% static "images/merch/hoodie_black_pins_logo.png" %}" alt="Black hoodie with the PINS logo" /></a></li>
         </ul>
     </div> 
     <div class="row"> 
@@ -85,8 +85,8 @@
         </div>
         <div class="row image-gallery-container">
             <ul class="merch-image-gallery">
-                <li><a data-toggle="modal" data-target="#zoodie-white"><img src={% static "images/merch/zoodie_white_podencos_logo.png" %} /></a></li>
-                <li><a data-toggle="modal" data-target="#zoodie-grey"><img src={% static "images/merch/zoodie_grey_podencos_logo.png" %} /></a></li>
+                <li><a href="#zoodie-white" data-bs-toggle="modal"><img src="{% static "images/merch/zoodie_white_podencos_logo.png" %}" alt="White zip-up hoodie with the Podencos in Need logo" /></a></li>
+                <li><a href="#zoodie-grey" data-bs-toggle="modal"><img src="{% static "images/merch/zoodie_grey_podencos_logo.png" %}" alt="Grey zip-up hoodie with the Podencos in Need logo" /></a></li>
             </ul>
         </div>
 
@@ -129,8 +129,8 @@
         </div>
         <div class="row image-gallery-container">
             <ul class="merch-image-gallery">
-                <li><a data-toggle="modal" data-target="#tshirt-pod"><img src={% static "images/merch/tshirt_podencos_logo.png" %} /></li>
-                <li><a data-toggle="modal" data-target="#tshirt-pins"><img src={% static "images/merch/tshirt_pins_logo.png" %} /></li>
+                <li><a href="#tshirt-pod" data-bs-toggle="modal"><img src="{% static "images/merch/tshirt_podencos_logo.png" %}" alt="White T-shirt with the Podencos in Need logo" /></a></li>
+                <li><a href="#tshirt-pins" data-bs-toggle="modal"><img src="{% static "images/merch/tshirt_pins_logo.png" %}" alt="White T-shirt with the PINS logo" /></a></li>
             </ul>
         </div>
         <div>
@@ -212,86 +212,86 @@
 
 
 <!-- Image modals -->
-<div class="modal fade" id="hoodie-white" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+<div class="modal fade" id="hoodie-white" tabindex="-1" aria-label="White hoodie with the PINS logo">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <img src={% static "images/merch/hoodie_white_pins_logo.jpg" %} />
+                <img class="img-fluid" src="{% static "images/merch/hoodie_white_pins_logo.jpg" %}" alt="White hoodie with the PINS logo" />
             </div>
         </div>
     </div>
 </div>
-<div class="modal fade" id="hoodie-grey" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+<div class="modal fade" id="hoodie-grey" tabindex="-1" aria-label="Grey hoodie with the PINS logo">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <img src={% static "images/merch/hoodie_grey_pins_logo.jpg" %} />
+                <img class="img-fluid" src="{% static "images/merch/hoodie_grey_pins_logo.jpg" %}" alt="Grey hoodie with the PINS logo" />
             </div>
         </div>
     </div>
 </div>
-<div class="modal fade" id="hoodie-black" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+<div class="modal fade" id="hoodie-black" tabindex="-1" aria-label="Black hoodie with the PINS logo">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <img src={% static "images/merch/hoodie_black_pins_logo.jpg" %} />
+                <img class="img-fluid" src="{% static "images/merch/hoodie_black_pins_logo.jpg" %}" alt="Black hoodie with the PINS logo" />
             </div>
         </div>
     </div>
 </div>
-<div class="modal fade" id="zoodie-white" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+<div class="modal fade" id="zoodie-white" tabindex="-1" aria-label="White zip-up hoodie with the Podencos in Need logo">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <img src={% static "images/merch/zoodie_white_podencos_logo_lg.png" %} />
+                <img class="img-fluid" src="{% static "images/merch/zoodie_white_podencos_logo_lg.png" %}" alt="White zip-up hoodie with the Podencos in Need logo" />
             </div>
         </div>
     </div>
 </div>
-<div class="modal fade" id="zoodie-grey" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+<div class="modal fade" id="zoodie-grey" tabindex="-1" aria-label="Grey zip-up hoodie with the Podencos in Need logo">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <img src={% static "images/merch/zoodie_grey_podencos_logo_lg.png" %} />
+                <img class="img-fluid" src="{% static "images/merch/zoodie_grey_podencos_logo_lg.png" %}" alt="Grey zip-up hoodie with the Podencos in Need logo" />
             </div>
         </div>
     </div>
 </div>
-<div class="modal fade" id="tshirt-pins" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+<div class="modal fade" id="tshirt-pins" tabindex="-1" aria-label="White T-shirt with the PINS logo">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <img src={% static "images/merch/tshirt_pins_logo_lg.png" %} />
+                <img class="img-fluid" src="{% static "images/merch/tshirt_pins_logo_lg.png" %}" alt="White T-shirt with the PINS logo" />
             </div>
         </div>
     </div>
 </div>
-<div class="modal fade" id="tshirt-pod" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+<div class="modal fade" id="tshirt-pod" tabindex="-1" aria-label="White T-shirt with the Podencos in Need logo">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <img src={% static "images/merch/tshirt_podencos_logo_lg.png" %} />
+                <img class="img-fluid" src="{% static "images/merch/tshirt_podencos_logo_lg.png" %}" alt="White T-shirt with the Podencos in Need logo" />
             </div>
         </div>
     </div>
@@ -300,22 +300,3 @@
 
 
 {% endblock content %}
-
-
-{% block extra_js %}
-<!-- Initialize Bootstrap functionality -->
-<!-- Bootstrap JS -->
-<script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
-<script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
-<script>
-    // Initialize tooltip component
-    $(function () {
-      $('[data-toggle="tooltip"]').tooltip()
-    })
-    
-    // Initialize popover component
-    $(function () {
-      $('[data-toggle="popover"]').popover()
-    })
-    </script>
-{% endblock %}

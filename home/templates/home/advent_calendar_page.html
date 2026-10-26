@@ -17,7 +17,7 @@
                     <button onclick="toggle()" class="btn btn-success window-button">Open all previous days</button>
                     </div>
                     <div class="row image-gallery-container">
-                        <ul class="image-gallery">
+                        <div class="image-gallery advent-calendar__days">
                             {% for day in page.days.all %}
 
                             {% if forloop.counter < today_day %}
@@ -38,7 +38,7 @@
                             {% endif %}
 
                             {% endfor %}
-                        </ul>
+                        </div>
                     </div>
     
                 </div>

@@ -106,7 +106,7 @@
                         {% for variant in variants.all %}
                             {% get_variant_form_field form=form field_name=variant.slug as field %}
                             {% if group_name %}
-                                <div aria-required={% if field.field.required %}"true"{% else %}"false"{% endif %}>                            
+                                <div>                            
                                     {% if variant.description %}
                                         <p class="help">{{ variant.description }}</p>
                                     {% endif %}
@@ -115,7 +115,7 @@
                                 </div>
                             {% else %}
                                 {% comment %} No group {% endcomment %}
-                                <div class="form-page__field" aria-required={% if field.field.required %}"true"{% else %}"false"{% endif %}>                            
+                                <div class="form-page__field">                            
                                     {% if variant.description %}
                                         <p class="help">{{ variant.description }}</p>
                                     {% endif %}
@@ -132,7 +132,7 @@
                     <h3>Your details</h4>
                     {% for field in form %}
                         {% if not page|is_order_quantity:field.name and not page|is_end_of_form_field:field.name %}
-                            <div class="form-page__field" aria-required={% if field.field.required %}"true"{% else %}"false"{% endif %}>
+                            <div class="form-page__field">
                             
                                 {{ field.label_tag }}{% if field.field.required %}<span class="required">*</span>{% endif %}
 
@@ -167,7 +167,7 @@
 
                         {% for field in form %}
                             {% if page|is_end_of_form_field:field.name %}
-                                <div class="form-page__field" aria-required={% if field.field.required %}"true"{% else %}"false"{% endif %}>
+                                <div class="form-page__field">
                                     
                                     {{ field.label_tag }}{% if field.field.required %}<span class="required">*</span>{% endif %}
 

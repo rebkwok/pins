@@ -19,8 +19,6 @@ SERIOUS = {"serious", "critical"}
 
 # Known issues that aren't the shop's: (rule, element)
 KNOWN = {
-    # the site's header navigation (its list's markup): step 17
-    ("list", ".navigation__desktop > ul:nth-child(2)"),
     # Wagtail's rich text editor (Draftail), in the admin
     ("aria-input-field-name", ".notranslate"),
 }
