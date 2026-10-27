@@ -342,20 +342,6 @@ SERVER_EMAIL = SUPPORT_EMAIL
 
 if env("LOCAL") or env("CI"):
     MAILERS = {"default": {"BACKEND": "django.core.mail.backends.console.EmailBackend"}}
-# MAILCATCHER
-elif env("USE_MAILCATCHER"):  # pragma: no cover
-    MAILERS = {
-        "default": {
-            "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
-            "OPTIONS": {
-                "host": "127.0.0.1",
-                "host_user": "",
-                "host_password": "",
-                "port": 1025,
-                "use_tls": False,
-            },
-        }
-    }
 else:  # pragma: no cover
     AWS_SES_ACCESS_KEY_ID = env("AWS_SES_ACCESS_KEY_ID")
     AWS_SES_SECRET_ACCESS_KEY = env("AWS_SES_SECRET_ACCESS_KEY")
@@ -365,6 +351,18 @@ else:  # pragma: no cover
         "default": {"BACKEND": "django_ses.SESBackend"},
     }
 
+# MAILCATCHER
+if env("USE_MAILCATCHER"):  # pragma: no cover
+    MAILERS = {
+        "default": {
+            "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+            "OPTIONS": {
+                "host": "127.0.0.1",
+                "port": 1025,
+                "use_tls": False,
+            },
+        }
+    }
 
 # #####LOGGING######
 # The level for the site's own apps' logs (and the log file): LOG_LEVEL in the
