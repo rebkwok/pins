@@ -31,6 +31,7 @@ from .admin_views import (
     SHOP_STOCK_MENU_LABEL,
     CategoryProductsReorderView,
     DispatchersView,
+    ShopHelpView,
 )
 from . import activity
 from .admin_activity import ShopActivityViewSet
@@ -281,6 +282,25 @@ class DispatchersViewSet(ViewSet):
         return [path("", DispatchersView.as_view(), name="index")]
 
 
+class ShopHelpMenuItem(MenuItem):
+    def is_shown(self, request):
+        return ShopHelpView.can_view(request.user)
+
+
+class ShopHelpViewSet(ViewSet):
+    """Shop help (in the main menu, the last of the shop's items): handling orders"""
+
+    name = "shop_help"
+    menu_label = "Shop help"
+    icon = "help"
+    add_to_admin_menu = True
+    menu_item_class = ShopHelpMenuItem
+    menu_order = 535
+
+    def get_urlpatterns(self):
+        return [path("", ShopHelpView.as_view(), name="index")]
+
+
 class ShopSettingsMenuItem(PermissionMenuItem):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, permission="shop.change_shopsettings", **kwargs)
@@ -487,6 +507,11 @@ def register_dispatch_viewset():
 @hooks.register("register_admin_viewset")
 def register_dispatchers_viewset():
     return DispatchersViewSet()
+
+
+@hooks.register("register_admin_viewset")
+def register_shop_help_viewset():
+    return ShopHelpViewSet()
 
 
 def _protected_variants_response(request, variants, obj):

@@ -1504,8 +1504,8 @@ class Product(ClusterableModel):
         default=0,
         verbose_name="Shared stock",
         help_text=(
-            "The number of single items in stock, if the variants share stock (not "
-            "counting items in customers' baskets)."
+            "If the variants share stock: the number of single items still "
+            "available (items in customers' baskets are already taken off)."
         ),
     )
     dispatcher = models.ForeignKey(
@@ -1930,8 +1930,9 @@ class ProductVariant(Orderable):
     stock = models.IntegerField(
         default=1,
         help_text=(
-            "In stock, not counting customers' baskets. Your change is added to the "
-            "current stock when you save, so baskets' changes meanwhile aren't lost."
+            "Still available (items in customers' baskets are already taken off). "
+            "Your change is added to the current stock when you save, so baskets' "
+            "changes meanwhile aren't lost."
         ),
     )
     pack_size = models.PositiveIntegerField(

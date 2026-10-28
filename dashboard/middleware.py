@@ -5,8 +5,8 @@ from wagtail.admin.menu import SubmenuMenuItem, admin_menu
 
 
 # The shop's order pages (menu item names): users whose menu is just these (e.g.
-# Shop managers: Orders and Dispatcher activity) start at the first
-ORDER_PAGES = {"items-to-send", "orders", "dispatcher-activity"}
+# Shop managers: Orders, Dispatcher activity and Shop help) start at the first
+ORDER_PAGES = {"items-to-send", "orders", "dispatcher-activity", "shop-help"}
 
 
 def single_admin_page_url(request):

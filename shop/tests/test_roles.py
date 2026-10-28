@@ -97,7 +97,7 @@ def test_shop_admin_menu(client):
     # (and Dispatcher activity, where they can see the dispatchers, but not
     # change them)
     # (and no Images: they add images from products' pages)
-    assert set(items) == {"orders", "dispatcher-activity", "shop-stock", "shop-admin"}
+    assert set(items) == {"orders", "dispatcher-activity", "shop-help", "shop-stock", "shop-admin"}
     assert items["shop-stock"] == ["categories", "products", "product-variants"]
     assert items["shop-admin"] == [
         "sales",
@@ -110,7 +110,7 @@ def test_shop_admin_menu(client):
 
 
 def test_shop_manager_menu(client):
-    assert set(menu(client, user_in("Shop manager"))) == {"orders", "dispatcher-activity"}
+    assert set(menu(client, user_in("Shop manager"))) == {"orders", "dispatcher-activity", "shop-help"}
 
 
 def test_superuser_menu(client):
@@ -126,6 +126,7 @@ def test_superuser_menu(client):
         "dispatcher-activity",
         "shop-stock",
         "shop-admin",
+        "shop-help",
         "recipe-book",
         "auctions",
         "reports",
@@ -546,3 +547,59 @@ def test_other_plain_menus_start_at_welcome_page(client):
     user.groups.add(group)
     assert {"images", "documents"} <= set(menu(client, user, url=reverse("wagtailimages:index")))
     assert client.get(reverse("wagtailadmin_home")).status_code == 200
+
+
+# Shop help
+
+
+@pytest.mark.parametrize(
+    "group,sections",
+    [
+        ("Shop admins", ["orders", "products", "dispatchers"]),
+        ("Shop manager", ["orders", "dispatchers"]),
+    ],
+)
+def test_shop_help(client, group, sections):
+    # in sections by role: orders (for those who can see them), products and
+    # stock (for those who can change products), and dispatchers' (last); the
+    # contents list just those
+    client.force_login(user_in(group))
+    content = client.get(reverse("shop_help:index")).content.decode()
+    for section in ["orders", "products", "dispatchers"]:
+        assert (f'<h2 class="w-h2 shop-help__group" id="{section}">' in content) == (section in sections)
+        assert (f'href="#{section}"' in content) == (section in sections)
+    headings = re.findall(r'shop-help__group" id="([a-z]+)"', content)
+    assert headings == sections
+    assert f'<a href="{ORDERS_URL}">Orders</a>' in content
+    assert "Items waiting more than 3 days are highlighted." in content
+
+
+def test_shop_help_dispatchers(client):
+    # just their section, without its heading
+    client.force_login(user_in("Dispatchers"))
+    content = client.get(reverse("shop_help:index")).content.decode()
+    assert "w-h2 shop-help__group" not in content
+    assert "For dispatchers" not in content
+    assert '<li><a href="#items-to-send">Your items to send</a></li>' in content
+    assert 'id="marking-sent"' in content
+    assert 'id="statuses"' not in content
+
+
+def test_shop_help_menu(client):
+    # the last of the shop's menu items; dispatchers still start at their items
+    assert list(menu(client, user_in("Dispatchers"), url=reverse("shop_dispatch:index"))) == [
+        "items-to-send",
+        "shop-help",
+    ]
+    client.force_login(user_in("Dispatchers"))
+    assert client.get(reverse("wagtailadmin_home")).url == reverse("shop_dispatch:index")
+
+
+def test_shop_help_not_allowed(client):
+    # an admin user with nothing to do with the shop
+    user = baker.make("auth.User")
+    user.user_permissions.add(Permission.objects.get(codename="access_admin"))
+    client.force_login(user)
+    # (Wagtail sends them to the dashboard)
+    assert client.get(reverse("shop_help:index")).url == reverse("wagtailadmin_home")
+    assert "shop-help" not in menu(client, user, url=reverse("wagtailadmin_home"))

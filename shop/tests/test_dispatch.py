@@ -238,7 +238,7 @@ def test_dispatcher_menu(dispatcher_client):
     page = dispatcher_client.get(URL).content.decode()
     names = re.findall(r'"name": "([a-z-]+)", "label"', page)
     # (and the account menu)
-    assert [name for name in names if name not in ("account", "logout")] == ["items-to-send"]
+    assert [name for name in names if name not in ("account", "logout")] == ["items-to-send", "shop-help"]
 
 
 # Seeing a dispatcher's page (read-only), e.g. from the Dispatchers page

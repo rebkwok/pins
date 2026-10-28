@@ -26,6 +26,7 @@ from .models import (
     OrderItem,
     Product,
     dispatcher_name,
+    is_dispatcher,
 )
 
 User = get_user_model()
@@ -236,3 +237,47 @@ class DispatchersView(WagtailAdminTemplateMixin, TemplateView):
         log(user, activity.DISPATCHER_ADDED)
         messages.success(request, f"{dispatcher_name(user)} is now a dispatcher.")
         return redirect("shop_dispatchers:index")
+
+
+class ShopHelpView(WagtailAdminTemplateMixin, TemplateView):
+    """
+    Shop help, in sections by role: sending items (for dispatchers, and those
+    who handle orders), handling orders (statuses, sending, refunds, disputes;
+    for shop admins and Shop managers: anyone who can see orders), and products
+    and stock (for those who can change products: shop admins)
+    """
+
+    template_name = "shop/admin/help.html"
+    page_title = "Shop help"
+    header_icon = "help"
+
+    @staticmethod
+    def sections(user):
+        """Which sections the user sees: {"dispatch", "orders", "products"}"""
+        from .admin_orders import OrderPermissionPolicy
+
+        orders = OrderPermissionPolicy(Order).user_has_any_permission(user, ["view", "change"])
+        return {
+            "dispatch": orders or is_dispatcher(user),
+            "orders": orders,
+            "products": user.has_perm("shop.change_product"),
+        }
+
+    @classmethod
+    def can_view(cls, user):
+        return any(cls.sections(user).values())
+
+    def dispatch(self, request, *args, **kwargs):
+        if not self.can_view(request.user):
+            raise PermissionDenied
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_breadcrumbs_items(self):
+        return self.breadcrumbs_items + [{"url": "", "label": self.page_title}]
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        show = context["show"] = self.sections(self.request.user)
+        context["dispatcher_only"] = not (show["orders"] or show["products"])
+        context["overdue_days"] = DispatchersView.OVERDUE_DAYS
+        return context
