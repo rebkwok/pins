@@ -24,7 +24,7 @@ it).
     </div>
     <div class="basket-item__price">
         {% if item.extra_rows %}
-            <s class="text-danger">£<span id="subtotal_{{ item.product_id }}">{{ item.subtotal }}</span></s>
+            <s class="shop-was-price">£<span id="subtotal_{{ item.product_id }}">{{ item.subtotal }}</span></s>
         {% endif %}
         £<span id="total_{{ item.product_id }}">{{ item.total }}</span>
     </div>

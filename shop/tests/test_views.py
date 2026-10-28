@@ -670,7 +670,7 @@ def test_get_checkout_view_sale_prices(rf, basket, sale_with_items, freezer):
     )
     request.session = {"BASKET_ID": basket.id}
     content = checkout_view(request).rendered_content
-    assert '<s class="text-danger">£<span id="subtotal_' in content
+    assert '<s class="shop-was-price">£<span id="subtotal_' in content
     assert ">20.00</span></s>" in content
     assert '£<span id="total_' in content and ">16.00</span>" in content
     assert "Sale: 20% off" in content

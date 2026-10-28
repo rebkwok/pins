@@ -50,21 +50,17 @@
     }
 
     function updateInBasket(form) {
-        const variant = form.querySelector("[name=variant_id]");
+        // the variants: the drop-down's options, the one variant's input, or
+        // if it's out of stock, an input for each
+        const variants = [...form.querySelectorAll("[data-in-basket]")];
+        const inBasket = variants.filter((variant) => Number(variant.dataset.inBasket || 0) > 0);
+        const total = inBasket.reduce((sum, variant) => sum + Number(variant.dataset.inBasket), 0);
         let text = "";
-        let total = 0;
-        if (variant && variant.tagName === "SELECT") {
-            const inBasket = [...variant.options].filter(
-                (option) => Number(option.dataset.inBasket || 0) > 0
-            );
-            total = inBasket.reduce((sum, option) => sum + Number(option.dataset.inBasket), 0);
-            if (inBasket.length) {
-                text = "In your basket: " + inBasket
-                    .map((option) => `${option.dataset.name} × ${option.dataset.inBasket}`)
-                    .join(", ");
-            }
-        } else if (variant && Number(variant.dataset.inBasket || 0) > 0) {
-            total = Number(variant.dataset.inBasket);
+        if (variants.length > 1 && inBasket.length) {
+            text = "In your basket: " + inBasket
+                .map((variant) => `${variant.dataset.name} × ${variant.dataset.inBasket}`)
+                .join(", ");
+        } else if (total) {
             text = `${total} in your basket`;
         }
         setNote(form.querySelector(".shop-in-basket"), text);

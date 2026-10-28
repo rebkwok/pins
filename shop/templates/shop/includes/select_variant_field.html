@@ -3,6 +3,10 @@
 {# The variant to add to the basket: a drop-down if there's a choice (with selected_variant_id selected, if given). (Updated by htmx after adding to the basket, see views.add_to_basket, or when more can't be added, see views._variant_options_oob_html.) #}
 {% if product.out_of_stock %}
     <p class="shop-card__stock shop-card__stock--out">Out of stock</p>
+    {# What's in the basket from it, still (no name, so not posted; see quantity_buttons.js) #}
+    {% for variant in product.live_variants %}
+        <input type="hidden" data-in-basket="{% in_basket variant %}" data-name="{{ variant.variant_full_name|default:product.name }}">
+    {% endfor %}
 {% else %}
     {% with variants=product.live_variants %}
         {% if variants|length == 1 %}

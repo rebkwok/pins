@@ -156,6 +156,13 @@ def test_results_summary(client, shop):
     assert '<a href="?category=mugs">Clear the search</a>' in content
 
 
+def test_search_form_searches_every_category(client, shop):
+    # (no hidden category field: a search from a category's page isn't limited to it)
+    content = client.get("/shop/", {"category": "mugs"}).content.decode()
+    form = content.split('role="search"')[1].split("</form>")[0]
+    assert 'name="category"' not in form
+
+
 def test_category_buttons_keep_search(client, shop):
     content = html.unescape(client.get("/shop/", {"q": "o", "category": "mugs"}).content.decode())
     assert re.search(r'href="\?q=o&category=clothing"[^>]*>Clothing', content)

@@ -286,7 +286,10 @@ class Command(BaseCommand):
         return collection
 
     def create_sale(self):
-        start, end = timezone.now() - timedelta(days=1), timezone.now() + timedelta(days=30)
+        # to the minute, as the admin's date picker has no seconds (so editing
+        # the sale doesn't log its dates as changed)
+        now = timezone.now().replace(second=0, microsecond=0)
+        start, end = now - timedelta(days=1), now + timedelta(days=30)
         if Sale.objects.filter(start_date__lt=end, end_date__gt=start).exists():
             self.skipped.append("sale (a sale already exists for these dates)")
             return

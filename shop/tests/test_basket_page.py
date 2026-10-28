@@ -281,6 +281,20 @@ def test_in_basket_on_product_page(basket_client, basket):
     assert f'<p class="shop-in-basket" hidden><a href="{reverse("shop:basket")}"></a></p>' in content
 
 
+def test_in_basket_when_out_of_stock(basket_client, basket):
+    # out of stock (e.g. the last ones are in the basket): no options, but still
+    # what's in the basket, for "In your basket: Small × 2"
+    variant = basket.get_items()[0].product
+    baker.make("shop.ProductVariant", product=variant.product, variant_name="Large", stock=0)
+    variant.stock = 0
+    variant.save()
+    content = get(basket_client, reverse("shop:product_detail", args=(variant.product.id,)))
+    assert "Out of stock" in content
+    assert 'name="variant_id"' not in content
+    assert '<input type="hidden" data-in-basket="2" data-name="Small">' in content
+    assert '<input type="hidden" data-in-basket="0" data-name="Large">' in content
+
+
 # The order status page
 
 

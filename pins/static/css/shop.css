@@ -33,10 +33,13 @@
   text-decoration: underline;
 }
 
-/* #sale banner */
+/* #sale banner, and prices before the sale: in the sale's red */
+:root {
+  --sale: #b3261e;
+}
+
 .shop-sale-banner {
-  background-color: var(--pins-strong);
-  color: var(--dark);
+  background-color: var(--sale);
   text-align: center;
   padding: 12px 0;
   margin-bottom: 12px;
@@ -44,6 +47,8 @@
 
 .shop-sale-banner p {
   margin: 0;
+  /* (the site sets every p's colour, so it isn't inherited) */
+  color: var(--white);
 }
 
 .shop-sale-banner__title {
@@ -418,8 +423,9 @@
   margin: 0;
 }
 
+.shop-was-price,
 .shop-card__price s {
-  color: var(--grey);
+  color: var(--sale);
   margin-right: 4px;
 }
 

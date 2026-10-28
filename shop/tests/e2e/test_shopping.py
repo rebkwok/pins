@@ -1,12 +1,14 @@
 """Browsing the shop, and the basket"""
 
 import re
+from datetime import timedelta
 
 import pytest
 from django.urls import reverse
+from django.utils import timezone
 from playwright.sync_api import expect
 
-from ...models import ProductVariant
+from ...models import ProductVariant, Sale, SaleProduct
 from .conftest import E2E, PHONE, add_to_basket, card, choose_option
 
 pytestmark = E2E
@@ -49,6 +51,24 @@ def test_quantity_limits(page, live_server, shop):
     # another option: its own limit (5), and the quantity is kept
     choose_option(form, "White, M")
     expect(more).to_be_enabled()
+
+
+def test_adding_the_last_ones(page, live_server, shop):
+    # once out of stock, what's in the basket is still shown, and after reloading
+    shop["mug"].variants.update(stock=1)
+    shop["tshirt"].variants.update(stock=0)
+    shop["tshirt"].variants.filter(size="S").update(stock=1)
+    page.goto(f"{live_server.url}/shop/")
+    page.wait_for_load_state()
+    for name, text in [("Podenco mug", "1 in your basket"), ("PINS T-shirt", "In your basket: Black, S × 1")]:
+        product = card(page, name)
+        product.get_by_role("button", name="Add to basket").click()
+        expect(product.get_by_text("Added!")).to_be_visible()
+        expect(product.get_by_text("Out of stock")).to_be_visible()
+        expect(product.locator(".shop-form .shop-in-basket")).to_have_text(text)
+    page.reload()
+    expect(card(page, "Podenco mug").locator(".shop-form .shop-in-basket")).to_have_text("1 in your basket")
+    expect(card(page, "PINS T-shirt").locator(".shop-form .shop-in-basket")).to_have_text("In your basket: Black, S × 1")
 
 
 def test_stock_taken_meanwhile(page, live_server, shop):
@@ -140,3 +160,20 @@ def test_phone(page, live_server, shop):
     choose = card(page, "PINS T-shirt").get_by_role("link", name="Choose options")
     expect(choose).to_have_css("background-color", "rgb(163, 90, 71)")
     expect(card(page, "PINS T-shirt").locator(".shop-in-basket--compact")).to_have_text("1 in your basket")
+
+
+def test_sale(page, live_server, shop):
+    # the banner's white text on the sale's red, and the price before the sale
+    # in red
+    now = timezone.now()
+    sale = Sale.objects.create(
+        name="Sale", banner_title="Sale now on!", banner_content="Discounts across the shop.", banner_include_end=True,
+        start_date=now - timedelta(days=1), end_date=now + timedelta(days=1),
+    )
+    SaleProduct.objects.create(sale=sale, product=shop["mug"], discount=20)
+    page.goto(f"{live_server.url}/shop/")
+    banner = page.locator(".shop-sale-banner")
+    expect(banner).to_have_css("background-color", "rgb(179, 38, 30)")
+    for text in ["Sale now on!", "Discounts across the shop.", "Sale ends on"]:
+        expect(banner.get_by_text(text)).to_have_css("color", "rgb(255, 255, 255)")
+    expect(card(page, "Podenco mug").locator(".shop-card__price s")).to_have_css("color", "rgb(179, 38, 30)")

@@ -165,6 +165,9 @@ def test_seed_shop_sale(seed_settings):
     assert Sale.current_sale() == sale
     assert sale.sale_products.get().product.name == "Podenco mug"
     assert "sale 'Seed sale' (20% off 'Podenco mug')" in output
+    # its dates are to the minute, as in the admin
+    assert sale.start_date.second == sale.start_date.microsecond == 0
+    assert sale.end_date.second == sale.end_date.microsecond == 0
     # not created again
     output = seed("--sale")
     assert Sale.objects.count() == 1
