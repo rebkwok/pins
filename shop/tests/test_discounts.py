@@ -322,7 +322,11 @@ def test_basket_page_code_problem(basket_client, discounted_basket, code):
     code.amount = Decimal("24.80")
     code.save()
     content = html.unescape(basket_client.get(reverse("shop:basket")).content.decode())
-    assert DISCOUNT_CODE_TOO_LITTLE_LEFT in content
+    # (styled as the other discount messages)
+    assert (
+        '<p class="basket-discount__message basket-discount__message--error mb-0">'
+        "Discount cannot be applied to this basket.</p>"
+    ) in content
     assert 'id="total">24.99<' in content
     # it isn't in the totals, so it's shown (with its Remove button) with the reason
     assert "Discount code <strong>PINS5OFF</strong>" in content
@@ -412,11 +416,12 @@ def test_checkout_code_removed(basket_client, discounted_basket, code, method, s
 
 def test_checkout_code_kept(basket_client, discounted_basket, code):
     # the code would leave too little to pay: kept (it applies if the basket
-    # changes), with the reason, and back to the basket
+    # changes), and back to the basket, which says why by the code (so no
+    # message as well)
     DiscountCode.objects.filter(id=code.id).update(amount=Decimal("19.80"))
     resp = basket_client.get(checkout_url())
     assert resp.url == reverse("shop:basket")
-    assert messages_for(resp) == [DISCOUNT_CODE_TOO_LITTLE_LEFT]
+    assert messages_for(resp) == []
     assert Basket.objects.get(id=discounted_basket.id).discount_code == code
 
 

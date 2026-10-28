@@ -35,8 +35,8 @@ from ..views import (
 Basket = get_salesman_model("Basket")
 
 COLLECT_NOTE = (
-    "Only choose this if you have contacted PINS and confirmed that you can "
-    "collect your order in person."
+    "Not available for most items. Only choose this if you have contacted PINS "
+    "and confirmed that you can collect all items in your order in person."
 )
 Order = get_salesman_model("Order")
 
@@ -225,7 +225,7 @@ def test_basket_view(rf, basket, product):
     # delivery is shown first
     assert resp.context_data["shipping_methods"] == [
         ("deliver", "Delivery", ""),
-        ("collect", "Collect in person", COLLECT_NOTE),
+        ("collect", "Collect in person (prior arrangement only)", COLLECT_NOTE),
     ]
     # the basket's method (collect) is selected, and the total has no
     # shipping cost
@@ -238,8 +238,8 @@ def test_basket_view(rf, basket, product):
     # changing the method updates the basket
     assert f'hx-post="{reverse("shop:update_shipping_method")}"' in content
     # the note is shown with the collection option
-    assert "Collect in person" in content
-    assert COLLECT_NOTE in content
+    assert '<label class="form-check-label" for="id_collect">Collect in person (prior arrangement only)</label>' in content
+    assert f'<div class="basket-options__help basket-options__warning">{COLLECT_NOTE}</div>' in content
     # basket items are converted to a dict keyed by product, with product type and category added
     assert list(resp.context_data["basket"]["items"].keys()) == [product.identifier]
     item = resp.context_data["basket"]["items"][product.identifier][0]
@@ -488,7 +488,26 @@ def test_update_quantity_checks_stock(rf, basket, new_quantity, updated, expecte
         assert "Basket updated" in resp.content.decode()
     else:
         assert basket.quantity == 2
-        assert "Quantity requested is not available" in resp.content.decode()
+        content = resp.content.decode()
+        assert "Quantity requested is not available" in content
+        # the quantity field back to the item's quantity (e.g. if it was typed),
+        # with the most it can be: the stock and what's in the basket
+        assert (
+            f'<input type="number" min="1" inputmode="numeric" class="form-control quantity" '
+            f'aria-label="Quantity" id="id_quantity_{variant.id}" name="quantity" value="2" max="5">'
+        ) in content
+
+
+def test_update_quantity_unchanged(rf, basket):
+    # e.g. the second of the item's update posts for one change: the page is
+    # left as it is (so "Basket updated" isn't cleared)
+    basket_item = basket.items.first()
+    data = {"quantity": 2, "variant_id": basket_item.product.id}
+    request = rf.post(reverse("shop:update_quantity", args=(basket_item.ref,)), data=data)
+    request.session = {"BASKET_ID": basket.id}
+    resp = update_quantity(request, basket_item.ref)
+    assert resp.status_code == 200
+    assert resp.content == b""
 
 
 def test_update_quantity_wrong_variant(rf, basket, product):

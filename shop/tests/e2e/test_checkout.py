@@ -57,7 +57,7 @@ def test_delivery_order(page, live_server, shop, stripe):
 def test_collection_and_other_country(page, live_server, shop, stripe):
     add_to_basket(page, live_server, shop["mug"])
     page.goto(f"{live_server.url}/shop/basket/")
-    page.get_by_label("Collect in person").check()
+    page.get_by_label("Collect in person (prior arrangement only)").check()
     expect(page.locator("#total")).to_have_text("10.00")
     page.get_by_role("button", name="Checkout").click()
     # no address for collection

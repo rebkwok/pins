@@ -87,11 +87,14 @@ SHIPPING_NONE = "none"
 # delivery is the default
 SHIPPING_METHODS = {SHIPPING_DELIVER: "Delivery", SHIPPING_COLLECT: "Collect in person"}
 SHIPPING_METHOD_CHOICES = {**SHIPPING_METHODS, SHIPPING_NONE: "No shipping needed"}
-# Shown with the shipping method options in the basket
+# The basket's labels for the shipping methods, where they differ
+SHIPPING_METHOD_BASKET_LABELS = {SHIPPING_COLLECT: "Collect in person (prior arrangement only)"}
+# Warnings shown with the shipping method options in the basket
 SHIPPING_METHOD_NOTES = {
     SHIPPING_COLLECT: (
-        "Only choose this if you have contacted PINS and confirmed that you can "
-        "collect your order in person."
+        "Not available for most items. Only choose this if you have contacted "
+        "PINS and confirmed that you can collect all items in your order in "
+        "person."
     ),
 }
 
@@ -2356,10 +2359,9 @@ DISCOUNT_CODE_USED = "Discount code already used."
 # (A code being paid for in another basket; it may become valid again if that
 # payment is cancelled)
 DISCOUNT_CODE_IN_USE = "Discount code is no longer valid."
-DISCOUNT_CODE_TOO_LITTLE_LEFT = (
-    "Discount code can't be used: it would leave less than £0.30 to pay "
-    "(the minimum card payment)."
-)
+# (It would leave less than a card payment's minimum to pay; rare, and a
+# customer who's used a code to pay nothing wouldn't expect it, so not explained)
+DISCOUNT_CODE_TOO_LITTLE_LEFT = "Discount cannot be applied to this basket."
 
 
 class DiscountCode(models.Model):

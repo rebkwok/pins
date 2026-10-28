@@ -96,13 +96,64 @@ def test_basket(page, live_server, shop):
     expect(page.locator(".basket-item")).to_have_count(1)
     expect(total).to_have_text("14.99")
     # collection: no shipping cost, and the choice is kept on reloading
-    page.get_by_label("Collect in person").check()
+    page.get_by_label("Collect in person (prior arrangement only)").check()
     expect(total).to_have_text("10.00")
     page.reload()
-    expect(page.get_by_label("Collect in person")).to_be_checked()
+    expect(page.get_by_label("Collect in person (prior arrangement only)")).to_be_checked()
     # removing the last item: the empty basket
     page.locator(".basket-item").get_by_role("button", name=re.compile("Remove")).click()
     expect(page.get_by_text("Your basket is empty.")).to_be_visible()
+
+
+def test_basket_quick_clicks(page, live_server, shop):
+    # pressing + quickly: the item's requests run in turn, one update for each
+    # change, and the basket ends up right
+    add_to_basket(page, live_server, shop["mug"])
+    add_to_basket(page, live_server, shop["raffle"])
+    page.goto(f"{live_server.url}/shop/basket/")
+    page.wait_for_load_state()
+    updates = []
+    page.on("request", lambda request: "/update/" in request.url and updates.append(request.url))
+    mug = page.locator(".basket-item", has_text="Podenco mug")
+    for _ in range(3):
+        mug.get_by_role("button", name="More").click()
+    # 4 x £10 + £2, with £4.99 delivery
+    expect(page.locator("#total")).to_have_text("46.99")
+    assert len(updates) == 3
+    page.locator(".basket-item", has_text="Raffle ticket").get_by_role("button", name=re.compile("Remove")).click()
+    expect(page.locator(".basket-item")).to_have_count(1)
+    page.reload()
+    expect(mug.get_by_label("Quantity")).to_have_value("4")
+    expect(page.locator("#total")).to_have_text("44.99")
+
+
+def test_basket_typed_quantity(page, live_server, shop):
+    add_to_basket(page, live_server, shop["mug"])
+    page.goto(f"{live_server.url}/shop/basket/")
+    page.wait_for_load_state()
+    total = page.locator("#total")
+    quantity = page.locator(".basket-item").get_by_label("Quantity")
+    # Enter updates the item to the typed quantity (and doesn't remove it)
+    quantity.fill("3")
+    quantity.press("Enter")
+    expect(total).to_have_text("34.99")
+    expect(page.get_by_text("Basket updated")).to_be_visible()
+    page.reload()
+    expect(quantity).to_have_value("3")
+    # as does leaving the field
+    quantity.fill("2")
+    quantity.press("Tab")
+    expect(total).to_have_text("24.99")
+    # more than there is: the most there is (5)
+    quantity.fill("9")
+    expect(quantity).to_have_value("5")
+    quantity.press("Enter")
+    expect(total).to_have_text("54.99")
+    # not a quantity: back to the item's
+    quantity.fill("0")
+    quantity.press("Enter")
+    expect(quantity).to_have_value("5")
+    expect(page.locator(".basket-item")).to_have_count(1)
 
 
 # (a short window, so the basket page scrolls)

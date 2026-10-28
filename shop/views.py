@@ -26,6 +26,7 @@ from .models import (
     DISCOUNT_CODE_USED,
     SHIPPING_COLLECT,
     SHIPPING_DELIVER,
+    SHIPPING_METHOD_BASKET_LABELS,
     SHIPPING_METHOD_CHOICES,
     SHIPPING_METHOD_NOTES,
     SHIPPING_METHODS,
@@ -484,8 +485,10 @@ def update_quantity(request, ref):
     current_quantity = item.quantity
 
     if current_quantity == new_quantity:
-        # nothing to do
-        result_html = f"<div id='updated_{variant_id}' class='alert-info' hx-swap-oob='true'></div>"
+        # nothing to do, and the page is left as it is: each of the item's
+        # update inputs posts (see basket_item.html), so this may be the second
+        # post of one change, which would otherwise clear "Basket updated"
+        result_html = ""
     else:
         with transaction.atomic():
             # Lock the variant and its product (whose stock it may share) until
@@ -506,9 +509,21 @@ def update_quantity(request, ref):
                 item.save(update_fields=["quantity", "date_updated"])
 
         if not can_update:
+            # (and the quantity field back to the item's quantity, e.g. when
+            # one was typed)
+            quantity_html = render_to_string(
+                "shop/includes/quantity_field.html",
+                {
+                    "form_id": variant_id,
+                    "value": current_quantity,
+                    "max_value": _max_quantity(request, variant, in_basket=True),
+                },
+                request,
+            )
             result_html = (
                 f"<div id='updated_{variant_id}' class='alert-danger' hx-swap-oob='true'>"
                 "Quantity requested is not available</div>"
+                f"<span id='id_quantity_wrapper_{variant_id}' hx-swap-oob='true'>{quantity_html}</span>"
             )
         else:
             basket_data = serialize_basket(request, basket)
@@ -694,18 +709,17 @@ def get_discount_context(basket):
 
 def _discount_problem_redirect(request, basket):
     """
-    Back to the basket, saying why its discount code doesn't apply. A code that
-    isn't valid (invalid, disabled, used, or being paid for in another basket) is
-    removed; one that would leave too little to pay is kept, as it applies if the
-    basket changes, with the reason shown on the basket.
+    Back to the basket, as its discount code doesn't apply. A code that isn't
+    valid (invalid, disabled, used, or being paid for in another basket) is
+    removed, saying why; one that would leave too little to pay is kept, as it
+    applies if the basket changes, and the basket shows why by the code (so
+    there's no message).
     """
     problem = basket.discount_problem
     if problem in (DISCOUNT_CODE_INVALID, DISCOUNT_CODE_USED, DISCOUNT_CODE_IN_USE):
         code = basket.extra.get(basket.DISCOUNT_CODE_KEY)
         basket.set_discount_code(None)
         messages.error(request, f"Discount code {code} removed: {problem}")
-    else:
-        messages.error(request, problem)
     return HttpResponseRedirect(reverse("shop:basket"))
 
 
@@ -805,7 +819,11 @@ def get_checkout_options_context(request, basket):
     requires_shipping = basket is not None and basket.requires_shipping
     shipping_methods = (
         [
-            (method, label, SHIPPING_METHOD_NOTES.get(method, ""))
+            (
+                method,
+                SHIPPING_METHOD_BASKET_LABELS.get(method, label),
+                SHIPPING_METHOD_NOTES.get(method, ""),
+            )
             for method, label in SHIPPING_METHODS.items()
         ]
         if requires_shipping

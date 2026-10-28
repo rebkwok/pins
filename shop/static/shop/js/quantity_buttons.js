@@ -96,4 +96,34 @@
             update(event.target.closest(".input-group.quantity"));
         }
     });
+
+    // In the basket, a typed quantity: update the item with it (as the -/+
+    // buttons do; the server checks the stock), on Enter or leaving the
+    // field. (Enter would otherwise submit the form with its first button,
+    // Remove.) Not a whole number from 1: back to the item's quantity.
+    function updateTyped(input) {
+        const value = Number(input.value);
+        if (!Number.isInteger(value) || value < 1) {
+            input.value = input.defaultValue;
+            update(input.closest(".input-group.quantity"));
+            return;
+        }
+        if (input.value === input.defaultValue) {
+            return;
+        }
+        input.defaultValue = input.value;
+        htmx.trigger(document.body, `quantity-changed-${input.id.replace("id_quantity_", "")}`);
+    }
+
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" && event.target.matches(".basket-item__controls input.quantity")) {
+            event.preventDefault();
+            updateTyped(event.target);
+        }
+    });
+    document.addEventListener("change", function (event) {
+        if (event.target.matches(".basket-item__controls input.quantity")) {
+            updateTyped(event.target);
+        }
+    });
 })();

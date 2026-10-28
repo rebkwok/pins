@@ -201,6 +201,15 @@
 
 .form-control.quantity {
   width: 50px;
+  /* no up/down arrows: the -/+ buttons do that */
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.form-control.quantity::-webkit-outer-spin-button,
+.form-control.quantity::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* Hero image area */
@@ -874,6 +883,10 @@
 .basket-options__help {
   font-size: 0.9rem;
   color: #666;
+}
+
+.basket-options__help.basket-options__warning {
+  color: #842029;
 }
 
 .basket-options .form-check {

@@ -34,12 +34,12 @@ it).
             <div class="input-group quantity">
                 <button
                     type="button"
-                    id="id_dec_wrapper_{{ item.product_id }}"
                     class="btn btn-outline-secondary"
                     aria-label="Fewer"
                     hx-trigger="click"
                     hx-target="#id_quantity_wrapper_{{ item.product_id }}"
                     hx-get="{% url 'shop:decrease_quantity' item.product_id %}?ref=basket&variant_id={{ item.product_id }}"
+                    hx-sync="closest form:queue all"
                     hx-include="[id='id_quantity_{{ item.product_id }}']"
                 >-</button>
                 <span id="id_quantity_wrapper_{{ item.product_id }}">
@@ -47,27 +47,21 @@ it).
                 </span>
                 <button
                     type="button"
-                    id="id_inc_wrapper_{{ item.product_id }}"
                     class="btn btn-outline-secondary"
                     aria-label="More"
                     hx-trigger="click"
                     hx-target="#id_quantity_wrapper_{{ item.product_id }}"
                     hx-get="{% url 'shop:increase_quantity' item.product_id %}?ref=basket&variant_id={{ item.product_id }}"
+                    hx-sync="closest form:queue all"
                     hx-include="[id='id_quantity_{{ item.product_id }}']"
                 >+</button>
             </div>
-            {# (outside the input group, so the + button keeps its rounded corners) #}
+            {# Posts the new quantity, after the -/+ buttons' (or a typed quantity, see quantity_buttons.js). The item's requests run one at a time, in order (hx-sync on the form). (Outside the input group, so the + button keeps its rounded corners.) #}
             <input type="hidden"
                 value="Update"
                 hx-post="{% url 'shop:update_quantity' item.ref %}"
                 hx-trigger="quantity-changed-{{ item.product_id }} from:body"
-                hx-sync="#id_inc_wrapper_{{ item.product_id }}:queue first"
-            >
-            <input type="hidden"
-                value="Update"
-                hx-post="{% url 'shop:update_quantity' item.ref %}"
-                hx-trigger="quantity-changed-{{ item.product_id }} from:body"
-                hx-sync="#id_dec_wrapper_{{ item.product_id }}:queue first"
+                hx-sync="closest form:queue all"
             >
             <button type="submit"
                 class="btn basket-item__remove"
@@ -75,6 +69,7 @@ it).
                 aria-label="Remove {{ item.product.name }}"
                 hx-post="{% url 'shop:delete_basket_item' item.ref %}"
                 hx-trigger="click"
+                hx-sync="closest form:queue all"
             >
                 <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
             </button>
