@@ -283,34 +283,37 @@ figure img {
   font-size: 1.375rem;
 }
 
-.alert {
-  margin: 40px auto 0;
-  max-width: 1400px;
-  border-radius: 0;
-  background-color: rgba(207, 148, 131, 0.2);
-  color: var(--dark);
-  padding: 40px;
+/* The site's messages (includes/messages.html): cards on the cream, with a bar
+   in the message level's colour; the text stays dark */
+.site-messages {
+  margin-top: 20px;
+  margin-bottom: 10px;
 }
 
-.alert>.alert__title {
-  color: var(--white);
-  font-family: var(--font--primary);
-  font-size: 1.625rem;
-  margin-bottom: 5px;
-}
-
-.alert__messages {
-  list-style-type: none;
+.site-messages__list {
+  list-style: none;
   margin: 0;
-  padding-left: 0;
+  padding: 0;
 }
 
-.alert__messages>li.success {
-  color: green;
+.site-message {
+  background-color: var(--cream);
+  border-left: 5px solid var(--pins-strong);
+  border-radius: 4px;
+  color: var(--dark);
+  padding: 12px 16px;
 }
 
-.alert__messages>li.error {
-  color: darkred;
+.site-message + .site-message {
+  margin-top: 8px;
+}
+
+.site-message--error {
+  border-left-color: #a12622;
+}
+
+.site-message--warning {
+  border-left-color: var(--orange);
 }
 
 /* Hero image area */
@@ -2543,7 +2546,12 @@ div.info-text li {
   margin: 0 0 0 30px;
 }
 
-button.account-nav-button {
+/* Login and Account, in the header: in PINS's colour (the Login link too) */
+/* (the Login link: more specific than the menu's other links) */
+.account-nav-button,
+.navigation__items>li>a.account-nav-button,
+.navigation__items>li>a.account-nav-button:hover,
+.navigation__items>li>a.account-nav-button:focus {
   background-color: transparent;
   border: none;
   color: var(--pins-strong);
@@ -2551,7 +2559,7 @@ button.account-nav-button {
 }
 
 @media (min-width: 1150px) {
-  .dropdown-item.account-nav-button {
+  .navigation__items>li>a.account-nav-button {
     margin-left: 20px;
   }
 }

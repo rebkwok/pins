@@ -187,6 +187,9 @@ Required unless a default is given.
   minimum, to match Stripe Checkout's minimum session length; under 24 hours)
 - `HIDE_SEARCH`, `HIDE_BREADCRUMBS`: hide the header's search box and the
   breadcrumbs (default False)
+- `SHOW_LOGIN`: show the header's Login link (default False: only auctions
+  need users to log in; logged-in users always see the Account menu, and
+  /login/ still works)
 
 **Other parts of the site**
 - Facebook (dog albums): `FB_APP_ID`, `FB_APP_SECRET`, `FB_ACCESS_TOKEN` (a

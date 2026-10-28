@@ -1,8 +1,9 @@
+{# The site's messages (e.g. "Successfully signed in"): each a card, with a bar in its level's colour (main-v1.3.css) #}
 {% if messages %}
-    <div class="alert">
-        <ul class="alert__messages">
+    <div class="container site-messages" role="status">
+        <ul class="site-messages__list">
             {% for message in messages %}
-                <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+                <li class="site-message site-message--{{ message.level_tag|default:'info' }}">{{ message }}</li>
             {% endfor %}
         </ul>
     </div>

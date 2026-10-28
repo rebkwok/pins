@@ -5,4 +5,5 @@ def home(request):
     return {
         "hide_search": settings.HIDE_SEARCH,
         "hide_breadcrumbs": settings.HIDE_BREADCRUMBS,
+        "show_login": settings.SHOW_LOGIN,
     }

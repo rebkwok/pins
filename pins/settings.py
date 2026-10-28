@@ -590,6 +590,9 @@ RECIPE_SUBMISSIONS_OPEN=env.bool("RECIPE_SUBMISSIONS_OPEN", default=False)
 # Hide the site search box and breadcrumbs
 HIDE_SEARCH = env.bool("HIDE_SEARCH", default=False)
 HIDE_BREADCRUMBS = env.bool("HIDE_BREADCRUMBS", default=False)
+# The header's Login link: off, as only auctions need users to log in (users
+# who are logged in still see the Account menu; /login/ still works)
+SHOW_LOGIN = env.bool("SHOW_LOGIN", default=False)
 
 
 # Image uploads
