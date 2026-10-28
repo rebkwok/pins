@@ -2179,6 +2179,12 @@ class NotifyAddressesWarningPanel(MessagePanel):
             return None if self.instance.notify_email_addresses else NO_NOTIFY_ADDRESSES_WARNING
 
 
+DEFAULT_EMAIL_FOOTER = (
+    "Podencos In Need (PINS)\n"
+    "All proceeds from the shop support PINS's work. Thank you for your support!"
+)
+
+
 @register_setting(icon="cogs")
 class ShopSettings(BaseGenericSetting):
     notify_email_addresses = models.CharField(
@@ -2201,11 +2207,20 @@ class ShopSettings(BaseGenericSetting):
             "dispatchers) go."
         ),
     )
+    email_footer = models.TextField(
+        blank=True,
+        default=DEFAULT_EMAIL_FOOTER,
+        help_text=(
+            "At the end of the shop's emails to customers: e.g. the charity's "
+            "name and registered charity number."
+        ),
+    )
 
     panels = [
         NotifyAddressesWarningPanel(),
         FieldPanel("notify_email_addresses"),
         FieldPanel("reply_to"),
+        FieldPanel("email_footer"),
     ]
 
     class Meta:

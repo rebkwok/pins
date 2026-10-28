@@ -112,8 +112,8 @@ def test_order_nothing_to_ship_completed(shop_variants, django_capture_on_commit
     assert order.status == OrderStatus.COMPLETED
     # one email (the order received email), saying it's complete
     (email,) = mail.outbox
-    assert email.subject == f"Order '{order.ref}' has been received"
-    assert "Your order is complete." in email.body
+    assert email.subject == f"PINS shop order {order.ref} has been received"
+    assert "Thank you for your order! It's complete: nothing needs sending." in email.body
 
 
 @pytest.mark.parametrize("status", [OrderStatus.HOLD, OrderStatus.CREATED])
@@ -148,9 +148,9 @@ def test_ship_some_items(shop_variants, dispatcher, freezer, django_capture_on_c
     assert order.status == OrderStatus.PARTIALLY_SHIPPED
     (email,) = mail.outbox
     assert email.to == ["c@test.com"]
-    assert email.subject == f"Part of order '{order.ref}' has been shipped"
+    assert email.subject == f"PINS shop order {order.ref} has been partly shipped"
     assert email.body.startswith(
-        "These items from your order have been shipped:\n"
+        f"These items from order {order.ref} have been shipped:\n"
         "- 2 x Test Product - Mug\n"
         "\n"
         "Still to be shipped:\n"
@@ -170,8 +170,17 @@ def test_ship_rest_of_items(shop_variants, dispatcher, django_capture_on_commit_
     # shipped, not completed (completed is set by hand)
     assert order.status == OrderStatus.SHIPPED
     (email,) = mail.outbox
-    assert email.subject == f"Order '{order.ref}' has been shipped"
-    assert "- 2 x Card" in email.body
+    assert email.subject == f"PINS shop order {order.ref} has been shipped"
+    # what's been shipped now, and before (so it's clear the order is complete)
+    assert email.body.startswith(
+        f"These items from order {order.ref} have been shipped:\n"
+        "- 2 x Card\n"
+        "\n"
+        "These items had already been shipped:\n"
+        "- 2 x Test Product - Mug\n"
+        "\n"
+        "View the status of your order: https://"
+    )
     assert "Still to be" not in email.body
 
 
@@ -193,8 +202,8 @@ def test_collect_items(shop_variants, dispatcher, django_capture_on_commit_callb
     order.refresh_from_db()
     assert order.status == OrderStatus.PARTIALLY_SHIPPED
     (email,) = mail.outbox
-    assert email.subject == f"Part of order '{order.ref}' has been collected"
-    assert "These items from your order have been collected:" in email.body
+    assert email.subject == f"PINS shop order {order.ref} has been partly collected"
+    assert f"These items from order {order.ref} have been collected:" in email.body
     assert "Still to be collected:" in email.body
 
 
@@ -460,14 +469,15 @@ def test_dispatcher_emailed_about_paid_order(
 ):
     order = paid_order(shop_variants, django_capture_on_commit_callbacks)
     (email,) = emails_to("ann@test.com")
-    assert email.subject == f"Shop order '{order.ref}': items to send"
+    assert email.subject == f"PINS shop order {order.ref}: items to send"
     # only their items (not the card, which has no dispatcher, or the raffle
     # ticket, which isn't shipped)
     assert email.body == (
-        f"Shop order '{order.ref}' has items for you to send:\n"
+        f"PINS shop order {order.ref} has items for you to send:\n"
         "- 2 x Test Product - Mug\n"
         "\n"
         "Customer: Cat (c@test.com)\n"
+        "\n"
         "Shipping address:\n"
         "1 Road\n"
         "Town\n"
@@ -482,8 +492,12 @@ def test_dispatcher_emailed_about_collection(
 ):
     order = paid_order(shop_variants, django_capture_on_commit_callbacks, shipping_method="collect")
     (email,) = emails_to("ann@test.com")
-    assert email.subject == f"Shop order '{order.ref}': items to hand over"
-    assert "has items for you to hand over (for collection):" in email.body
+    assert email.subject == f"PINS shop order {order.ref}: items to be collected"
+    assert f"PINS shop order {order.ref} has items to be collected from you:" in email.body
+    assert (
+        "Mark the items as collected once they've been picked up: "
+        "https://podencosinneed.org/admin/shop/dispatch/"
+    ) in email.body
     assert "Shipping method: Collect in person\n" in email.body
     assert email.body.endswith("https://podencosinneed.org/admin/shop/dispatch/")
 
@@ -524,9 +538,9 @@ def test_dispatcher_email_failure_logged(
     def fail(self, *args, **kwargs):
         raise SMTPException("Down")
 
-    monkeypatch.setattr("django.core.mail.EmailMessage.send", fail)
+    monkeypatch.setattr("django.core.mail.EmailMultiAlternatives.send", fail)
     order = paid_order(shop_variants, django_capture_on_commit_callbacks)
-    assert f"Error sending email 'Shop order '{order.ref}': items to send'" in caplog.text
+    assert f"Error sending email 'PINS shop order {order.ref}: items to send'" in caplog.text
 
 
 def test_notify_dispatcher_needs_dispatcher(product, dispatcher):
@@ -566,19 +580,20 @@ def test_shop_new_order_email(
     # (processing, but no payment recorded, e.g. in the admin)
     order = paid_order(shop_variants, django_capture_on_commit_callbacks)
     email = shop_email()
-    assert email.subject == f"New shop order '{order.ref}'"
+    assert email.subject == f"PINS shop order {order.ref}: new order"
     assert email.body == (
-        f"A new shop order '{order.ref}' has been received (not paid).\n"
+        f"A new shop order {order.ref} has been received (not paid).\n"
         "Some items' dispatchers haven't been emailed (or there isn't one): please pass these on.\n"
         "\n"
         "Customer: Cat (c@test.com)\n"
         "Shipping method: Delivery\n"
+        "\n"
         "Shipping address:\n"
         "1 Road\n"
         "Town\n"
         "\n"
         "Items:\n"
-        "- 2 x Test Product - Mug: Ann Smith (emailed)\n"
+        "- 2 x Test Product - Mug: to be sent by Ann Smith (emailed)\n"
         "- 2 x Card: no dispatcher\n"
         "- 2 x Raffle ticket: no shipping needed\n"
         "\n"
@@ -586,6 +601,12 @@ def test_shop_new_order_email(
         "\n"
         f"View the order: https://podencosinneed.org/admin/shop/orders/{order.pk}/"
     )
+    # the HTML version: the dispatcher's name in bold, and the logo
+    html = email.alternatives[0].content
+    assert "to be sent by <strong>Ann Smith</strong> (emailed)" in html
+    assert 'src="https://podencosinneed.org/static/images/logo.png"' in html
+    # (the footer is only for customers)
+    assert "All proceeds" not in html
 
 
 def test_shop_new_order_email_paid_all_emailed(
@@ -603,9 +624,10 @@ def test_shop_new_order_email_paid_all_emailed(
     with django_capture_on_commit_callbacks(execute=True):
         order = Order.objects.create_from_basket(basket, None, status=OrderStatus.PROCESSING)
     body = shop_email().body
-    assert body.startswith(f"A new shop order '{order.ref}' has been received (paid).\n\n")
+    assert body.startswith(f"A new shop order {order.ref} has been received (paid).\n\n")
     assert "please pass these on" not in body
     assert "Shipping method: Collect in person\n\nItems:" in body
+    assert "- 1 x Test Product - Mug: to be collected from Ann Smith (emailed)" in body
     # the mug (£10) is free
     assert "Discount code: FREE (-£10.00)\nTotal: £0.00 (including discount)" in body
 
@@ -615,10 +637,92 @@ def test_shop_new_order_email_awaiting_payment(
 ):
     order = paid_order(shop_variants, django_capture_on_commit_callbacks, status=OrderStatus.HOLD)
     body = shop_email().body
-    assert body.startswith(f"A new shop order '{order.ref}' has been received (awaiting payment).")
+    assert body.startswith(f"A new shop order {order.ref} has been received (awaiting payment).")
     # Ann isn't emailed about this product
-    assert "- 2 x Test Product - Mug: Ann Smith (not emailed)" in body
+    assert "- 2 x Test Product - Mug: to be sent by Ann Smith (not emailed)" in body
     assert "please pass these on" in body
+
+
+# The customer's emails
+
+
+def test_customer_order_email(shop_variants, django_capture_on_commit_callbacks):
+    # what they ordered, the total, the order's status page, and the footer
+    order = paid_order(shop_variants, django_capture_on_commit_callbacks)
+    (email,) = emails_to("c@test.com")
+    assert email.subject == f"PINS shop order {order.ref} has been received"
+    assert email.body == (
+        "Thank you for your order! It's being processed, and we'll email you when "
+        "the items are sent.\n"
+        "\n"
+        "Items:\n"
+        "- 2 x Test Product - Mug\n"
+        "- 2 x Card\n"
+        "- 2 x Raffle ticket\n"
+        "\n"
+        f"Total: £{order.total:.2f}\n"
+        "\n"
+        f"View the status of your order: https://podencosinneed.org/shop/order/{order.token}/\n"
+        "\n"
+        "--\n"
+        "Podencos In Need (PINS)\n"
+        "All proceeds from the shop support PINS's work. Thank you for your support!"
+    )
+    # the HTML version: the logo, the items, the link and the footer
+    html = email.alternatives[0].content
+    assert 'src="https://podencosinneed.org/static/images/logo.png"' in html
+    assert "<li>2 x Test Product - Mug</li>" in html
+    assert f'<a href="https://podencosinneed.org/shop/order/{order.token}/"' in html
+    assert "Podencos In Need (PINS)<br>All proceeds from the shop support PINS&#x27;s work." in html
+
+
+def test_customer_order_email_collection(shop_variants, django_capture_on_commit_callbacks):
+    paid_order(shop_variants, django_capture_on_commit_callbacks, shipping_method="collect")
+    (email,) = emails_to("c@test.com")
+    assert email.body.startswith(
+        "Thank you for your order! It's being processed.\n"
+        "\n"
+        "This order is to be collected by prior arrangement with PINS. Please "
+        "contact PINS to confirm when it will be ready and where to collect it.\n"
+        "\n"
+        "Items:"
+    )
+
+
+def test_customer_paid_email_collection(shop_variants, django_capture_on_commit_callbacks):
+    # paid after it was placed: how to collect it
+    order = paid_order(
+        shop_variants, django_capture_on_commit_callbacks, shipping_method="collect", status=OrderStatus.HOLD
+    )
+    (email,) = emails_to("c@test.com")
+    assert "collected by prior arrangement" not in email.body
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        order.status = OrderStatus.PROCESSING
+        order.save()
+    (email,) = emails_to("c@test.com")
+    assert email.subject == f"PINS shop order {order.ref} is being processed"
+    assert email.body.startswith(
+        f"Payment for order {order.ref} has been received, and it's being processed.\n"
+        "\n"
+        "This order is to be collected by prior arrangement with PINS."
+    )
+
+
+def test_customer_email_footer_from_settings(shop_variants, django_capture_on_commit_callbacks):
+    # the footer from Shop settings (e.g. with the charity number), or none
+    settings = baker.make("shop.ShopSettings", email_footer="PINS\nCharity number 123")
+    paid_order(shop_variants, django_capture_on_commit_callbacks)
+    (email,) = emails_to("c@test.com")
+    assert email.body.endswith("\n\n--\nPINS\nCharity number 123")
+    assert "PINS<br>Charity number 123" in email.alternatives[0].content
+    settings.email_footer = ""
+    settings.save()
+    mail.outbox.clear()
+    paid_order(shop_variants, django_capture_on_commit_callbacks)
+    (email,) = emails_to("c@test.com")
+    assert "--" not in email.body
+    assert "Charity number" not in email.alternatives[0].content
 
 
 # Changing a product's dispatcher

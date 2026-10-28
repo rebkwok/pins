@@ -637,7 +637,7 @@ def test_complete_order(
         f"Order {order.ref} is completed, and the customer has been emailed."
     ]
     (email,) = mail.outbox
-    assert email.subject == f"Order '{order.ref}' is completed"
+    assert email.subject == f"PINS shop order {order.ref} is complete"
 
 
 def test_complete_not_allowed(admin_client, shop_variants):
@@ -738,7 +738,7 @@ def test_shipped_email_ignores_items_not_sent(shop_variants, dispatcher, django_
     with django_capture_on_commit_callbacks(execute=True):
         order.mark_items_shipped(order.items.all(), dispatcher)
     (email,) = mail.outbox
-    assert email.subject == f"Order '{order.ref}' has been shipped"
+    assert email.subject == f"PINS shop order {order.ref} has been shipped"
     assert "Card" not in email.body
 
 

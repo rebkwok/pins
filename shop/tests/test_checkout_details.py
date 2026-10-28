@@ -14,7 +14,8 @@ from salesman.core.utils import get_salesman_model
 
 from ..forms import UK_ONLY_NOTE, CheckoutForm, tidy_uk_postcode
 from ..models import UK
-from ..signals import OUTSIDE_UK_WARNING, customer_details_lines
+from ..emails import Paragraph
+from ..signals import OUTSIDE_UK_WARNING, customer_details_blocks
 from ..views import checkout_view
 
 pytestmark = pytest.mark.django_db
@@ -201,15 +202,17 @@ def delivered_order(order):
 
 
 def test_email_details(delivered_order):
-    assert customer_details_lines(delivered_order) == [
+    assert [block.as_text() for block in customer_details_blocks(delivered_order)] == [
         "Mobile number: 07700 900123",
-        "Shipping address:",
-        "1 Rue\nParis\nFrance",
-        OUTSIDE_UK_WARNING,
+        "Shipping address:\n1 Rue\nParis\nFrance",
+        "OUTSIDE THE UK: check that shipping has been pre-arranged with the customer "
+        "and any extra costs have been paid before shipping.",
         "Safe place: Porch",
     ]
+    # (the warning in bold)
+    assert customer_details_blocks(delivered_order)[2].as_html() == f"<strong>{OUTSIDE_UK_WARNING}</strong>"
     delivered_order.shipping_method = "collect"
-    assert customer_details_lines(delivered_order) == ["Mobile number: 07700 900123"]
+    assert customer_details_blocks(delivered_order) == [Paragraph("Mobile number: 07700 900123")]
 
 
 def test_admin_order_page(client, delivered_order):

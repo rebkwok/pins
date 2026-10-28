@@ -110,7 +110,7 @@ def test_refund_order(admin_client, paid_order, requests_mock, django_capture_on
     # the customer is emailed
     (email,) = mail.outbox
     assert email.to == ["customer@test.com"]
-    assert email.subject == f"Order '{paid_order.ref}' has been refunded"
+    assert email.subject == f"PINS shop order {paid_order.ref} has been refunded"
     assert (
         "We have refunded £20.00 to the card (or other payment method) you used for "
         "this order. It can take 5-10 working days to appear on your statement."
@@ -188,7 +188,7 @@ def test_webhook_partial_refund_email(
     paid_order.refresh_from_db()
     assert paid_order.status == Order.Status.PROCESSING
     (email,) = mail.outbox
-    assert email.subject == f"Order '{paid_order.ref}' has been partially refunded"
+    assert email.subject == f"PINS shop order {paid_order.ref} has been partly refunded"
     assert "We have refunded £5.00 to the card (or other payment method)" in email.body
 
 
