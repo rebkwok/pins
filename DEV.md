@@ -178,7 +178,9 @@ Required unless a default is given.
 **The shop**
 - `SALESMAN_STRIPE_CONNECT_SECRET_KEY`: the platform's Stripe secret key
   (`sk_test_...` or `sk_live_...`)
-- `SALESMAN_STRIPE_CONNECT_CLIENT_ID`: the platform's Connect client id (`ca_...`)
+- `SALESMAN_STRIPE_CONNECT_CLIENT_ID`: the platform's Connect client id (`ca_...`),
+  in the platform's dashboard: Settings → Connect → Onboarding options → OAuth
+  (test and live mode have different ones)
 - `SALESMAN_STRIPE_CONNECT_WEBHOOK_SECRET`: the webhook endpoint's signing
   secret (`whsec_...`; see Stripe webhooks)
 - `SALESMAN_STRIPE_CONNECT_PAGES_ENABLED`: the pages for connecting the PINS
@@ -275,7 +277,8 @@ which removes it here via the webhook).
 In the stripe dashboard, ensure you're using sandbox mode.
 
 Find SALESMAN_STRIPE_CONNECT_SECRET_KEY (sk_test_...), and SALESMAN_STRIPE_CONNECT_CLIENT_ID
-(ca_..., in Connect settings) and add them to `pins/.env`.
+(ca_..., on the OAuth page below: Settings → Connect → Onboarding options →
+OAuth) and add them to `pins/.env`.
 
 Enable Oauth for Connect:
 https://dashboard.stripe.com/test/settings/connect/onboarding-options/oauth
@@ -361,7 +364,8 @@ Every deploy:
 **Before the first deploy**
 - Set the shop's environment variables, with Stripe's **test** keys to begin
   with: `SALESMAN_STRIPE_CONNECT_SECRET_KEY` (`sk_test_...`),
-  `SALESMAN_STRIPE_CONNECT_CLIENT_ID` (the test `ca_...`),
+  `SALESMAN_STRIPE_CONNECT_CLIENT_ID` (the test `ca_...`, from Settings →
+  Connect → Onboarding options → OAuth, in test mode),
   `SALESMAN_STRIPE_CONNECT_WEBHOOK_SECRET` (from the test webhook endpoint),
   `SALESMAN_STRIPE_CONNECT_PAGES_ENABLED=True`, and `SHOP_PREVIEW=True`.
 - In the platform's Stripe dashboard (test mode): enable OAuth for Connect
