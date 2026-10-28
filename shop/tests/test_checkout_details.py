@@ -229,6 +229,7 @@ def test_customer_order_page(client, delivered_order):
 
 def test_uk_only_note():
     assert 'please <a href="/contact-us/">contact us</a>' in UK_ONLY_NOTE
+    assert UK_ONLY_NOTE.endswith("for shipping costs before placing an order.")
 
 
 def test_basket_page_uk_note(client, delivery_basket):

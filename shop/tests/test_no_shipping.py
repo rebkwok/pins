@@ -100,6 +100,8 @@ def test_basket_page(rf, entry_basket):
     assert "Nothing in your basket needs shipping." in content
     assert 'name="shipping-method"' not in content
     assert "Select shipping" not in content
+    # the FAQs link: below the Checkout button, with or without shipping
+    assert_faqs_link_last(content)
 
 
 def test_basket_page_mixed(rf, basket, entry):
@@ -110,6 +112,14 @@ def test_basket_page_mixed(rf, basket, entry):
     assert "Delivery or collection" in content
     assert 'name="shipping-method"' in content
     assert "Nothing in your basket needs shipping." not in content
+    assert_faqs_link_last(content)
+
+
+def assert_faqs_link_last(content):
+    content = " ".join(content.split())
+    faqs = f'<p class="basket-options__help basket-options__faqs"><a href="{reverse("shop:faqs")}">Delivery and other FAQs</a></p>'
+    assert content.count(faqs) == 1
+    assert content.index('value="Checkout"') < content.index(faqs)
 
 
 def test_basket_page_after_no_shipping_checkout(rf, entry_basket, product):

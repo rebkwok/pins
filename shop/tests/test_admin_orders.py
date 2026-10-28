@@ -92,6 +92,10 @@ def test_display_status(order, status, shipping_method, paid, expected):
     if paid:
         order.pay(amount=order.total, transaction_id="pi_1")
     assert order.display_status == expected
+    # the customer's is the same, but a collection may not be ready yet
+    if expected == "Paid – ready to collect":
+        expected = "Paid – to be collected"
+    assert order.customer_display_status == expected
 
 
 def test_display_status_partly_refunded(order):

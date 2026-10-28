@@ -700,12 +700,14 @@ def test_get_checkout_view_collect(rf, basket):
         reverse("shop:checkout") + "?payment-method=stripe&shipping-method=collect"
     )
     request.session = {"BASKET_ID": basket.id}
-    content = checkout_view(request).rendered_content
+    content = " ".join(checkout_view(request).rendered_content.split())
     # a warning about collecting in person
     assert '<p class="basket-options__help">Collect in person</p>' in content
     assert '<p class="shop-shipping-reminder">' in content
-    assert "Reminder: collection must be arranged with PINS in advance." in content
-    assert f'<a href="{reverse("shop:basket")}">Go back</a> to change delivery options.' in content
+    assert (
+        "Reminder: collection must be arranged with PINS in advance. If you haven't "
+        f'done this, you can <a href="{reverse("shop:basket")}">go back</a> to change delivery options.'
+    ) in content
     assert COLLECT_NOTE not in content
 
 

@@ -15,6 +15,12 @@
         {% if basket.items %}
             <p class="basket-continue"><a href="{% url 'shop:basket' %}">&lsaquo; Back to basket</a></p>
             <div class="basket-layout basket-layout--checkout">
+                {# On phones, collapsed above the form (checkout.js), so the form is in view; beside it on wider screens, where the toggle is hidden #}
+                <details class="checkout-summary" open>
+                <summary class="checkout-summary__toggle">
+                    <span>Order summary</span>
+                    <span>£{{ basket.total }}</span>
+                </summary>
                 <aside class="basket-summary" aria-label="Order summary">
                     <h2 class="basket-summary__title">Order summary</h2>
                     {% for product_identifier, items in basket.items.items %}
@@ -29,12 +35,6 @@
                     </p>
                     <p class="basket-options__help">{{ shipping_method_label }}</p>
                     <p class="basket-options__help"><a href="{% url 'shop:faqs' %}">Delivery and other FAQs</a></p>
-                    {% if collect_warning %}
-                        <p class="shop-shipping-reminder">
-                            Reminder: collection must be arranged with PINS in advance.
-                            <a href="{% url 'shop:basket' %}">Go back</a> to change delivery options.
-                        </p>
-                    {% endif %}
                     {% if discount_covers_order %}
                         <p>
                             Your discount code covers the whole order, so there's nothing to pay.
@@ -42,8 +42,16 @@
                         </p>
                     {% endif %}
                 </aside>
+                </details>
 
                 <div class="basket-details">
+                    {# (here, not in the summary, which is collapsed on phones) #}
+                    {% if collect_warning %}
+                        <p class="shop-shipping-reminder">
+                            Reminder: collection must be arranged with PINS in advance.
+                            If you haven't done this, you can <a href="{% url 'shop:basket' %}">go back</a> to change delivery options.
+                        </p>
+                    {% endif %}
                     {# (the form's sections have headings: Your details, Delivery address, Data processing consent) #}
                     {% if form.errors %}
                         <p class="text-danger">Please correct the errors below:</p>

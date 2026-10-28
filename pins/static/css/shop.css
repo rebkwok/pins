@@ -702,8 +702,58 @@
     grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr);
   }
 
-  .basket-layout--checkout .basket-summary {
+  .basket-layout--checkout .checkout-summary {
     order: 2;
+  }
+}
+
+/* The checkout's order summary, collapsed on phones: "Order summary £x" */
+.checkout-summary__toggle {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 6px;
+  background: #faf8f3;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.checkout-summary__toggle::-webkit-details-marker {
+  display: none;
+}
+
+.checkout-summary__toggle span:first-child::after {
+  content: " \25BE";
+  /* (not read out) */
+  content: " \25BE" / "";
+}
+
+.checkout-summary[open] .checkout-summary__toggle span:first-child::after {
+  content: " \25B4";
+  content: " \25B4" / "";
+}
+
+@media (min-width: 992px) {
+  /* (always open, see checkout.js) */
+  .checkout-summary__toggle {
+    display: none;
+  }
+}
+
+@media (max-width: 991.98px) {
+  .checkout-summary[open] .checkout-summary__toggle {
+    border-radius: 6px 6px 0 0;
+  }
+
+  .checkout-summary .basket-summary {
+    border-radius: 0 0 6px 6px;
+  }
+
+  /* (the toggle says it) */
+  .checkout-summary .basket-summary__title {
+    display: none;
   }
 }
 
@@ -891,6 +941,12 @@
 
 .basket-options .form-check {
   margin-bottom: 6px;
+}
+
+/* (below the Checkout button: the FAQs aren't only about delivery) */
+.basket-options__faqs {
+  margin: 12px 0 0;
+  text-align: center;
 }
 
 /* The page's main action (Checkout, Pay now) */

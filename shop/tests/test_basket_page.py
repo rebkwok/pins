@@ -328,6 +328,14 @@ def test_order_status_item_status(client, paid_order, shipping_status, shipping_
         assert f'<span class="basket-item__status">{label}</span>' in html.unescape(resp.content.decode())
 
 
+def test_order_status_page_collection(client, paid_order):
+    # the customer's wording: the collection may not be ready yet
+    paid_order.shipping_method = "collect"
+    paid_order.save()
+    content = get(client, reverse("shop:order_status", args=(paid_order.token,)))
+    assert "<dd>Paid – to be collected</dd>" in content
+
+
 def test_order_status_page(client, paid_order):
     content = get(client, reverse("shop:order_status", args=(paid_order.token,)))
     assert ">Go to shop</a>" in content

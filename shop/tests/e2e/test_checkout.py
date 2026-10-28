@@ -1,12 +1,14 @@
 """Checking out: paying (Stripe faked), free orders, cancelling, and expiry"""
 
 import re
+
+import pytest
 from django.core import mail
 from playwright.sync_api import expect
 from salesman.core.utils import get_salesman_model
 
 from ...models import ProductVariant
-from .conftest import E2E, add_to_basket, field, fill_checkout
+from .conftest import E2E, PHONE, add_to_basket, field, fill_checkout
 
 pytestmark = E2E
 
@@ -137,3 +139,37 @@ def test_basket_expires(page, live_server, shop, settings):
     expect(page.get_by_text("Your basket has expired.")).to_be_visible(timeout=15_000)
     expect(page.get_by_text("Your basket is empty.")).to_be_visible()
     assert ProductVariant.objects.get(product=shop["mug"]).stock == 5
+
+
+@pytest.mark.parametrize("browser_context_args", [None, PHONE], indirect=True, ids=["desktop", "phone"])
+def test_order_summary(page, live_server, shop, browser_context_args):
+    # on phones, collapsed above the form (so the form is in view); beside it
+    # on wider screens, always open
+    add_to_basket(page, live_server, shop["mug"])
+    go_to_checkout(page, live_server)
+    toggle = page.locator(".checkout-summary__toggle")
+    summary = page.get_by_role("complementary", name="Order summary")
+    if browser_context_args.get("is_mobile"):
+        expect(toggle).to_have_text(re.compile(r"Order summary\s+£14\.99"))
+        expect(summary).to_be_hidden()
+        expect(page.locator("legend", has_text="Your details")).to_be_in_viewport()
+        toggle.click()
+        expect(summary).to_be_visible()
+        expect(summary).to_contain_text("Podenco mug")
+    else:
+        expect(toggle).to_be_hidden()
+        expect(summary).to_be_visible()
+        expect(summary.get_by_role("heading", name="Order summary")).to_be_visible()
+
+
+@pytest.mark.parametrize("browser_context_args", [PHONE], indirect=True)
+def test_collection_reminder_on_phone(page, live_server, shop):
+    # with the summary collapsed, the collection reminder is still shown
+    add_to_basket(page, live_server, shop["mug"])
+    page.goto(f"{live_server.url}/shop/basket/")
+    page.wait_for_load_state()
+    page.get_by_label("Collect in person (prior arrangement only)").check()
+    expect(page.locator("#total")).to_have_text("10.00")
+    go_to_checkout(page, live_server)
+    expect(page.get_by_role("complementary", name="Order summary")).to_be_hidden()
+    expect(page.get_by_text("Reminder: collection must be arranged with PINS in advance.")).to_be_visible()

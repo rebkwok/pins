@@ -23,7 +23,7 @@ CONTACT_URL = "/contact-us/"
 UK_ONLY_NOTE = mark_safe(
     "Please note this order form is for shipping within the UK ONLY. If you are "
     f'ordering from outside the UK, please <a href="{CONTACT_URL}">contact us</a> for '
-    "shipping costs."
+    "shipping costs before placing an order."
 )
 
 COUNTRY_OTHER = "other"

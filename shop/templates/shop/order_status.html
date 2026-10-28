@@ -15,7 +15,7 @@
                 <h2 class="basket-summary__title">Order {{ order.ref }}</h2>
                 <dl class="order-details">
                     <dt>Status</dt>
-                    <dd>{{ order.display_status }}</dd>
+                    <dd>{{ order.customer_display_status }}</dd>
                     <dt>Order date</dt>
                     <dd>{{ order.date_created|date:"d M Y" }}</dd>
                     <dt>Shipping method</dt>

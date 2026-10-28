@@ -35,7 +35,6 @@ removed.
                         {% if method.2 %}<div class="basket-options__help basket-options__warning">{{ method.2 }}</div>{% endif %}
                         {% if method.0 == "deliver" %}
                             <div class="basket-options__help shop-uk-note">{{ uk_only_note }}</div>
-                            <div class="basket-options__help"><a href="{% url 'shop:faqs' %}">Delivery and other FAQs</a></div>
                         {% endif %}
                     </div>
                 {% endfor %}
@@ -45,4 +44,5 @@ removed.
         {% endif %}
         <input class="btn basket-btn shop-main-btn" type="submit" value="Checkout">
     </form>
+    <p class="basket-options__help basket-options__faqs"><a href="{% url 'shop:faqs' %}">Delivery and other FAQs</a></p>
 </div>

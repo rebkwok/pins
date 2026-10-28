@@ -289,6 +289,17 @@ class Order(OrderAmountsMixin, BaseOrder):
     @property
     def display_status(self):
         """The order's status in plain words, for shop admins"""
+        return self._status_label()
+
+    @property
+    def customer_display_status(self):
+        """
+        The order's status in plain words, for the customer (the order status
+        page): as for shop admins, but a collection may not be ready yet
+        """
+        return self._status_label(for_customer=True)
+
+    def _status_label(self, for_customer=False):
         Status = self.Status
         shipped = "Collected" if self.is_collected else "Shipped"
         if self.status in (Status.NEW, Status.CREATED, Status.HOLD):
@@ -301,8 +312,10 @@ class Order(OrderAmountsMixin, BaseOrder):
             elif not self.items_to_send.exists():
                 # e.g. none of its items will be sent
                 label = "Paid – nothing to send"
+            elif not self.is_collected:
+                label = "Paid – ready to ship"
             else:
-                label = f"Paid – ready to {'collect' if self.is_collected else 'ship'}"
+                label = "Paid – to be collected" if for_customer else "Paid – ready to collect"
         elif self.status == Status.PARTIALLY_SHIPPED:
             label = f"Partly {shipped.lower()}"
         elif self.status == Status.SHIPPED:
