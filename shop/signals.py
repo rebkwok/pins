@@ -110,6 +110,45 @@ def send_refund_email(sender, order, amount, fully_refunded, **kwargs):
     send_email(email, [order.email], reply_to)
 
 
+def send_payment_failed_emails(order, released_code=False):
+    """
+    A payment that completes later (e.g. a bank debit) failed (see
+    PayByStripe.order_payment_failed): tell the customer the order's cancelled,
+    and the shop not to send it
+    """
+    notify_emails, reply_to = get_email_settings()
+    subject = order_subject(order, ": payment failed")
+    customer = Email(
+        subject,
+        [
+            Paragraph(
+                f"The payment for order {order.ref} didn't go through, so the order "
+                "has been cancelled and nothing will be sent. You're welcome to order "
+                "again."
+            ),
+            Link("View the status of your order", order_status_url(order)),
+        ],
+        footer=customer_footer(),
+    )
+    send_email(customer, [order.email], reply_to)
+    if notify_emails:
+        restocked = "Its items have been put back in stock"
+        if released_code:
+            restocked += f", and its discount code ({order.discount_code}) can be used again"
+        shop = Email(
+            subject,
+            [
+                Paragraph(
+                    f"The payment for order {order.ref} (a payment that completes "
+                    "later, e.g. a bank debit) failed, so the order hasn't been paid: "
+                    f"don't send anything. {restocked}. The customer has been emailed."
+                ),
+                Link("View the order", order_admin_url(order)),
+            ],
+        )
+        send_email(shop, notify_emails, reply_to)
+
+
 @receiver(stripe_signals.dispute_created)
 @receiver(stripe_signals.dispute_closed)
 def send_dispute_notification(sender, order, message, signal, **kwargs):

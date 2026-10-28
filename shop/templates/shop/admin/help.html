@@ -85,8 +85,8 @@ in view), above on phones.
                             <tr><th>Status</th><th>What it means</th></tr>
                         </thead>
                         <tbody>
-                            <tr><td>Awaiting payment</td><td>The payment hasn't arrived yet. Don't send anything until it's paid.</td></tr>
-                            <tr><td>Payment failed</td><td>The payment didn't go through. Nothing needs doing.</td></tr>
+                            <tr><td>Awaiting payment</td><td>The payment hasn't arrived yet: some payment methods (e.g. bank debits) take a few days. Don't send anything until it's paid; you'll get the usual emails then. A bank debit (Bacs) can take up to 7 working days for a new customer. Any other payment that hasn't arrived after 7 days is cancelled automatically, with the order.</td></tr>
+                            <tr><td>Payment failed</td><td>The payment didn't go through: its items have been put back in stock, and the customer and shop emailed. Nothing needs doing.</td></tr>
                             <tr><td>Paid – ready to ship<br>Paid – ready to collect</td><td>Paid, and nothing has been sent (or collected) yet.</td></tr>
                             <tr><td>Paid – nothing to send</td><td>Paid, but none of its items will be sent (they were marked won't be sent). Refund it if that hasn't been done, then mark it completed.</td></tr>
                             <tr><td>Partly shipped<br>Partly collected</td><td>Some of the items have been sent; the rest are still to send.</td></tr>
@@ -188,6 +188,7 @@ in view), above on phones.
                             details. Or they can accept the dispute, if the customer is right.
                         </li>
                         <li>Don't refund a disputed payment: the money has already been taken back.</li>
+                    <li>Bank debit (Bacs) disputes are different: they can be raised at any time, can't be challenged with evidence, and the bank's decision is final. Contact the customer instead. (A debit that fails after Stripe has said it succeeded also arrives as a dispute.)</li>
                         <li>It's often worth contacting the customer: a misunderstanding can be sorted out, and the customer can withdraw the dispute.</li>
                     </ul>
                     <p>

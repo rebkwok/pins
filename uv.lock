@@ -814,7 +814,7 @@ dependencies = [
 [[package]]
 name = "django-salesman-stripe-connect"
 version = "0.1.0"
-source = { git = "https://github.com/rebkwok/django-salesman-stripe-connect.git?rev=f692bb4b35e117d2ecf6b8949b81594b8500967d#f692bb4b35e117d2ecf6b8949b81594b8500967d" }
+source = { git = "https://github.com/rebkwok/django-salesman-stripe-connect.git?rev=2a8c4d70e480fc65c4a00e901521f9fffa659a70#2a8c4d70e480fc65c4a00e901521f9fffa659a70" }
 dependencies = [
     { name = "django" },
     { name = "django-salesman" },
@@ -2106,7 +2106,7 @@ requires-dist = [
     { name = "django-paypal", specifier = "<=2.1" },
     { name = "django-recaptcha", specifier = "<=4.1.0" },
     { name = "django-salesman", git = "https://github.com/rebkwok/django-salesman.git?rev=12a6cdb0d36bbd544590c151aa2e0422fb72489e" },
-    { name = "django-salesman-stripe-connect", git = "https://github.com/rebkwok/django-salesman-stripe-connect.git?rev=f692bb4b35e117d2ecf6b8949b81594b8500967d" },
+    { name = "django-salesman-stripe-connect", git = "https://github.com/rebkwok/django-salesman-stripe-connect.git?rev=2a8c4d70e480fc65c4a00e901521f9fffa659a70" },
     { name = "django-ses", extras = ["events"], specifier = "<=4.8.2" },
     { name = "django-storages", extras = ["boto3"], specifier = "<=1.14.6" },
     { name = "envdir", specifier = "<=1.0.1" },

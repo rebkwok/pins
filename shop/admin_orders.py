@@ -445,7 +445,8 @@ class OrderDetailView(OrderViewMixin, TemplateView):
             and any(item.shipping_status == OrderItem.TO_SEND for item in items),
             can_undo=order.can_undo_items,
             # (its items to send won't be)
-            closed=order.status in (Order.Status.REFUNDED, Order.Status.CANCELLED),
+            closed=order.status
+            in (Order.Status.REFUNDED, Order.Status.CANCELLED, Order.Status.FAILED),
             payments=order.payments.order_by("date_created"),
             notes=order.notes.order_by("date_created"),
             # who did what to the order (activity.py), oldest first
@@ -778,7 +779,7 @@ class OrderViewSet(ModelViewSet):
         "quantity",
         "total",
         "dispatcher_name",
-        "get_shipping_status_display",
+        "status_label",
         "shipped_at",
     ]
     export_headings = {
@@ -795,7 +796,7 @@ class OrderViewSet(ModelViewSet):
         "quantity": "Quantity",
         "total": "Item total (£)",
         "dispatcher_name": "Dispatcher",
-        "get_shipping_status_display": "Item status",
+        "status_label": "Item status",
         "shipped_at": "Shipped/collected",
     }
     export_filename = "orders"

@@ -228,7 +228,13 @@ testing), not in the PINS account:
 - URL: `https://<domain>/stripe/webhook/`
 - API version: `2026-09-30.endive` (the version the code uses)
 - Listen for:
-  - checkout.session.completed
+  - checkout.session.completed (paid; or for a payment that completes later,
+    e.g. a bank debit, the order is created awaiting payment)
+  - checkout.session.async_payment_succeeded (a payment that completes later
+    has arrived: the order is paid)
+  - checkout.session.async_payment_failed (it failed: the order's payment
+    failed, its stock and discount code are released, and the customer and
+    shop emailed)
   - checkout.session.expired
   - charge.refunded (full or partial refunds, from the orders admin or the PINS
     Stripe dashboard)
@@ -242,10 +248,6 @@ testing), not in the PINS account:
   - account.application.deauthorized (PINS disconnected their account from the
     platform: the saved account is removed and the shop emailed; payments can't
     be taken until an account is connected again at /stripe/connect/)
-  - (If BACS is added: not for now, as it would mean handling payments that
-    are pending for several days and could be reversed)
-    - checkout.session.async_payment_succeeded
-    - checkout.session.async_payment_failed
 - The endpoint has its own signing secret (whsec_...); set it as
   SALESMAN_STRIPE_CONNECT_WEBHOOK_SECRET in that environment (production's
   envdir).
@@ -347,6 +349,10 @@ Every deploy:
 
 - `python manage.py clear_expired_baskets`: every 5 minutes or so (returns
   expired baskets' items to stock; deletes old empty baskets)
+- `python manage.py cancel_unpaid_orders`: daily (orders still awaiting a
+  payment that completes later after 7 days, e.g. a bank transfer never made,
+  are checked with Stripe, then cancelled: stock and discount codes released,
+  customer and shop emailed; `--days` to change)
 
 ## The shop's first deploy and launch
 
@@ -361,7 +367,10 @@ Every deploy:
   with the redirect URI `https://podencosinneed.org/stripe/oauth/callback/`,
   and create the webhook endpoint for events on connected accounts (see
   Webhooks).
-- Set up the `clear_expired_baskets` cron.
+- Set up the `clear_expired_baskets` and `cancel_unpaid_orders` crons.
+- In PINS's Stripe dashboard (test mode, and live at launch): turn off bank
+  transfers (Settings → Payment methods). A customer who chooses one only
+  gets bank details, and the shop can't take them back to pay another way.
 
 **After deploying (a hidden preview)**
 - Import the products: `import_shop_stock` with `--dry-run` first, then

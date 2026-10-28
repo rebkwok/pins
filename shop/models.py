@@ -439,6 +439,33 @@ class OrderItem(BaseOrderItem):
     def needs_shipping(self):
         return self.shipping_status != self.NO_SHIPPING
 
+    @property
+    def ready_to_send(self):
+        """Still to send, and its order is paid (and not refunded or cancelled)"""
+        return self.shipping_status == self.TO_SEND and self.order.can_ship_items
+
+    @property
+    def status_label(self):
+        """
+        The item's shipping status for the admin, e.g. "Ready to collect";
+        unsent items of unpaid orders are "Awaiting payment", and of refunded,
+        cancelled or failed orders, "Not sent"
+        """
+        order = self.order
+        if self.shipping_status == self.SHIPPED:
+            return "Collected" if order.is_collected else "Shipped"
+        if self.shipping_status != self.TO_SEND:
+            return self.get_shipping_status_display()
+        if self.ready_to_send:
+            return "Ready to collect" if order.is_collected else "Ready to send"
+        if order.status in (
+            order.Status.NEW,
+            order.Status.CREATED,
+            order.Status.HOLD,
+        ):
+            return "Awaiting payment"
+        return "Not sent"
+
 
 class OrderPayment(BaseOrderPayment):
     pass

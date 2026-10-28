@@ -1,10 +1,15 @@
 {% extends "shop/base.html" %}
 {% load wagtailcore_tags wagtailimages_tags %}
 
-{% block title %}Order confirmed{% endblock %}
+{# (payment_pending: a payment that completes later, e.g. a bank debit) #}
+{% block title %}{% if payment_pending %}Order received{% else %}Order confirmed{% endif %}{% endblock %}
 
 {% block content %}
-    {% include "shop/includes/header-hero.html" with title="Order confirmed" %}
+    {% if payment_pending %}
+        {% include "shop/includes/header-hero.html" with title="Order received" %}
+    {% else %}
+        {% include "shop/includes/header-hero.html" with title="Order confirmed" %}
+    {% endif %}
 
     <div class="container shop-basket">
         <div class="row">
@@ -13,7 +18,9 @@
                 {% if order %}
                     <p>Your order reference is <strong>{{ order.ref }}</strong>.</p>
                 {% endif %}
-                {% if total %}
+                {% if payment_pending %}
+                    <p>Your order will be processed once your payment of £{{ total|floatformat:2 }} has been received. We'll email you when it has.</p>
+                {% elif total %}
                     <p>You have been charged £{{ total|floatformat:2 }}.</p>
                 {% endif %}
                 {% if order %}

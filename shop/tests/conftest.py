@@ -30,3 +30,19 @@ def connected_account(request):
     account = ConnectedAccount(account_id=STRIPE_ACCOUNT, livemode=False)
     account.save()
     yield account
+
+
+STRIPE_CUSTOMERS_URL = "https://api.stripe.com/v1/customers"
+
+
+@pytest.fixture(autouse=True)
+def stripe_customers(requests_mock):
+    """
+    Stripe's API is faked in every test (requests_mock: an unexpected request
+    fails), with a customer (cus_test) for every email, as checkout sessions
+    look the customer up (salesman_stripe_connect's get_customer)
+    """
+    yield requests_mock.get(
+        STRIPE_CUSTOMERS_URL,
+        json={"object": "list", "data": [{"id": "cus_test", "object": "customer"}], "has_more": False},
+    )

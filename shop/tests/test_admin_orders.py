@@ -305,7 +305,7 @@ def test_orders_export_csv(admin_client, shop_variants, dispatcher):
     assert mug_row["Quantity"] == "2"
     assert mug_row["Item total (£)"] == "20.00"
     assert mug_row["Dispatcher"] == "Ann Smith"
-    assert mug_row["Item status"] == "Shipped/collected"
+    assert mug_row["Item status"] == "Shipped"
     # dates without seconds (the site's time zone is UTC)
     assert mug_row["Date"] == f"{order.date_created:%Y-%m-%d %H:%M}"
     assert len(mug_row["Shipped/collected"]) == len("2026-10-24 14:05")
@@ -985,3 +985,59 @@ def test_undo_not_allowed(admin_client, shop_variants, dispatcher):
     order = paid_order([mug])
     resp = undo(admin_client, order, order.items.get())
     assert messages_for(resp)[-1] == "Those items have already been changed."
+
+
+# Items' status labels
+
+
+@pytest.mark.parametrize(
+    "status,shipping_method,label",
+    [
+        (OrderStatus.PROCESSING, "deliver", "Ready to send"),
+        (OrderStatus.PARTIALLY_SHIPPED, "collect", "Ready to collect"),
+        (OrderStatus.HOLD, "deliver", "Awaiting payment"),
+        (OrderStatus.CREATED, "deliver", "Awaiting payment"),
+        (OrderStatus.REFUNDED, "deliver", "Not sent"),
+        (OrderStatus.CANCELLED, "deliver", "Not sent"),
+        (OrderStatus.FAILED, "collect", "Not sent"),
+    ],
+)
+def test_item_status_label_to_send(shop_variants, status, shipping_method, label):
+    mug, card, raffle = shop_variants
+    order = make_order([mug], status=status, shipping_method=shipping_method)
+    item = order.items.get()
+    assert item.status_label == label
+    assert item.ready_to_send == label.startswith("Ready")
+
+
+@pytest.mark.parametrize(
+    "shipping_status,shipping_method,label",
+    [
+        ("shipped", "deliver", "Shipped"),
+        ("shipped", "collect", "Collected"),
+        ("not_sent", "deliver", "Won't be sent"),
+        ("no_shipping", "deliver", "No shipping needed"),
+    ],
+)
+def test_item_status_label(shop_variants, shipping_status, shipping_method, label):
+    mug, card, raffle = shop_variants
+    order = make_order([mug], shipping_method=shipping_method)
+    order.items.update(shipping_status=shipping_status)
+    assert order.items.get().status_label == label
+
+
+def test_awaiting_payment_items(admin_client, shop_variants):
+    # an unpaid order (e.g. a bank transfer on its way): its items await payment,
+    # on its page, in the list, and in the download
+    mug, card, raffle = shop_variants
+    order = make_order([mug], status=OrderStatus.HOLD)
+    content = html.unescape(admin_client.get(order_url(order)).content.decode())
+    assert "Awaiting payment" in content
+    assert "Ready to send" not in content
+    content = " ".join(html.unescape(admin_client.get(INDEX_URL).content.decode()).split())
+    assert "<li> 2 x Test Product - Mug <small>(awaiting payment)</small> </li>" in content
+    resp = admin_client.get(INDEX_URL, {"export": "xlsx"})
+    sheet = load_workbook(io.BytesIO(b"".join(resp.streaming_content))).active
+    rows = list(sheet.values)
+    assert rows[1][rows[0].index("Item status")] == "Awaiting payment"
+

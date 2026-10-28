@@ -104,10 +104,11 @@
                                         Won't be sent
                                         {% if item.shipped_by %}<br><small>{{ item.shipped_at|date:"j M Y" }}, by {{ item.shipped_by.get_full_name|default:item.shipped_by.get_username }}</small>{% endif %}
                                         {% if can_undo %}{% include "shop/admin/orders/undo_button.html" %}{% endif %}
-                                    {% elif item.shipping_status == "to_send" and closed %}
-                                        Not sent
+                                    {% elif item.ready_to_send %}
+                                        <strong>{{ item.status_label }}</strong>
                                     {% elif item.shipping_status == "to_send" %}
-                                        <strong>{% if order.is_collected %}Ready to collect{% else %}Ready to send{% endif %}</strong>
+                                        {# (awaiting payment, or not sent: refunded, cancelled or failed) #}
+                                        {{ item.status_label }}
                                     {% else %}
                                         No shipping needed
                                     {% endif %}
@@ -127,7 +128,7 @@
                         </p>
                     </div>
                 {% elif closed %}
-                    {% if order.items_to_send.exists %}<p class="help">The order has been {{ order.status_display|lower }}, so its items can't be marked {% if order.is_collected %}collected{% else %}shipped{% endif %}.</p>{% endif %}
+                    {% if order.items_to_send.exists %}<p class="help">{% if order.status == "FAILED" %}The order's payment failed{% else %}The order has been {{ order.status_display|lower }}{% endif %}, so its items can't be marked {% if order.is_collected %}collected{% else %}shipped{% endif %}.</p>{% endif %}
                 {% elif order.items_to_send.exists %}
                     <p class="help">Items can be marked shipped once the order has been paid.</p>
                 {% endif %}

@@ -101,7 +101,8 @@ def test_get_stripe_session_data(rf, basket, freezer):
     assert data["metadata"] == {"shipping_method": "collect"}
     # 31 mins from now
     assert data["expires_at"] == int(datetime(2024, 1, 1, 10, 31, tzinfo=UTC).timestamp())
-    assert data["customer_email"] == "test@test.com"
+    # the customer, found by their email (so Checkout can offer bank transfers)
+    assert data["customer"] == "cus_test"
 
 
 def test_get_stripe_session_data_delivery(rf, basket):
@@ -161,10 +162,32 @@ def test_success_view(client, requests_mock, basket):
     assert requests_mock.call_count == 1
 
 
-def test_success_view_unpaid_session(client, requests_mock, basket):
+def test_success_view_payment_pending(client, requests_mock, basket):
+    # a payment that completes later (e.g. a bank debit): the order, awaiting
+    # payment
+    basket = basket_from_checkout(basket)
+    basket.save()
     requests_mock.get(
         "https://api.stripe.com/v1/checkout/sessions/test-session",
-        json=stripe_session_data(payment_status="unpaid"),
+        json=stripe_session_data(client_reference_id=f"basket_{basket.id}", payment_status="unpaid"),
+    )
+    content = client.get(reverse("stripe-connect-success") + "?session_id=test-session").content.decode()
+    order = Order.objects.get()
+    assert order.status == Order.Status.HOLD
+    assert "Order received" in content
+    assert "Order confirmed" not in content
+    assert (
+        "Your order will be processed once your payment of £20.00 has been received. "
+        "We'll email you when it has."
+    ) in content
+    assert "You have been charged" not in content
+
+
+def test_success_view_unpaid_session(client, requests_mock, basket):
+    # (not complete, e.g. the address visited before paying)
+    requests_mock.get(
+        "https://api.stripe.com/v1/checkout/sessions/test-session",
+        json=stripe_session_data(status="open", payment_status="unpaid"),
     )
     resp = client.get(reverse("stripe-connect-success") + "?session_id=test-session")
     content = resp.content.decode()

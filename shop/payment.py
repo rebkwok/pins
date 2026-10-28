@@ -140,6 +140,32 @@ class PayByStripe(StripeConnectPayment):
         basket.reset_timeout()
 
     @classmethod
+    def paid_status(cls, order):
+        # An order (on hold, for a payment that completes later) with nothing
+        # to send is complete once it's paid
+        from .models import OrderItem
+
+        if not order.items.exclude(shipping_status=OrderItem.NO_SHIPPING).exists():
+            return Order.Status.COMPLETED
+        return super().paid_status(order)
+
+    @classmethod
+    def order_payment_failed(cls, order):
+        # A payment that completes later (e.g. a bank debit) failed: put the
+        # order's items back in stock, free its discount code (it wasn't paid
+        # for), and tell the customer and the shop
+        from .models import DiscountCode
+        from .signals import adjust_stock, send_payment_failed_emails
+
+        for item in order.items.all():
+            if item.product is not None:
+                adjust_stock(item.product, item.quantity)
+        released_code = DiscountCode.objects.filter(order=order).update(
+            order=None, date_used=None
+        )
+        send_payment_failed_emails(order, released_code=bool(released_code))
+
+    @classmethod
     def get_request_basket(cls, request):
         return Basket.get_existing(request)
 
