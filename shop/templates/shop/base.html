@@ -4,6 +4,11 @@
 
 {% load navigation_tags shoptags %}
 
+{% block extrahead %}
+{{ block.super }}
+{% if shop_preview %}<meta name="robots" content="noindex, nofollow">{% endif %}
+{% endblock extrahead %}
+
 {% block sale_banner %}
 {% include "shop/includes/sale_banner.html" %}
 {% endblock sale_banner %}

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.utils.functional import SimpleLazyObject
 
 from .models import Sale
@@ -12,4 +13,6 @@ def shop_context(request):
             lambda: get_existing_basket_quantity(request)
         ),
         "current_sale": SimpleLazyObject(Sale.current_sale),
+        # (shop/base.html: not listed by search engines while a hidden preview)
+        "shop_preview": settings.SHOP_PREVIEW,
     }

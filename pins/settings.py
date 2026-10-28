@@ -596,6 +596,9 @@ HIDE_BREADCRUMBS = env.bool("HIDE_BREADCRUMBS", default=False)
 # The header's Login link: off, as only auctions need users to log in (users
 # who are logged in still see the Account menu; /login/ still works)
 SHOW_LOGIN = env.bool("SHOW_LOGIN", default=False)
+# While the new shop is a hidden preview: its pages ask search engines not to
+# list them (a "noindex" robots meta tag), in case the address gets out
+SHOP_PREVIEW = env.bool("SHOP_PREVIEW", default=False)
 
 
 # Image uploads
