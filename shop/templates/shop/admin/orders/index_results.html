@@ -8,6 +8,18 @@
     </p>
     <style>
         .shop-orders-download-help { margin: 1rem 0 0.5rem; }
+        .shop-orders-scroll { overflow-x: auto; }
+        /* "3 items": a link, with an arrow (▸, ▾ when open) */
+        .shop-orders-items summary { cursor: pointer; white-space: nowrap; list-style: none; color: var(--w-color-text-link-default); text-decoration: underline; }
+        .shop-orders-items summary::-webkit-details-marker { display: none; }
+        .shop-orders-items summary::before { content: "\25B8\00a0"; content: "\25B8\00a0" / ""; display: inline-block; text-decoration: none; }
+        .shop-orders-items details[open] summary::before { content: "\25BE\00a0"; content: "\25BE\00a0" / ""; }
+        .shop-orders-items summary:hover { color: var(--w-color-text-link-hover); }
+        .shop-orders-items ul { margin: 0.4rem 0 0; padding-inline-start: 1.1rem; min-width: 14rem; }
+        .shop-orders-items li + li { margin-top: 0.25rem; }
     </style>
-    {{ block.super }}
+    {# (scrolls sideways if it's wider than the screen, e.g. on phones: Wagtail's main area hides what's wider) #}
+    <div class="shop-orders-scroll">
+        {{ block.super }}
+    </div>
 {% endblock %}

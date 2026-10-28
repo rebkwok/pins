@@ -194,6 +194,12 @@ class SelectColumn(BaseColumn):
         js = ["shop/js/order_export.js"]
 
 
+class ItemsColumn(BaseColumn):
+    """The order's items, collapsed ("3 items"), with their shipping status"""
+
+    cell_template_name = "shop/admin/orders/tables/items_cell.html"
+
+
 def customer_display(order):
     return format_html(
         "{}<br><small>{}</small>", order.name or "-", order.email
@@ -208,16 +214,31 @@ class OrderItemsExportMixin(SpreadsheetExportMixin):
 
     # Each order's rows (one per item) are shaded in turn, so the orders can be
     # told apart: the first order's rows grey, the next's white, and so on. All
-    # the cells have borders, and the headings are bold.
+    # the cells have borders, and the headings are bold. Columns are as wide as
+    # their longest line, up to MAX_COLUMN_WIDTH (characters); longer values,
+    # and values on several lines (e.g. addresses), wrap.
     ORDER_SHADING = "D9D9D9"
     BORDER_COLOUR = "A6A6A6"
+    MAX_COLUMN_WIDTH = 50
+    # (dates, as Excel shows them)
+    DATE_WIDTH = 16
     export_sheet_title = "Orders"
+
+    @classmethod
+    def cell_width(cls, value):
+        """The width a cell's value needs: its longest line"""
+        if value is None:
+            return 0
+        if hasattr(value, "year"):
+            return cls.DATE_WIDTH
+        return max(len(line) for line in str(value).split("\n"))
 
     def write_xlsx(self, queryset, output):
         # (queryset: order items, in their orders' order)
         from openpyxl import Workbook
         from openpyxl.cell import WriteOnlyCell
-        from openpyxl.styles import Border, Font, PatternFill, Side
+        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+        from openpyxl.utils import get_column_letter
         from wagtail.admin.views.mixins import ExcelDateFormatter
 
         workbook = Workbook(write_only=True, iso_dates=True)
@@ -230,7 +251,7 @@ class OrderItemsExportMixin(SpreadsheetExportMixin):
             cell.font = Font(bold=True)
             cell.border = border
             headings.append(cell)
-        worksheet.append(headings)
+        rows = [headings]
         date_format = ExcelDateFormatter().get()
         shading = PatternFill("solid", fgColor=self.ORDER_SHADING)
         order_id, shaded = None, False
@@ -246,6 +267,21 @@ class OrderItemsExportMixin(SpreadsheetExportMixin):
                 cell.border = border
                 if shaded:
                     cell.fill = shading
+            rows.append(cells)
+        # (set before the rows are written, in a write-only worksheet)
+        wrap = Alignment(wrap_text=True, vertical="top")
+        for column, cells in enumerate(zip(*rows), start=1):
+            width = max(self.cell_width(cell.value) for cell in cells)
+            worksheet.column_dimensions[get_column_letter(column)].width = (
+                min(width, self.MAX_COLUMN_WIDTH) + 2
+            )
+            for cell in cells:
+                value = cell.value
+                if isinstance(value, str) and (
+                    "\n" in value or len(value) > self.MAX_COLUMN_WIDTH
+                ):
+                    cell.alignment = wrap
+        for cells in rows:
             worksheet.append(cells)
         workbook.save(output)
 
@@ -276,8 +312,8 @@ class OrderIndexView(OrderItemsExportMixin, IndexView):
         )
 
     def get_base_queryset(self):
-        # display_status uses the payments
-        return super().get_base_queryset().prefetch_related("payments")
+        # display_status uses the payments; the items column, the items
+        return super().get_base_queryset().prefetch_related("payments", "items")
 
     # Export: one row per order item, of the ticked orders, or all the (filtered)
     # orders
@@ -718,6 +754,7 @@ class OrderViewSet(ModelViewSet):
             ),
         ),
         Column("customer", label="Customer", accessor=customer_display),
+        ItemsColumn("items", label="Items"),
         Column("total", label="Total", accessor=lambda order: gbp(order.total)),
         Column("status", label="Status", accessor="display_status"),
     ]

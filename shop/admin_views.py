@@ -188,6 +188,21 @@ class DispatchersView(WagtailAdminTemplateMixin, TemplateView):
         context["pending_without_dispatcher_url"] = (
             reverse("shop_orders:index") + "?no_dispatcher=true"
         )
+        # The table's rows: the dispatchers, and if products without one have
+        # items to send, a row for them; those with the oldest items to send
+        # first (so the ones with something to do come first), then those with
+        # nothing, by name (the sort's stable)
+        rows = [{"dispatcher": dispatcher, "pending": dispatcher.pending} for dispatcher in dispatchers]
+        if context["pending_without_dispatcher"]:
+            rows.append(
+                {
+                    "dispatcher": None,
+                    "pending": context["pending_without_dispatcher"],
+                    "pending_url": context["pending_without_dispatcher_url"],
+                }
+            )
+        rows.sort(key=lambda row: (row["pending"] is None, row["pending"] and row["pending"]["oldest"]))
+        context["rows"] = rows
         context["dispatchers"] = dispatchers
         context["can_manage"] = self.can_manage
         if self.can_manage:

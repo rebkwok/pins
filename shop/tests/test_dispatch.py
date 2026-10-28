@@ -87,7 +87,7 @@ def test_orders_to_send(dispatcher_client, shop_variants, dispatcher):
     assert "<title>Items to send" in page
     nav = re.search(r'<nav[^>]*aria-label="Breadcrumb">(.*?)</nav>', page, re.S).group(1)
     assert "Items to send" in " ".join(re.sub(r"<[^>]+>", " ", nav).split())
-    assert "To send (2)" in page
+    assert "To send (2 items)" in page
     assert f"Order {older.ref}" in page
     assert "1 Road<br>Town" in page
     assert "2 x</strong> Test Product - Mug" in page
@@ -186,7 +186,7 @@ def test_sent(dispatcher_client, shop_variants, dispatcher):
     assert "Shipped 1 Oct 2026" in page
     assert "by Sam" in page
     assert "Mark as shipped" not in page
-    assert "To send (1)" in page
+    assert "To send (1 item)" in page
 
 
 def test_nothing_sent(dispatcher_client):
@@ -353,6 +353,26 @@ def test_dispatcher_activity(client, shop_variants, dispatcher):
     orders_url = reverse("shop_orders:index")
     assert f'<a href="{orders_url}?no_dispatcher=true">Pending items (1)</a>' in page
     assert "No dispatcher" in page
+
+
+def test_dispatcher_activity_order(client, shop_variants, dispatcher):
+    # those with the oldest items still to send first (including products
+    # without a dispatcher), then those with nothing to send, by name
+    mug, card, raffle = shop_variants
+    bea = make_dispatcher("Bea", "bea@test.com")
+    make_dispatcher("Abe", "abe@test.com")
+    make_dispatcher("Cat", "cat@test.com")
+    beas = baker.make("shop.ProductVariant", product=baker.make("shop.Product", dispatcher=bea, price=5), stock=10)
+    anns_order, beas_order, no_dispatchers = order_with([mug]), order_with([beas]), order_with([card])
+    backdate(anns_order, timezone.now() - timedelta(days=1))
+    backdate(beas_order, timezone.now() - timedelta(days=2))
+    backdate(no_dispatchers, timezone.now() - timedelta(hours=1))
+    shop_admin(client)
+    resp = client.get(DISPATCHERS_URL)
+    names = [row["dispatcher"].first_name if row["dispatcher"] else None for row in resp.context["rows"]]
+    assert names == ["Bea", "Ann", None, "Abe", "Cat"]
+    page = " ".join(content(resp).split())
+    assert page.index("Ann Smith") < page.index("No dispatcher") < page.index("Abe Smith")
 
 
 def test_dispatcher_activity_not_overdue(client, shop_variants, dispatcher):

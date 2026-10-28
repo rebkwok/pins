@@ -404,6 +404,46 @@ def test_orders_export_xlsx(admin_client, shop_variants):
     assert rows[1][0] == order.ref
 
 
+def test_orders_export_xlsx_column_widths(admin_client, shop_variants):
+    # columns as wide as their longest line (up to 50 characters, + 2); longer
+    # values, and those on several lines, wrap
+    order = paid_order(shop_variants)
+    order.shipping_address = "1 Road\nTown"
+    order.safe_place = "In the shed at the bottom of the garden, behind the blue bins please"
+    order.save()
+    resp = admin_client.get(INDEX_URL, {"export": "xlsx"})
+    sheet = load_workbook(io.BytesIO(b"".join(resp.streaming_content))).active
+    widths = {cell.value: sheet.column_dimensions[cell.column_letter].width for cell in sheet[1]}
+    assert widths["Order"] == len(order.ref) + 2
+    assert widths["Date"] == 16 + 2
+    assert widths["Shipping address"] == len("Shipping address") + 2
+    assert widths["Safe place"] == 50 + 2
+    assert widths["Item"] == len("Test Product - Mug") + 2
+    address, safe_place, ref = sheet["G2"], sheet["H2"], sheet["A2"]
+    assert address.value == "1 Road\nTown" and address.alignment.wrap_text
+    assert safe_place.alignment.wrap_text
+    assert not ref.alignment.wrap_text
+
+
+# The list's items column
+
+
+def test_orders_list_items(admin_client, shop_variants, dispatcher):
+    mug, card, raffle = shop_variants
+    order = paid_order(shop_variants)
+    order.mark_items_shipped([order.items.get(product_id=mug.id)], dispatcher)
+    content = " ".join(html.unescape(admin_client.get(INDEX_URL).content.decode()).split())
+    assert "<summary>3 items</summary>" in content
+    assert "<li> 2 x Test Product - Mug <small>(shipped)</small> </li>" in content
+    assert "<li> 2 x Card <small>(ready to send)</small> </li>" in content
+    assert "<li> 2 x Raffle ticket <small>(no shipping needed)</small> </li>" in content
+    collection = paid_order([card], shipping_method="collect")
+    content = " ".join(html.unescape(admin_client.get(INDEX_URL).content.decode()).split())
+    assert "<summary>1 item</summary>" in content
+    assert "<li> 2 x Card <small>(ready to collect)</small> </li>" in content
+    assert collection.ref in content
+
+
 # Permissions
 
 

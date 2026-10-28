@@ -235,6 +235,9 @@
         .shop-order__totals dd { text-align: right; max-width: 10rem; }
         .shop-order__ship { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 1rem; }
         .shop-order__ship .help { flex-basis: 100%; }
+        /* (the gap spaces them: no margin before a button after another, which
+           indents it when they wrap) */
+        .shop-order__ship .button, .shop-order__actions .button { margin: 0; }
         .shop-order__undo { display: block; margin-top: 0.25rem; }
         .shop-order__note { border-inline-start: 3px solid var(--w-color-border-furniture); padding-inline-start: 1rem; margin-bottom: 1rem; }
         .shop-order__note p { margin: 0.2rem 0; }

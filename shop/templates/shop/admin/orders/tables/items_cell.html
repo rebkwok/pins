@@ -1,0 +1,16 @@
+{# The order's items, collapsed (ItemsColumn) #}
+<td class="shop-orders-items">
+    {% with items=instance.items.all %}
+        <details>
+            <summary>{{ items|length }} item{{ items|length|pluralize }}</summary>
+            <ul>
+                {% for item in items %}
+                    <li>
+                        {{ item.quantity }} x {{ item.name }}
+                        <small>({% if item.shipping_status == "shipped" %}{% if instance.is_collected %}collected{% else %}shipped{% endif %}{% elif item.shipping_status == "to_send" %}{% if instance.is_collected %}ready to collect{% else %}ready to send{% endif %}{% else %}{{ item.get_shipping_status_display|lower }}{% endif %})</small>
+                    </li>
+                {% endfor %}
+            </ul>
+        </details>
+    {% endwith %}
+</td>

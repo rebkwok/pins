@@ -28,48 +28,51 @@
                 </tr>
             </thead>
             <tbody>
-                {% for dispatcher in dispatchers %}
-                    <tr>
-                        <td data-label="Name">
-                            {% if can_manage %}
-                                <a href="{% url 'wagtailusers_users:edit' dispatcher.pk %}">{{ dispatcher.get_full_name|default:dispatcher.get_username }}</a>
-                            {% else %}
-                                {{ dispatcher.get_full_name|default:dispatcher.get_username }}
-                            {% endif %}
-                        </td>
-                        <td data-label="Email">{% if dispatcher.email %}<a href="mailto:{{ dispatcher.email }}">{{ dispatcher.email }}</a>{% else %}-{% endif %}</td>
-                        <td data-label="Products">
-                            {% for product in dispatcher.dispatched_products.all %}
-                                <a href="{% url 'wagtailsnippets_shop_product:edit' product.pk %}">{{ product.name }}</a>{% if product.notify_dispatcher %} <span title="Emailed about new orders for this product">{% icon name="mail" classname="shop-dispatcher-emailed" %}<span class="w-sr-only">(emailed about new orders)</span></span>{% endif %}{% if not forloop.last %}<br>{% endif %}
-                            {% empty %}
-                                -
-                            {% endfor %}
-                        </td>
-                        <td data-label="Pending">
-                            {% include "shop/admin/includes/dispatcher_pending.html" with pending=dispatcher.pending url=dispatcher.pending_url %}
-                        </td>
-                        {% if can_manage %}
-                            <td>
-                                <form method="post">
-                                    {% csrf_token %}
-                                    <button type="submit" name="remove" value="{{ dispatcher.pk }}" class="button button-small button-secondary">Remove</button>
-                                </form>
+                {% for row in rows %}
+                    {% if row.dispatcher %}
+                        {% with dispatcher=row.dispatcher %}
+                            <tr>
+                                <td data-label="Name">
+                                    {% if can_manage %}
+                                        <a href="{% url 'wagtailusers_users:edit' dispatcher.pk %}">{{ dispatcher.get_full_name|default:dispatcher.get_username }}</a>
+                                    {% else %}
+                                        {{ dispatcher.get_full_name|default:dispatcher.get_username }}
+                                    {% endif %}
+                                </td>
+                                <td data-label="Email">{% if dispatcher.email %}<a href="mailto:{{ dispatcher.email }}">{{ dispatcher.email }}</a>{% else %}-{% endif %}</td>
+                                <td data-label="Products">
+                                    {% for product in dispatcher.dispatched_products.all %}
+                                        <a href="{% url 'wagtailsnippets_shop_product:edit' product.pk %}">{{ product.name }}</a>{% if product.notify_dispatcher %} <span title="Emailed about new orders for this product">{% icon name="mail" classname="shop-dispatcher-emailed" %}<span class="w-sr-only">(emailed about new orders)</span></span>{% endif %}{% if not forloop.last %}<br>{% endif %}
+                                    {% empty %}
+                                        -
+                                    {% endfor %}
+                                </td>
+                                <td data-label="Pending">
+                                    {% include "shop/admin/includes/dispatcher_pending.html" with pending=dispatcher.pending url=dispatcher.pending_url %}
+                                </td>
+                                {% if can_manage %}
+                                    <td>
+                                        <form method="post">
+                                            {% csrf_token %}
+                                            <button type="submit" name="remove" value="{{ dispatcher.pk }}" class="button button-small button-secondary">Remove</button>
+                                        </form>
+                                    </td>
+                                {% endif %}
+                            </tr>
+                        {% endwith %}
+                    {% else %}
+                        {# items of products without a dispatcher (sent by shop admins) #}
+                        <tr>
+                            <td data-label="Name"><em>No dispatcher</em></td>
+                            <td data-label="Email">-</td>
+                            <td data-label="Products">Products without a dispatcher</td>
+                            <td data-label="Pending">
+                                {% include "shop/admin/includes/dispatcher_pending.html" with pending=row.pending url=row.pending_url %}
                             </td>
-                        {% endif %}
-                    </tr>
+                            {% if can_manage %}<td></td>{% endif %}
+                        </tr>
+                    {% endif %}
                 {% endfor %}
-                {% if pending_without_dispatcher %}
-                    {# items of products without a dispatcher (sent by shop admins) #}
-                    <tr>
-                        <td data-label="Name"><em>No dispatcher</em></td>
-                        <td data-label="Email">-</td>
-                        <td data-label="Products">Products without a dispatcher</td>
-                        <td data-label="Pending">
-                            {% include "shop/admin/includes/dispatcher_pending.html" with pending=pending_without_dispatcher url=pending_without_dispatcher_url %}
-                        </td>
-                        {% if can_manage %}<td></td>{% endif %}
-                    </tr>
-                {% endif %}
             </tbody>
         </table>
     {% else %}

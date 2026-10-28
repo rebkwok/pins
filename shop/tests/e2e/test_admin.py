@@ -162,3 +162,32 @@ def test_dispatcher_on_phone(page, live_server, paid_order, dispatcher):
     page.get_by_role("button", name="Yes, mark as shipped").click()
     expect(page.get_by_text(re.compile("marked shipped"))).to_be_visible()
     assert paid_order.items.filter(dispatcher=dispatcher, shipping_status=OrderItem.SHIPPED).count() == 1
+
+
+@pytest.mark.parametrize("browser_context_args", [PHONE], indirect=True)
+def test_order_page_buttons_on_phone(page, live_server, admin_user, paid_order):
+    # the item buttons, wrapped onto two lines, line up
+    log_in(page, live_server, admin_user)
+    page.goto(order_url(live_server, paid_order))
+    ship = page.get_by_role("button", name="Mark selected items as shipped").bounding_box()
+    not_sent = page.get_by_role("button", name="Mark selected items as won't be sent").bounding_box()
+    assert not_sent["y"] > ship["y"]
+    assert not_sent["x"] == ship["x"]
+
+
+@pytest.mark.parametrize("browser_context_args", [PHONE], indirect=True)
+def test_orders_list_on_phone(page, live_server, admin_user, paid_order):
+    # wider than the screen (a long email, the items open): the list scrolls
+    # sideways, not the page (Wagtail's main area would cut it off)
+    paid_order.email = "catherine.customer.with.a.long.address@example.com"
+    paid_order.save()
+    log_in(page, live_server, admin_user)
+    page.goto(live_server.url + reverse("shop_orders:index"))
+    page.get_by_text("2 items").click()
+    scroll = page.locator(".shop-orders-scroll")
+    width = page.evaluate("innerWidth")
+    assert page.evaluate("document.documentElement.scrollWidth") == width
+    assert scroll.evaluate("e => e.scrollWidth > e.clientWidth")
+    status = page.locator("table.listing td", has_text="Paid – ready to ship")
+    status.scroll_into_view_if_needed()
+    expect(status).to_be_in_viewport()

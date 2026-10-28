@@ -11,7 +11,7 @@
             </p>
         {% endif %}
         <nav class="dispatch__tabs" aria-label="Orders">
-            <a href="{{ to_send_url }}" {% if not showing_sent %}aria-current="page"{% endif %}>To send ({{ to_send_count }})</a>
+            <a href="{{ to_send_url }}" {% if not showing_sent %}aria-current="page"{% endif %}>To send ({{ to_send_count }} item{{ to_send_count|pluralize }})</a>
             <a href="{{ sent_url }}" {% if showing_sent %}aria-current="page"{% endif %}>Sent</a>
         </nav>
 
