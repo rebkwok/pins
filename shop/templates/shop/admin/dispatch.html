@@ -78,9 +78,9 @@
                 {% if read_only %}
                     <a href="{% url 'shop_orders:edit' order.pk %}" class="button button-secondary">Order page</a>
                 {% elif not showing_sent %}
-                    <form method="post">
-                        {% csrf_token %}
-                        <button type="submit" name="order" value="{{ order.pk }}" class="button">
+                    {# (to a page to confirm, see DispatchView.confirm) #}
+                    <form method="get">
+                        <button type="submit" name="mark" value="{{ order.pk }}" class="button">
                             Mark as {% if order.is_collected %}collected{% else %}shipped{% endif %}
                         </button>
                     </form>

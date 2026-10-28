@@ -123,6 +123,36 @@ def test_mark_order_shipped(dispatcher_client, shop_variants, dispatcher, django
     assert len(mail.outbox) == 1
 
 
+@pytest.mark.parametrize("shipping_method,done", [("deliver", "shipped"), ("collect", "collected")])
+def test_mark_order_shipped_confirm(dispatcher_client, shop_variants, shipping_method, done):
+    # first a page to confirm, listing their items: nothing's changed yet
+    mug, card, raffle = shop_variants
+    order = order_with([mug, card], shipping_method=shipping_method)
+    mail.outbox.clear()
+    resp = dispatcher_client.get(URL, {"mark": order.pk})
+    assert resp.status_code == 200
+    page = " ".join(content(resp).split())
+    assert f"Mark these items as {done}?" in page
+    assert "<ul> <li>2 x Test Product - Mug</li> </ul>" in page
+    assert f"<strong>The customer will be emailed</strong> to say they've been {done}." in page
+    assert f'<input type="hidden" name="order" value="{order.pk}">' in page
+    assert f"Yes, mark as {done}" in page
+    assert f'<a href="{URL}" class="button button-secondary">No, go back</a>' in page
+    assert order.items.get(product_id=mug.id).shipping_status == OrderItem.TO_SEND
+    assert not mail.outbox
+    # the order's button opens it
+    assert f'<button type="submit" name="mark" value="{order.pk}" class="button">' in content(dispatcher_client.get(URL))
+
+
+def test_mark_order_shipped_confirm_nothing_to_send(dispatcher_client, shop_variants):
+    # e.g. back to the page to confirm after confirming
+    mug, card, raffle = shop_variants
+    order = order_with([card])
+    resp = dispatcher_client.get(URL, {"mark": order.pk})
+    assert resp.url == URL
+    assert messages_for(resp) == [f"Order {order.ref} has nothing for you to send."]
+
+
 def test_mark_collected(dispatcher_client, shop_variants):
     mug, card, raffle = shop_variants
     order = order_with([mug], shipping_method="collect")

@@ -219,7 +219,7 @@ def test_admin_order_page(client, delivered_order):
     client.force_login(baker.make("auth.User", is_superuser=True))
     content = html.unescape(client.get(reverse("shop_orders:edit", args=(delivered_order.pk,))).content.decode())
     assert '<a href="tel:07700 900123">07700 900123</a>' in content
-    assert "Outside the UK: check that shipping has been arranged" in content
+    assert "Outside the UK: check that shipping has been pre-arranged with the customer and any extra costs have been paid before shipping." in content
     assert "<dd>Porch</dd>" in content
     assert "Data processing consent" in content
 

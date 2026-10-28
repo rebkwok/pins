@@ -51,15 +51,35 @@ def test_order_page(page, live_server, admin_user, paid_order):
     # mark the mugs shipped: the customer is emailed, and it's logged
     page.get_by_label(re.compile("Select .*Podenco mug")).check()
     page.get_by_role("button", name="Mark selected items as shipped").click()
+    # (confirming first: nothing's been emailed yet)
+    expect(page.get_by_role("heading", name="Mark these items as shipped?")).to_be_visible()
+    assert not mail.outbox
+    page.get_by_role("button", name="Yes, mark as shipped").click()
     expect(page.get_by_text("1 item marked shipped, and the customer has been emailed.")).to_be_visible()
     expect(page.get_by_text("Partly shipped")).to_be_visible()
     assert [message.to for message in mail.outbox] == [["cat@test.com"]]
     activity = page.locator("table.shop-order__activity")
     expect(activity).to_contain_text("Marked shipped: 2 × Podenco mug")
     expect(activity).to_contain_text("Ada")
+    # undoing it (by mistake, say), then shipping them again
+    page.get_by_role("button", name="Undo marking Podenco mug as shipped").click()
+    page.get_by_role("button", name="Yes, undo").click()
+    expect(page.get_by_text("Undone: 1 item is ready to send again. The customer hasn't been emailed.")).to_be_visible()
+    expect(page.get_by_text("Paid – ready to ship")).to_be_visible()
+    expect(activity).to_contain_text("Undone, ready to send again: 2 × Podenco mug")
+    # the back button: to the page to confirm, which has nothing left to do, so
+    # back to the order
+    page.go_back()
+    expect(page.get_by_text("Those items have already been changed.")).to_be_visible()
+    expect(page).to_have_url(order_url(live_server, paid_order))
+    page.get_by_label(re.compile("Select .*Podenco mug")).check()
+    page.get_by_role("button", name="Mark selected items as shipped").click()
+    page.get_by_role("button", name="Yes, mark as shipped").click()
+    expect(page.get_by_text("Partly shipped")).to_be_visible()
     # the T-shirt won't be sent; then the order can be completed
     page.get_by_label(re.compile("Select .*PINS T-shirt")).check()
     page.get_by_role("button", name="Mark selected items as won't be sent").click()
+    page.get_by_role("button", name="Yes, mark as won't be sent").click()
     page.get_by_role("link", name="Mark as completed").click()
     page.get_by_role("button", name="Mark as completed").click()
     expect(page.get_by_text(f"Order {paid_order.ref} is completed")).to_be_visible()
@@ -139,5 +159,6 @@ def test_dispatcher_on_phone(page, live_server, paid_order, dispatcher):
     order = page.locator(".dispatch-order", has_text=paid_order.ref)
     expect(order).to_contain_text("Porch")
     order.get_by_role("button", name=re.compile("Mark .*shipped")).click()
+    page.get_by_role("button", name="Yes, mark as shipped").click()
     expect(page.get_by_text(re.compile("marked shipped"))).to_be_visible()
     assert paid_order.items.filter(dispatcher=dispatcher, shipping_status=OrderItem.SHIPPED).count() == 1

@@ -46,7 +46,7 @@
                     <dd>
                         {{ order.shipping_address|linebreaksbr|default:"-" }}
                         {% if order.outside_uk %}
-                            <p class="help-block help-warning shop-order__outside-uk">Outside the UK: check that shipping has been arranged with the customer (it isn't standard).</p>
+                            <p class="help-block help-warning shop-order__outside-uk">Outside the UK: check that shipping has been pre-arranged with the customer and any extra costs have been paid before shipping.</p>
                         {% endif %}
                     </dd>
                     <dt>Safe place</dt>
@@ -59,8 +59,8 @@
 
         <section class="shop-order__section">
             <h2 class="w-h3">Items</h2>
-            <form method="post" action="{% url 'shop_orders:ship' order.pk %}">
-                {% csrf_token %}
+            {# (GET: to a page to confirm, see OrderShipView) #}
+            <form method="get" action="{% url 'shop_orders:ship' order.pk %}">
                 <table class="listing shop-order__table">
                     <thead>
                         <tr>
@@ -99,9 +99,13 @@
                                     {% if item.shipping_status == "shipped" %}
                                         {% if order.is_collected %}Collected{% else %}Shipped{% endif %}
                                         {{ item.shipped_at|date:"j M Y" }}{% if item.shipped_by %}<br><small>by {{ item.shipped_by.get_full_name|default:item.shipped_by.get_username }}</small>{% endif %}
+                                        {% if can_undo %}{% include "shop/admin/orders/undo_button.html" %}{% endif %}
                                     {% elif item.shipping_status == "not_sent" %}
                                         Won't be sent
                                         {% if item.shipped_by %}<br><small>{{ item.shipped_at|date:"j M Y" }}, by {{ item.shipped_by.get_full_name|default:item.shipped_by.get_username }}</small>{% endif %}
+                                        {% if can_undo %}{% include "shop/admin/orders/undo_button.html" %}{% endif %}
+                                    {% elif item.shipping_status == "to_send" and closed %}
+                                        Not sent
                                     {% elif item.shipping_status == "to_send" %}
                                         <strong>{% if order.is_collected %}Ready to collect{% else %}Ready to send{% endif %}</strong>
                                     {% else %}
@@ -122,6 +126,8 @@
                             Mark items as won't be sent if they can't or won't be sent (e.g. out of stock or no longer wanted): the customer isn't emailed, so contact them, and refund the items if necessary. An entire order can be refunded from this page; to refund part of an order, ask a Stripe admin.
                         </p>
                     </div>
+                {% elif closed %}
+                    {% if order.items_to_send.exists %}<p class="help">The order has been {{ order.status_display|lower }}, so its items can't be marked {% if order.is_collected %}collected{% else %}shipped{% endif %}.</p>{% endif %}
                 {% elif order.items_to_send.exists %}
                     <p class="help">Items can be marked shipped once the order has been paid.</p>
                 {% endif %}
@@ -229,6 +235,7 @@
         .shop-order__totals dd { text-align: right; max-width: 10rem; }
         .shop-order__ship { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 1rem; }
         .shop-order__ship .help { flex-basis: 100%; }
+        .shop-order__undo { display: block; margin-top: 0.25rem; }
         .shop-order__note { border-inline-start: 3px solid var(--w-color-border-furniture); padding-inline-start: 1rem; margin-bottom: 1rem; }
         .shop-order__note p { margin: 0.2rem 0; }
         .shop-order__note-form { margin-top: 1.5rem; max-width: 40rem; }

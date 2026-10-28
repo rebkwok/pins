@@ -234,6 +234,61 @@ class Order(OrderAmountsMixin, BaseOrder):
             activity.log_items(self, activity.ORDER_NOT_SENT, changed, user=user)
         return changed
 
+    @property
+    def can_undo_items(self):
+        """
+        Whether items marked shipped (or collected) or won't be sent can be
+        marked ready to send again: while the order's being shipped, not once it's
+        completed, refunded or cancelled
+        """
+        return self.status in (
+            self.Status.PROCESSING,
+            self.Status.PARTIALLY_SHIPPED,
+            self.Status.SHIPPED,
+        )
+
+    @transaction.atomic
+    def mark_items_to_send(self, items, user):
+        """
+        Undo marking the order's items shipped (or collected) or won't be sent,
+        e.g. if they were marked by mistake: they're ready to send again, and the
+        order's status is worked out again. The customer isn't emailed.
+        Returns the items changed.
+        """
+        from . import activity
+
+        if not self.can_undo_items:
+            return []
+        Order.objects.select_for_update().filter(pk=self.pk).first()
+        to_change = list(
+            self.items.filter(
+                pk__in=[item.pk for item in items],
+                shipping_status__in=[OrderItem.SHIPPED, OrderItem.NOT_SENT],
+            )
+        )
+        for item in to_change:
+            item.shipping_status = OrderItem.TO_SEND
+            item.shipped_at = None
+            item.shipped_by = None
+            item.save(update_fields=["shipping_status", "shipped_at", "shipped_by"])
+        if to_change:
+            self._reset_shipping_status()
+            activity.log_items(self, activity.ORDER_TO_SEND, to_change, user=user)
+        return to_change
+
+    def _reset_shipping_status(self):
+        """
+        The order's status from its items, after some are ready to send again: being
+        processed (nothing shipped) or partly shipped. Updated without saving the
+        order, as a status change saved would send its signals (e.g. "paid"
+        emails, for back to being processed).
+        """
+        shipped = self.items.filter(shipping_status=OrderItem.SHIPPED).exists()
+        new_status = self.Status.PARTIALLY_SHIPPED if shipped else self.Status.PROCESSING
+        if new_status != self.status:
+            Order.objects.filter(pk=self.pk).update(status=new_status, date_updated=timezone.now())
+            self.status = self._current_status = new_status
+
     def update_shipping_status(self):
         """
         Partially shipped once some (but not all) of the items that need shipping

@@ -33,9 +33,33 @@
         </div>
         <form method="post">
             {% csrf_token %}
+            {% if items_to_send %}
+                <div class="shop-refund__items">
+                    <p>These items haven't been {% if order.is_collected %}collected{% else %}shipped{% endif %}:</p>
+                    <ul>
+                        {% for item in items_to_send %}
+                            <li>{{ item.quantity }} x {{ item.name }}</li>
+                        {% endfor %}
+                    </ul>
+                    <label class="shop-refund__not-sent">
+                        <input type="checkbox" name="mark_not_sent" value="1" checked>
+                        Also mark them as won't be sent
+                    </label>
+                </div>
+            {% endif %}
             <button type="submit" class="button no">Yes, refund this order</button>
             <a href="{{ order_url }}" class="button button-secondary">No, go back</a>
         </form>
     {% endif %}
     </div>
+{% endblock %}
+
+{% block extra_css %}
+    {{ block.super }}
+    <style>
+        .shop-refund__items { margin: 1.5rem 0 2rem; }
+        .shop-refund__items ul { margin-bottom: 1.25rem; }
+        .shop-refund__items li + li { margin-top: 0.4rem; }
+        .shop-refund__not-sent { display: flex; align-items: center; gap: 0.5rem; }
+    </style>
 {% endblock %}

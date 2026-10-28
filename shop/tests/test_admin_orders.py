@@ -588,6 +588,41 @@ def test_ship_collected_items(admin_client, shop_variants):
     ]
 
 
+@pytest.mark.parametrize(
+    "action,question,note,yes",
+    [
+        ("ship", "Mark these items as shipped?", "<strong>The customer will be emailed</strong> to say they've been shipped.", "Yes, mark as shipped"),
+        ("not_sent", "Mark these items as won't be sent?", "The customer won't be emailed: contact them, and refund the items if necessary.", "Yes, mark as won't be sent"),
+    ],
+)
+def test_ship_confirm(admin_client, shop_variants, action, question, note, yes):
+    # first a page to confirm, listing the items: nothing's changed yet
+    mug, card, raffle = shop_variants
+    order = paid_order([mug, card])
+    mug_item = order.items.get(product_id=mug.id)
+    resp = admin_client.get(order_url(order, "ship"), {"items": [mug_item.pk], "action": action})
+    assert resp.status_code == 200
+    content = " ".join(html.unescape(resp.content.decode()).split())
+    assert question in content
+    assert "<ul> <li>2 x Test Product - Mug</li> </ul>" in content
+    assert note in content
+    assert f'<input type="hidden" name="items" value="{mug_item.pk}">' in content
+    assert f'<input type="hidden" name="action" value="{action}">' in content
+    assert yes in content
+    assert f'<a href="{order_url(order)}" class="button button-secondary">No, go back</a>' in content
+    mug_item.refresh_from_db()
+    assert mug_item.shipping_status == OrderItem.TO_SEND
+    assert not mail.outbox
+
+
+def test_ship_confirm_collected(admin_client, shop_variants):
+    order = paid_order(shop_variants, shipping_method="collect")
+    items = [item.pk for item in order.items_to_send]
+    content = html.unescape(admin_client.get(order_url(order, "ship"), {"items": items}).content.decode())
+    assert "Mark these items as collected?" in content
+    assert "Yes, mark as collected" in content
+
+
 def test_ship_no_items_chosen(admin_client, shop_variants):
     order = paid_order(shop_variants)
     resp = admin_client.post(order_url(order, "ship"), {})
@@ -603,8 +638,16 @@ def test_ship_unpaid_order(admin_client, shop_variants):
     assert order.items_to_send.count() == 2
 
 
-def test_ship_get_not_allowed(admin_client, order):
-    assert admin_client.get(order_url(order, "ship")).status_code == 405
+def test_ship_confirm_after_changed(admin_client, shop_variants, dispatcher):
+    # e.g. back to the page to confirm after confirming: back to the order
+    mug, card, raffle = shop_variants
+    order = shipped_order([mug], dispatcher)
+    item = order.items.get()
+    resp = admin_client.get(order_url(order, "ship"), {"items": [item.pk], "action": "ship"})
+    assert resp.url == order_url(order)
+    assert messages_for(resp) == ["Those items have already been changed."]
+    resp = admin_client.get(order_url(order, "ship"))
+    assert messages_for(resp)[-1] == "Choose the items first."
 
 
 # Completing and cancelling
@@ -798,3 +841,107 @@ def test_customer_order_page_link(admin_client, order):
     content = admin_client.get(reverse("shop_orders:edit", args=(order.pk,))).content.decode()
     url = reverse("shop:order_status", args=(order.token,))
     assert f'<a href="{url}" target="_blank" rel="noopener">Customer\'s order page' in content
+
+
+# Undoing shipped (or collected) and won't be sent
+
+
+def undo(admin_client, order, item, confirm=True):
+    # confirm=False: the page to confirm
+    method = admin_client.post if confirm else admin_client.get
+    return method(order_url(order, "ship"), {"undo": item.pk})
+
+
+def test_items_form(admin_client, shop_variants):
+    # to the page to confirm (GET, so the back button works there)
+    order = paid_order(shop_variants)
+    content = admin_client.get(order_url(order)).content.decode()
+    assert f'<form method="get" action="{order_url(order, "ship")}">' in content
+
+
+def test_undo_buttons(admin_client, shop_variants, dispatcher):
+    mug, card, raffle = shop_variants
+    order = paid_order([mug, card])
+    mug_item, card_item = order.items.get(product_id=mug.id), order.items.get(product_id=card.id)
+    order.mark_items_shipped([mug_item], dispatcher)
+    content = admin_client.get(order_url(order)).content.decode()
+    assert f'name="undo" value="{mug_item.pk}"' in content
+    assert f'name="undo" value="{card_item.pk}"' not in content
+    # not once the order's completed
+    order.mark_items_shipped([card_item], dispatcher)
+    order.status = OrderStatus.COMPLETED
+    order.save()
+    assert 'name="undo"' not in admin_client.get(order_url(order)).content.decode()
+
+
+def test_undo_shipped(admin_client, shop_variants, dispatcher, django_capture_on_commit_callbacks):
+    mug, card, raffle = shop_variants
+    order = shipped_order([mug, card], dispatcher)
+    assert order.status == OrderStatus.SHIPPED
+    mug_item = order.items.get(product_id=mug.id)
+    # confirm first, saying the customer was emailed
+    content = " ".join(html.unescape(undo(admin_client, order, mug_item, confirm=False).content.decode()).split())
+    assert "Undo marking this item as shipped?" in content
+    assert (
+        "It will be ready to send again. The customer won't be emailed (they've "
+        "already been emailed that it was shipped, so you may want to contact them)."
+    ) in content
+    assert "Yes, undo" in content
+    assert f'<input type="hidden" name="undo" value="{mug_item.pk}">' in content
+    mug_item.refresh_from_db()
+    assert mug_item.shipping_status == OrderItem.SHIPPED
+    # then: to send again, the order partly shipped, logged, and no emails (the
+    # customer's or dispatchers' "paid" emails)
+    with django_capture_on_commit_callbacks(execute=True):
+        resp = undo(admin_client, order, mug_item)
+    assert messages_for(resp) == ["Undone: 1 item is ready to send again. The customer hasn't been emailed."]
+    mug_item.refresh_from_db()
+    assert (mug_item.shipping_status, mug_item.shipped_at, mug_item.shipped_by) == (OrderItem.TO_SEND, None, None)
+    order.refresh_from_db()
+    assert order.status == OrderStatus.PARTIALLY_SHIPPED
+    assert not mail.outbox
+    content = html.unescape(admin_client.get(order_url(order)).content.decode())
+    assert "Undone, ready to send again: 2 × Test Product - Mug" in content
+    # undoing the other: back to being processed, still no emails
+    with django_capture_on_commit_callbacks(execute=True):
+        undo(admin_client, order, order.items.get(product_id=card.id))
+    order.refresh_from_db()
+    assert order.status == OrderStatus.PROCESSING
+    assert order.display_status == "Paid – ready to ship"
+    assert not mail.outbox
+
+
+def test_undo_not_sent(admin_client, shop_variants, dispatcher):
+    # the card won't be sent and the mug's shipped (so the order's shipped);
+    # undoing the card: partly shipped
+    mug, card, raffle = shop_variants
+    order = paid_order([mug, card], shipping_method="collect")
+    card_item = order.items.get(product_id=card.id)
+    order.mark_items_not_sent([card_item], dispatcher)
+    order.mark_items_shipped([order.items.get(product_id=mug.id)], dispatcher)
+    order.refresh_from_db()
+    assert order.status == OrderStatus.SHIPPED
+    content = " ".join(html.unescape(undo(admin_client, order, card_item, confirm=False).content.decode()).split())
+    assert "Undo marking this item as won't be sent?" in content
+    assert "It will be ready to collect again. The customer won't be emailed." in content
+    resp = undo(admin_client, order, card_item)
+    assert messages_for(resp) == ["Undone: 1 item is ready to collect again. The customer hasn't been emailed."]
+    order.refresh_from_db()
+    assert order.status == OrderStatus.PARTIALLY_SHIPPED
+    assert "Undone, ready to collect again: 2 × Card" in html.unescape(admin_client.get(order_url(order)).content.decode())
+
+
+def test_undo_not_allowed(admin_client, shop_variants, dispatcher):
+    # once the order's completed (or refunded, cancelled), or for an item still to send
+    mug, card, raffle = shop_variants
+    order = shipped_order([mug], dispatcher)
+    item = order.items.get()
+    order.status = OrderStatus.COMPLETED
+    order.save()
+    resp = undo(admin_client, order, item)
+    assert messages_for(resp) == ["Items can't be changed: the order is completed."]
+    assert item.shipping_status == OrderItem.SHIPPED
+    assert order.mark_items_to_send([item], dispatcher) == []
+    order = paid_order([mug])
+    resp = undo(admin_client, order, order.items.get())
+    assert messages_for(resp)[-1] == "Those items have already been changed."

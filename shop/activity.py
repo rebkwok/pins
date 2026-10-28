@@ -22,6 +22,7 @@ ORDER_PLACED = "shop.order.placed"
 ORDER_PAID = "shop.order.paid"
 ORDER_SHIPPED = "shop.order.shipped"
 ORDER_NOT_SENT = "shop.order.not_sent"
+ORDER_TO_SEND = "shop.order.to_send"
 ORDER_COMPLETED = "shop.order.completed"
 ORDER_CANCELLED = "shop.order.cancelled"
 ORDER_REFUNDED = "shop.order.refunded"
@@ -95,6 +96,15 @@ class ItemsNotSent(ItemsFormatter):
         return "Marked won't be sent"
 
 
+class ItemsToSend(ItemsFormatter):
+    label = "Items ready to send again"
+
+    def prefix(self, log_entry):
+        if self.data(log_entry, "collected", False):
+            return "Undone, ready to collect again"
+        return "Undone, ready to send again"
+
+
 class OrderRefunded(ShopLogFormatter):
     label = "Order refunded"
 
@@ -143,6 +153,7 @@ SHOP_LOG_ACTIONS = {
     ORDER_PAID: OrderPaid,
     ORDER_SHIPPED: ItemsShipped,
     ORDER_NOT_SENT: ItemsNotSent,
+    ORDER_TO_SEND: ItemsToSend,
     ORDER_REFUNDED: OrderRefunded,
     ORDER_NOTE: OrderNoteAdded,
     ORDER_DISPUTED: OrderDisputed,

@@ -407,6 +407,9 @@ class OrderDetailView(OrderViewMixin, TemplateView):
             items=items,
             can_ship=order.can_ship_items
             and any(item.shipping_status == OrderItem.TO_SEND for item in items),
+            can_undo=order.can_undo_items,
+            # (its items to send won't be)
+            closed=order.status in (Order.Status.REFUNDED, Order.Status.CANCELLED),
             payments=order.payments.order_by("date_created"),
             notes=order.notes.order_by("date_created"),
             # who did what to the order (activity.py), oldest first
@@ -437,22 +440,132 @@ class OrderDetailView(OrderViewMixin, TemplateView):
         return redirect(self.order_url)
 
 
-class OrderShipView(OrderViewMixin, TemplateView):
-    """Mark items shipped, or won't be sent (posted from the order page)"""
+class OrderShipView(OrderActionMixin, TemplateView):
+    """
+    Mark items shipped (or collected), won't be sent, or ready to send again
+    (undo), from the order page: its form opens this page (GET, so the browser's
+    back button can come back to it) to confirm, as marking items shipped
+    emails the customer; confirming posts the same fields, then it's back to
+    the order page.
+    """
 
-    http_method_names = ["post"]
+    template_name = "shop/admin/confirm_items.html"
+    action_label = "Confirm"
+
+    @property
+    def data(self):
+        return self.request.POST if self.request.method == "POST" else self.request.GET
+
+    @property
+    def action(self):
+        if "undo" in self.data:
+            return "undo"
+        return "not_sent" if self.data.get("action") == "not_sent" else "ship"
+
+    def get_items(self):
+        order = self.order
+        if self.action == "undo":
+            return list(
+                order.items.filter(
+                    pk=self.data.get("undo"),
+                    shipping_status__in=[OrderItem.SHIPPED, OrderItem.NOT_SENT],
+                )
+            )
+        return list(order.items_to_send.filter(pk__in=self.data.getlist("items")))
+
+    def confirm_context(self, items):
+        order = self.order
+        done = "collected" if order.is_collected else "shipped"
+        fields = [("items", item.pk) for item in items]
+        if self.action == "ship":
+            question = f"Mark these items as {done}?"
+            notes = [
+                format_html(
+                    "<strong>The customer will be emailed</strong> to say they've been {}.",
+                    done,
+                )
+            ]
+            fields.append(("action", "ship"))
+            yes_label = f"Yes, mark as {done}"
+        elif self.action == "not_sent":
+            question = "Mark these items as won't be sent?"
+            notes = [
+                "The customer won't be emailed: contact them, and refund the items if "
+                "necessary."
+            ]
+            fields.append(("action", "not_sent"))
+            yes_label = "Yes, mark as won't be sent"
+        else:
+            ready = "ready to collect" if order.is_collected else "ready to send"
+            item = items[0]
+            was = done if item.shipping_status == OrderItem.SHIPPED else "won't be sent"
+            question = f"Undo marking this item as {was}?"
+            notes = [
+                f"It will be {ready} again. The customer won't be emailed"
+                + (
+                    f" (they've already been emailed that it was {done}, so you may "
+                    "want to contact them)."
+                    if item.shipping_status == OrderItem.SHIPPED
+                    else "."
+                )
+            ]
+            fields = [("undo", item.pk)]
+            yes_label = "Yes, undo"
+        return {
+            "question": question,
+            "items": items,
+            "notes": notes,
+            "fields": fields,
+            "yes_label": yes_label,
+            "back_url": self.order_url,
+        }
+
+    def check(self):
+        """The items to change, or a redirect back to the order page saying why not"""
+        order = self.order
+        allowed = order.can_undo_items if self.action == "undo" else order.can_ship_items
+        if not allowed:
+            if self.action == "undo":
+                messages.error(
+                    self.request,
+                    f"Items can't be changed: the order is {order.display_status.lower()}.",
+                )
+            else:
+                messages.error(
+                    self.request, "Items can't be marked shipped until the order is paid."
+                )
+            return None, redirect(self.order_url)
+        items = self.get_items()
+        if not items:
+            if "undo" in self.data or self.data.getlist("items"):
+                # e.g. back to this page after confirming
+                messages.warning(self.request, "Those items have already been changed.")
+            else:
+                messages.warning(self.request, "Choose the items first.")
+            return None, redirect(self.order_url)
+        return items, None
+
+    def get(self, request, *args, **kwargs):
+        items, response = self.check()
+        if response:
+            return response
+        return self.render_to_response(self.get_context_data(**self.confirm_context(items)))
 
     def post(self, request, *args, **kwargs):
         order = self.order
-        if not order.can_ship_items:
-            messages.error(request, "Items can't be marked shipped until the order is paid.")
-            return redirect(self.order_url)
-        items = list(order.items_to_send.filter(pk__in=request.POST.getlist("items")))
-        if not items:
-            messages.warning(request, "Choose the items first.")
-            return redirect(self.order_url)
+        items, response = self.check()
+        if response:
+            return response
         count = f"{len(items)} item{pluralize(len(items))}"
-        if request.POST.get("action") == "not_sent":
+        if self.action == "undo":
+            changed = order.mark_items_to_send(items, request.user)
+            ready = "ready to collect" if order.is_collected else "ready to send"
+            messages.success(
+                request,
+                f"Undone: {len(changed)} item{pluralize(len(changed), ' is,s are')} {ready} again. "
+                "The customer hasn't been emailed.",
+            )
+        elif self.action == "not_sent":
             order.mark_items_not_sent(items, request.user)
             if order.items.exclude(shipping_status=OrderItem.NOT_SENT).exists():
                 # Some of the order is being sent (or doesn't need sending), so
@@ -547,6 +660,8 @@ class OrderRefundView(OrderActionMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         context["stripe_payments"] = stripe_payments(self.order)
         context["refund_amount"] = self.order.amount_paid
+        # (which can be marked won't be sent as well)
+        context["items_to_send"] = list(self.order.items_to_send)
         return context
 
     def post(self, request, *args, **kwargs):
@@ -554,12 +669,19 @@ class OrderRefundView(OrderActionMixin, TemplateView):
         if order.status == order.Status.REFUNDED:
             messages.error(request, f"Order {order} has already been refunded.")
             return redirect(self.order_url)
+        # (before refunding, which may change the order's status)
+        items_to_send = list(order.items_to_send)
         refunded, errors = PayByStripe.refund_order(order)
         if refunded:
+            not_sent = ""
+            if items_to_send and request.POST.get("mark_not_sent"):
+                order.mark_items_not_sent(items_to_send, request.user)
+                count = len(items_to_send)
+                not_sent = f" {count} item{pluralize(count)} marked as won't be sent."
             messages.success(
                 request,
-                f"{gbp(refunded)} refunded for order {order}. Stock hasn't been "
-                "changed; update it manually if items are going back into stock.",
+                f"{gbp(refunded)} refunded for order {order}.{not_sent} Stock hasn't "
+                "been changed; update it manually if items are going back into stock.",
             )
         for error in errors:
             messages.error(request, f"Error refunding order {order}: {error}")

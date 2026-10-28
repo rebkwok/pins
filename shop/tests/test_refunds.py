@@ -213,3 +213,40 @@ def test_order_status_page_refunds(client, paid_order):
     assert "<span>Amount refunded</span> <span>£5.00</span>" in content
     # nothing is due because of a refund
     assert "Amount outstanding" not in content
+
+
+def test_refund_page_items_to_send(admin_client, paid_order):
+    # unsent items: offered to be marked won't be sent as well (ticked). (The
+    # order is a collection.). (The
+    # order is a collection.)
+    content = " ".join(html.unescape(admin_client.get(refund_url(paid_order)).content.decode()).split())
+    assert "<p>These items haven't been collected:</p> <ul> <li>2 x Test Product - Small</li> </ul>" in content
+    assert '<input type="checkbox" name="mark_not_sent" value="1" checked> Also mark them as won\'t be sent' in content
+
+
+@pytest.mark.parametrize("mark_not_sent", [True, False])
+def test_refund_marks_items_not_sent(admin_client, paid_order, requests_mock, mark_not_sent):
+    requests_mock.post(REFUNDS_URL, json=refund_json())
+    data = {"mark_not_sent": "1"} if mark_not_sent else {}
+    resp = admin_client.post(refund_url(paid_order), data)
+    item = paid_order.items.get()
+    if mark_not_sent:
+        assert item.shipping_status == item.NOT_SENT
+        assert messages_for(resp) == [
+            f"£20.00 refunded for order {paid_order}. 1 item marked as won't be sent. "
+            "Stock hasn't been changed; update it manually if items are going back into stock."
+        ]
+    else:
+        assert item.shipping_status == item.TO_SEND
+    # the order page: items still to send aren't "Ready to send" once refunded
+    content = html.unescape(admin_client.get(reverse("shop_orders:edit", args=(paid_order.pk,))).content.decode())
+    assert "Ready to collect" not in content
+    if not mark_not_sent:
+        assert "Not sent" in content
+        assert "The order has been refunded, so its items can't be marked collected." in content
+
+
+def test_refund_failed_doesnt_mark_items(admin_client, paid_order, requests_mock):
+    requests_mock.post(REFUNDS_URL, status_code=400, json={"error": {"message": "No"}})
+    admin_client.post(refund_url(paid_order), {"mark_not_sent": "1"})
+    assert paid_order.items.get().shipping_status == "to_send"

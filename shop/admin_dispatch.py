@@ -12,7 +12,9 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect
 from django.template.defaultfilters import pluralize
+from django.template.response import TemplateResponse
 from django.urls import path, reverse
+from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.views.generic import TemplateView
 from wagtail.admin import messages
@@ -142,7 +144,38 @@ class DispatchView(OrderItemsExportMixin, WagtailAdminTemplateMixin, TemplateVie
     def get(self, request, *args, **kwargs):
         if request.GET.get("export") == self.FORMAT_XLSX:
             return self.as_spreadsheet(items_to_send(self.dispatcher), self.FORMAT_XLSX)
+        if "mark" in request.GET and not self.read_only:
+            return self.confirm(request)
         return super().get(request, *args, **kwargs)
+
+    def confirm(self, request):
+        """
+        A page to confirm marking the order's items shipped (or collected), as
+        the customer is emailed: ?mark=<order id> (GET, so the browser's back
+        button can come back to it); it posts the order
+        """
+        order = get_object_or_404(Order, pk=request.GET["mark"])
+        items = list(items_to_send(request.user).filter(order=order))
+        if not items:
+            # e.g. back to this page after confirming
+            messages.warning(request, f"Order {order.ref} has nothing for you to send.")
+            return redirect("shop_dispatch:index")
+        done = "collected" if order.is_collected else "shipped"
+        context = self.get_context_data(
+            question=f"Mark these items as {done}?",
+            order=order,
+            items=items,
+            notes=[
+                format_html(
+                    "<strong>The customer will be emailed</strong> to say they've been {}.",
+                    done,
+                )
+            ],
+            fields=[("order", order.pk)],
+            yes_label=f"Yes, mark as {done}",
+            back_url=reverse("shop_dispatch:index"),
+        )
+        return TemplateResponse(request, "shop/admin/confirm_items.html", context)
 
     @property
     def showing_sent(self):
@@ -172,7 +205,8 @@ class DispatchView(OrderItemsExportMixin, WagtailAdminTemplateMixin, TemplateVie
         return context
 
     def post(self, request, *args, **kwargs):
-        # Mark the dispatcher's items in the order shipped (or collected)
+        # Mark the dispatcher's items in the order shipped (or collected), from
+        # the page to confirm (see confirm)
         order = get_object_or_404(Order, pk=request.POST.get("order"))
         items = list(items_to_send(request.user).filter(order=order))
         shipped = order.mark_items_shipped(items, request.user) if items else []
