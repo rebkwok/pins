@@ -134,7 +134,11 @@ account" permission (superusers have it).
 
 - The email addresses to email new orders to
 - The reply-to address for shop emails
-- The shipping cost (a flat rate for every delivered order)
+- The email footer, on emails to customers: add PINS's registered charity
+  number (the default doesn't have it)
+
+Shipping costs are set as shipping rates (Shop admin > Shipping rates), one per
+product.
 
 ## The old order forms (deprecated)
 
@@ -349,7 +353,8 @@ Every deploy:
   `SALESMAN_STRIPE_CONNECT_CLIENT_ID` (the test `ca_...`),
   `SALESMAN_STRIPE_CONNECT_WEBHOOK_SECRET` (from the test webhook endpoint),
   `SALESMAN_STRIPE_CONNECT_PAGES_ENABLED=True`.
-- In the platform's Stripe dashboard (test mode): enable OAuth for Connect,
+- In the platform's Stripe dashboard (test mode): enable OAuth for Connect
+  (Settings → Connect → Onboarding Options → OAuth Settings),
   with the redirect URI `https://podencosinneed.org/stripe/oauth/callback/`,
   and create the webhook endpoint for events on connected accounts (see
   Webhooks).
