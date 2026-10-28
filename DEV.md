@@ -387,14 +387,20 @@ Every deploy:
   (Stripe dashboard > Webhooks).
 
 **Launch**
+0. While the site still has Stripe's **test** keys: clear out the test data with
+   `python manage.py clear_shop_test_data` (it shows what it would delete:
+   test orders, baskets, used discount codes and the orders' log entries),
+   then again with `--delete` (type `delete test data` to confirm). It refuses
+   to run with live keys or a live account connected, so it can't delete real
+   orders. Then reset the stock: `import_shop_stock` with an up-to-date CSV
+   and `--reset-stock`.
 1. In the platform's **live** Stripe dashboard, enable OAuth for Connect (same
    redirect URI) and create the live webhook endpoint (same events). Set the
    live secret key, client id and webhook secret, and restart.
 2. Disconnect the test account at /stripe/connect/disconnect/, connect PINS's
    live account at /stripe/connect/, then set
    `SALESMAN_STRIPE_CONNECT_PAGES_ENABLED=False` and restart.
-3. Clear out the test orders, baskets and used test discount codes, and reset
-   the stock: `import_shop_stock` with an up-to-date CSV and `--reset-stock`.
+3. Check the products' stock is still right.
 4. Change the old Shop page's slug (e.g. `shop-old`), and delete the /shop/
    redirect Wagtail makes for it. Give the new shop page the slug `shop`, turn
    on "Show in menus", and publish. Then unpublish the old Shop page.

@@ -42,7 +42,10 @@ environ.Env.read_env(root('pins/.env'))  # reading .env file
 
 TESTING = env("TESTING")
 if not TESTING:  # pragma: no cover
-    TESTING = any([test_str in arg for arg in sys.argv for test_str in ["test", "pytest"]])
+    # Running pytest (loaded before the settings), or Django's test command.
+    # (Not any argument containing "test": e.g. clear_shop_test_data runs in
+    # production, with production settings.)
+    TESTING = "pytest" in sys.modules or sys.argv[1:2] == ["test"]
 
 BASE_DIR = root()
 PROJECT_DIR = root("pins")
@@ -560,7 +563,7 @@ if not TESTING:  # pragma: no cover
     NOCAPTCHA = True
 
 # silence the test key check for management commands
-SILENCED_SYSTEM_CHECKS = ['captcha.recaptcha_test_key_error']
+SILENCED_SYSTEM_CHECKS = ['django_recaptcha.recaptcha_test_key_error']
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 
