@@ -1,6 +1,7 @@
 import logging
 import math
 
+from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import BadRequest
 from django.db import transaction
@@ -10,6 +11,7 @@ from django.template.response import TemplateResponse
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.html import format_html
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 from django.views.generic import DetailView
 import stripe
@@ -276,9 +278,16 @@ def increase_quantity(request, form_id):
     # We click on this button to increase the quantity from its current value
     # check that we can increase to this value plus 1
     can_increase = _can_increase_quantity(request, variant, value + 1, in_basket)
+    max_value = _max_quantity(request, variant, in_basket)
+    message = None
+    if can_increase and max_value is not None and value + 1 > max_value:
+        # In stock, but over the basket's limits
+        basket = get_existing_basket(request)
+        in_item = 0 if in_basket else _basket_quantities(basket, variant)[0]
+        message = basket_limit_html(basket_limit_problem(basket, variant, in_item + value + 1))
+        can_increase = False
     if can_increase:
         value += 1
-    max_value = _max_quantity(request, variant, in_basket)
     return _change_quantity(
         request,
         form_id,
@@ -287,6 +296,7 @@ def increase_quantity(request, form_id):
         max_value=max_value,
         in_basket=in_basket,
         variant=variant,
+        message=message,
     )
 
 
@@ -321,19 +331,95 @@ def _variant_options_oob_html(request, variant):
     return html
 
 
+def client_ip(request):
+    """
+    The visitor's address, for logs: nginx's X-Real-IP (which nginx sets, so a
+    visitor can't fake it), or REMOTE_ADDR
+    """
+    return request.META.get("HTTP_X_REAL_IP") or request.META.get("REMOTE_ADDR", "")
+
+
+def _basket_quantities(basket, variant):
+    """
+    (how many of the variant are in the basket, how many items in all that
+    hold stock: not those of products with no stock limit)
+    """
+    if basket is None:
+        return 0, 0
+    # (from the database, not basket.get_items(), which keeps the items for the
+    # rest of the request: e.g. the basket's total after an update would use
+    # the item's old quantity)
+    items = list(basket.items.all().prefetch_related("product"))
+    ref = BasketItem.get_product_ref(variant)
+    in_item = next((item.quantity for item in items if item.ref == ref), 0)
+    held = sum(
+        item.quantity
+        for item in items
+        if item.product is not None and not item.product.product.unlimited_stock
+    )
+    return in_item, held
+
+
+def basket_limit_problem(basket, variant, new_quantity):
+    """
+    Why the basket can't have new_quantity of the variant, as it's over the
+    basket's limits (SHOP_MAX_ITEM_QUANTITY of each item, SHOP_MAX_BASKET_ITEMS
+    in all, so one basket can't hold a lot of the shop's stock), or None.
+    Products with no stock limit (e.g. raffle tickets) hold no stock, so
+    aren't limited (or counted).
+    """
+    if variant.product.unlimited_stock:
+        return None
+    max_item, max_basket = settings.SHOP_MAX_ITEM_QUANTITY, settings.SHOP_MAX_BASKET_ITEMS
+    if new_quantity > max_item:
+        return f"Sorry, you can only have {max_item} of each item in your basket."
+    in_item, in_basket = _basket_quantities(basket, variant)
+    if in_basket - in_item + new_quantity > max_basket:
+        return f"Sorry, your basket can only hold {max_basket} items."
+    return None
+
+
+def basket_limit_html(problem):
+    """The basket limit problem for the customer, saying how to order more"""
+    return format_html(
+        '{} Please <a href="{}">contact us</a> if you\'d like to order more.',
+        problem,
+        CONTACT_URL,
+    )
+
+
+def log_basket_limit(request, basket, variant, new_quantity, problem):
+    """Log a basket that reached its limits (e.g. a bot taking stock)"""
+    logger.warning(
+        "Basket limit reached: %s x %s for basket %s (%s items), from %s: %s",
+        new_quantity,
+        variant,
+        basket.id if basket is not None else None,
+        basket.quantity if basket is not None else 0,
+        client_ip(request),
+        problem,
+    )
+
+
 def _max_quantity(request, variant, in_basket):
     """
-    The most of the variant that can be chosen: what's available, plus what's
-    already in the basket (in the basket, where its stock has been taken); None
-    if unknown. (Used to disable the + button, see quantity_buttons.js.)
+    The most of the variant that can be chosen: what's available (plus, in the
+    basket, what's already in it, where its stock has been taken), within the
+    basket's limits (see basket_limit_problem); None if there's no limit (or
+    no variant). (Used to disable the + button, see quantity_buttons.js.)
     """
-    if variant is None or variant.available is None:
+    if variant is None or variant.product.unlimited_stock:
         return None
-    if not in_basket:
-        return variant.available
-    basket = get_existing_basket(request)
-    item = basket.find(BasketItem.get_product_ref(variant)) if basket is not None else None
-    return variant.available + (item.quantity if item is not None else 0)
+    in_item, in_basket_total = _basket_quantities(get_existing_basket(request), variant)
+    max_item, max_basket = settings.SHOP_MAX_ITEM_QUANTITY, settings.SHOP_MAX_BASKET_ITEMS
+    if in_basket:
+        limit = min(max_item, max_basket - (in_basket_total - in_item))
+        stock = None if variant.available is None else variant.available + in_item
+    else:
+        limit = min(max_item - in_item, max_basket - in_basket_total)
+        stock = variant.available
+    limit = max(limit, 0)
+    return limit if stock is None else min(stock, limit)
 
 
 def _change_quantity(
@@ -344,6 +430,7 @@ def _change_quantity(
     max_value=None,
     in_basket=False,
     variant=None,
+    message=None,
 ):
     context = {"form_id": form_id, "value": new_value}
     if in_basket or not can_increase:
@@ -360,10 +447,11 @@ def _change_quantity(
         # Where the page shows messages: under the item in the basket, by the
         # product's form on the shop and product pages
         message_id = "updated" if in_basket else "added"
-        available = "None" if not max_value else f"Only {max_value}"
+        if message is None:
+            message = f"{'None' if not max_value else f'Only {max_value}'} available"
         resp_str += (
             f"<div id='{message_id}_{form_id}' class='alert-danger' hx-swap-oob='true'>"
-            f"{available} available</div>"
+            f"{message}</div>"
         )
         if not in_basket and variant is not None:
             resp_str += _variant_options_oob_html(request, variant)
@@ -403,6 +491,18 @@ def add_to_basket(request, product_id):
         if variant is None:
             resp_str = f"<div>{_basket_icon_html(request, get_existing_basket_quantity(request))}</div>"
             return HttpResponse(resp_str + _item_unavailable_html(request, product_id))
+        # The basket's limits
+        basket = get_existing_basket(request)
+        in_item = _basket_quantities(basket, variant)[0]
+        problem = basket_limit_problem(basket, variant, in_item + quantity)
+        if problem:
+            log_basket_limit(request, basket, variant, in_item + quantity, problem)
+            resp_str = f"<div>{_basket_icon_html(request, get_existing_basket_quantity(request))}</div>"
+            resp_str += (
+                f"<div id='added_{product_id}' class='alert-danger mt-2' hx-swap-oob='true'>"
+                f"{basket_limit_html(problem)} <a href='{reverse('shop:basket')}'>View basket</a></div>"
+            )
+            return HttpResponse(resp_str)
         # add_to_basket is called from the shop page, not the basket page; we're
         # adding this entire quantity to the basket, but we're not incrementing
         # it, so just check we can add the current quantity
@@ -500,9 +600,15 @@ def update_quantity(request, ref):
                 .get(id=item.product_id)
             )
             # Decreasing is always allowed; stock already excludes the current
-            # basket quantity
-            can_update = new_quantity < current_quantity or variant.has_stock_for(
-                new_quantity, in_basket=current_quantity
+            # basket quantity. Increasing is within the basket's limits.
+            problem = None
+            if new_quantity > current_quantity:
+                problem = basket_limit_problem(basket, variant, new_quantity)
+                if problem:
+                    log_basket_limit(request, basket, variant, new_quantity, problem)
+            can_update = not problem and (
+                new_quantity < current_quantity
+                or variant.has_stock_for(new_quantity, in_basket=current_quantity)
             )
             if can_update:
                 item.quantity = new_quantity
@@ -522,7 +628,7 @@ def update_quantity(request, ref):
             )
             result_html = (
                 f"<div id='updated_{variant_id}' class='alert-danger' hx-swap-oob='true'>"
-                "Quantity requested is not available</div>"
+                f"{basket_limit_html(problem) if problem else 'Quantity requested is not available'}</div>"
                 f"<span id='id_quantity_wrapper_{variant_id}' hx-swap-oob='true'>{quantity_html}</span>"
             )
         else:
