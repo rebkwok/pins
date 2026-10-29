@@ -77,6 +77,13 @@ body > main {
   flex: 1 0 auto;
 }
 
+/* (full width, as in a normal page: in a flex column, a section with auto
+   side margins, e.g. the footer's .container, would shrink to its content
+   and be centred. Other sections stretch to the width as before.) */
+body > .container {
+  width: 100%;
+}
+
 body.no-scroll {
   overflow-y: hidden;
 }
@@ -925,12 +932,12 @@ hr {
 }
 
 ul.list-inline.social-list {
-  margin-bottom: 5px;
+  margin-bottom: 0;
   display: inline-flex;
 }
 
 footer {
-  padding: 55px 0 30px;
+  padding: 20px 0;
   background-color: var(--white);
 }
 
@@ -940,6 +947,19 @@ footer {
   color: var(--pins-strong);
   padding: 0.5rem;
   border-radius: 50%;
+}
+
+/* One line: the social icons, then the footer text (wrapping on narrow
+   screens) */
+footer .col-sm-12 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 24px;
+}
+
+.copyright p:last-child {
+  margin-bottom: 0;
 }
 
 .copyright p {
@@ -1603,6 +1623,28 @@ input[type='radio'] {
   padding-bottom: 20px;
 }
 
+/* (the hero's row has Bootstrap's negative gutters, but its container has no
+   side padding (.hero), so the row stuck out, scrolling the page sideways;
+   only the column's padding sticks out, so nothing visible is clipped) */
+.homepage .hero {
+  overflow-x: clip;
+}
+
+/* (phones: the hero is edge to edge, but its text has the same side space as
+   the site's other containers; the row's negative gutters would cancel the
+   column's padding) */
+@media (max-width: 767.98px) {
+  .homepage .hero .row {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .homepage .hero .home-hero {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}
+
 @media (min-width: 768px) {
   .homepage .home-hero {
     padding-bottom: 20px;
@@ -1707,7 +1749,9 @@ input[type='radio'] {
 @media (min-width: 768px) {
   .homepage .promo-row {
     padding-top: 80px;
-    margin-right: -45px;
+    /* (into the container's 40px padding, not past it: more scrolled the
+       page sideways) */
+    margin-right: -40px;
   }
 }
 

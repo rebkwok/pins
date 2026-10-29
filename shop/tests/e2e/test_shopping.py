@@ -213,7 +213,7 @@ def test_phone(page, live_server, shop):
     expect(card(page, "PINS T-shirt").locator(".shop-in-basket--compact")).to_have_text("1 in your basket")
 
 
-def test_sale(page, live_server, shop):
+def test_sale(page, live_server, shop, settings):
     # the banner's white text on the sale's red, and the price before the sale
     # in red
     now = timezone.now()
@@ -230,3 +230,23 @@ def test_sale(page, live_server, shop):
     for text in ["Sale now on!", "Discounts across the shop.", "Sale ends on"]:
         expect(banner.get_by_text(text)).to_have_css("color", "rgb(255, 255, 255)")
     expect(card(page, "Podenco mug").locator(".shop-card__price s")).to_have_css("color", "rgb(179, 38, 30)")
+
+
+def test_banners_not_paragraphs_as_headings(page, live_server, shop, settings):
+    # the test mode and sale banners' titles aren't paragraphs styled as
+    # headings (axe's p-as-heading, which Wagtail's checker shows editors)
+    from axe_playwright_python.sync_playwright import Axe
+
+    settings.SHOP_TEST_MODE = True
+    now = timezone.now()
+    sale = Sale.objects.create(
+        name="Sale", banner_title="Sale now on!", banner_content="Discounts.", banner_include_end=True,
+        start_date=now - timedelta(days=1), end_date=now + timedelta(days=1),
+    )
+    SaleProduct.objects.create(sale=sale, product=shop["mug"], discount=20)
+    page.goto(f"{live_server.url}/shop/")
+    expect(page.get_by_role("complementary", name="Test mode")).to_be_visible()
+    expect(page.get_by_role("complementary", name="Sale")).to_be_visible()
+    result = Axe().run(page, options={"runOnly": ["p-as-heading"]}).response
+    assert result["violations"] == []
+

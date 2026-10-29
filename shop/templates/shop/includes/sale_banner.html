@@ -2,15 +2,18 @@
     {# (a landmark, so screen readers' landmark navigation finds it) #}
     <aside class="shop-sale-banner" aria-label="Sale">
         <div class="container">
-            {% if current_sale.banner_title %}
-                <p class="shop-sale-banner__title">{{ current_sale.banner_title }}</p>
-            {% endif %}
-            {% if current_sale.banner_content %}
-                <p class="shop-sale-banner__content">{{ current_sale.banner_content }}</p>
-            {% endif %}
-            {% if current_sale.banner_include_end %}
-                <p class="shop-sale-banner__end">Sale ends on {{ current_sale.end_date|date:'d M Y' }} at {{ current_sale.end_date|date:'H:i' }}</p>
-            {% endif %}
+            {# (one paragraph, each part on its own line: not a paragraph styled as a heading) #}
+            <p>
+                {% if current_sale.banner_title %}
+                    <span class="shop-sale-banner__title">{{ current_sale.banner_title }}</span>
+                {% endif %}
+                {% if current_sale.banner_content %}
+                    <span class="shop-sale-banner__content">{{ current_sale.banner_content }}</span>
+                {% endif %}
+                {% if current_sale.banner_include_end %}
+                    <span class="shop-sale-banner__end">Sale ends on {{ current_sale.end_date|date:'d M Y' }} at {{ current_sale.end_date|date:'H:i' }}</span>
+                {% endif %}
+            </p>
         </div>
     </aside>
 {% endif %}
