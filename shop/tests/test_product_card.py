@@ -169,9 +169,12 @@ def test_product_page_carousel(client, shop_pages):
         (indicator["data-bs-target"], indicator["data-bs-slide-to"])
         for indicator in parser.indicators
     ] == [(f"#shop-carousel-{product.id}", "0"), (f"#shop-carousel-{product.id}", "1")]
-    # images link to the image files; indicators aren't inside links
+    # images link to a large copy (a rendition: on S3, only renditions are
+    # public, not the original files); indicators aren't inside links
     for image in product.images:
-        assert parser.image_links.count(image.image.file.url) == 1
+        large = image.image.get_rendition("max-1600x1600")
+        assert parser.image_links.count(large.url) == 1
+        assert image.image.file.url not in parser.image_links
     assert parser.indicators_in_links == 0
     assert parser.nested_links == 0
 

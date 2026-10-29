@@ -1,5 +1,5 @@
 {% load wagtailimages_tags static %}
-{# The product's images, on its own page #}
+{# The product's images, on its own page; each links to a large copy (a rendition: on S3, only renditions are public, not the original files) #}
 {% with images=product.images %}
     {% if images %}
         <div id="shop-carousel-{{ product.id }}" class="carousel slide shop-carousel shop-carousel--detail"{% if images|length > 1 %} data-bs-ride="carousel"{% endif %}>
@@ -13,7 +13,8 @@
             <div class="carousel-inner">
                 {% for item in images %}
                     <div class="carousel-item{% if forloop.first %} active{% endif %}">
-                        <a href="{{ item.image.file.url }}">
+                        {% image item.image max-1600x1600 as large %}
+                        <a href="{{ large.url }}">
                             {% image item.image fill-600x600-c100 loading="lazy" class="d-block w-100" alt=item.alt %}
                         </a>
                     </div>

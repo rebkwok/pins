@@ -1,4 +1,7 @@
-"""SHOP_PREVIEW: while the shop is a hidden preview, its pages aren't listed by search engines"""
+"""
+SHOP_PREVIEW: while the shop is a hidden preview, its pages aren't listed by
+search engines; SHOP_TEST_MODE: a banner says it's in test mode
+"""
 
 import pytest
 from django.urls import reverse
@@ -33,3 +36,22 @@ def test_other_pages_indexed(client, shop, settings):
     # (just the shop's pages)
     settings.SHOP_PREVIEW = True
     assert NOINDEX not in client.get("/").content.decode()
+
+
+# SHOP_TEST_MODE: a banner on the shop's pages
+
+TEST_BANNER = '<div class="shop-test-banner" role="note" aria-label="Test mode">'
+
+
+@pytest.mark.parametrize("test_mode", [True, False])
+def test_test_mode_banner(client, shop, settings, test_mode):
+    settings.SHOP_TEST_MODE = test_mode
+    for url in shop_urls(shop):
+        content = " ".join(client.get(url).content.decode().split())
+        assert (TEST_BANNER in content) == test_mode, url
+        assert ("orders aren't real, and no real payments are taken" in content) == test_mode, url
+
+
+def test_test_mode_banner_shop_only(client, shop, settings):
+    settings.SHOP_TEST_MODE = True
+    assert TEST_BANNER not in client.get("/").content.decode()
