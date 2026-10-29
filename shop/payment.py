@@ -1,0 +1,174 @@
+# payment.py
+from datetime import UTC, datetime, timedelta
+
+from django.conf import settings
+from django.db import transaction
+from django.urls import reverse
+
+from salesman.basket.models import BaseBasket
+from salesman.checkout.payment import PaymentError, PaymentMethod
+from salesman.core.utils import get_salesman_model
+from salesman_stripe_connect.conf import app_settings as stripe_settings
+from salesman_stripe_connect.payment import StripeConnectPayment
+
+
+Basket = get_salesman_model("Basket")
+Order = get_salesman_model("Order")
+OrderNote = get_salesman_model("OrderNote")
+
+
+
+def checkout_session_expiry():
+    """
+    How long until a checkout session expires: the basket timeout (which is at
+    least 30 minutes, see settings) plus a minute, since Stripe requires
+    expires_at to be at least 30 minutes after the session is created, and the
+    request takes time to reach Stripe.
+    """
+    return timedelta(minutes=settings.BASKET_TIMEOUT_MINUTES + 1)
+
+# Hold a basket's items a little longer than its checkout session, so that a
+# payment completed just before the session expires can still be fulfilled
+BASKET_PAYMENT_HOLD_MARGIN = timedelta(minutes=5)
+
+
+PAYMENT_METHOD_DESCRIPTIONS = {
+    "pay-in-advance": """
+        Offline payment; your order will be placed on hold until
+        payment has been received
+    """,
+    "stripe": "Pay with stripe",
+}
+
+PAYMENT_METHOD_BUTTON_TEXT = {
+    "pay-in-advance": "Submit Order",
+    "stripe": "Pay Now",
+}
+
+
+class PayInAdvance(PaymentMethod):
+    """
+    Payment method that requires advance payment via bank account.
+    """
+
+    identifier = "pay-in-advance"
+    label = "Pay in advance"
+
+    def basket_payment(self, basket, request):
+        """
+        Create a new order and mark it on-hold. Reserve items from stock and await
+        manual payment from customer via back account. When paid order status should be
+        changed to `PROCESSING`, `SHIPPED` or `COMPLETED` and a new payment should be
+        added to order.
+        """
+        basket.extra["name"] = request.POST.get("name")
+        order = Order.objects.create_from_basket(basket, request, status="HOLD")
+        basket.delete()
+        url = reverse("shop:new_order_status", args=(order.token,))
+        return request.build_absolute_uri(url)
+
+
+class PayByStripe(StripeConnectPayment):
+    """
+    Stripe Checkout payments (see salesman_stripe_connect), holding the basket's
+    items while the payment is in progress.
+    """
+
+    success_template_name = "shop/stripe_success.html"
+    cancel_template_name = "shop/stripe_cancel.html"
+
+    def basket_payment(self, basket, request):
+        basket.extra["name"] = request.POST.get("name")
+        basket.update(request)
+        if basket.discount_problem:
+            # Don't take the full price when the customer expects a discount
+            raise PaymentError(basket.discount_problem)
+        # Claiming the discount code and starting the payment happen together:
+        # the code is locked until the payment has started, and if it can't be
+        # started, the claim is undone
+        with transaction.atomic():
+            error = basket.claim_discount_code()
+            if error:
+                raise PaymentError(error)
+            if basket.total == 0:
+                # Paid in full by a discount code: no card payment is needed
+                return self.free_order(basket, request)
+            return super().basket_payment(basket, request)
+
+    def free_order(self, basket, request):
+        """Create a paid order for a basket with nothing to pay"""
+        order = Order.objects.create_from_basket(
+            basket, request, status=stripe_settings.SALESMAN_STRIPE_CONNECT_PAID_STATUS
+        )
+        OrderNote.objects.create(
+            order=order,
+            message=f"Paid in full by discount code {order.discount_code}.",
+            public=False,
+        )
+        basket.delete()
+        url = reverse("shop:new_order_status", args=(order.token,))
+        return request.build_absolute_uri(url)
+
+    def session_created(self, obj, session, request):
+        if isinstance(obj, BaseBasket):
+            # Starting the payment locks the basket, and holds its items until
+            # the session expires
+            expires_at = datetime.fromtimestamp(session.expires_at, UTC)
+            obj.start_payment(
+                session.id,
+                session.url,
+                hold_until=expires_at + BASKET_PAYMENT_HOLD_MARGIN,
+            )
+
+    def get_session_data(self, obj, request):
+        session_data = super().get_session_data(obj, request)
+        session_data["metadata"] = {"shipping_method": obj.shipping_method}
+        return session_data
+
+    def get_session_expiry(self, obj):
+        return checkout_session_expiry()
+
+    @classmethod
+    def basket_payment_expired(cls, basket):
+        # Return the basket's items to stock
+        basket.clear()
+        basket.timeout = None
+
+    @classmethod
+    def basket_payment_cancelled(cls, basket):
+        # The basket keeps its items, with a new timeout
+        basket.reset_timeout()
+
+    @classmethod
+    def paid_status(cls, order):
+        # An order (on hold, for a payment that completes later) with nothing
+        # to send is complete once it's paid
+        from .models import OrderItem
+
+        if not order.items.exclude(shipping_status=OrderItem.NO_SHIPPING).exists():
+            return Order.Status.COMPLETED
+        return super().paid_status(order)
+
+    @classmethod
+    def order_payment_failed(cls, order):
+        # A payment that completes later (e.g. a bank debit) failed: put the
+        # order's items back in stock, free its discount code (it wasn't paid
+        # for), and tell the customer and the shop
+        from .models import DiscountCode
+        from .signals import adjust_stock, send_payment_failed_emails
+
+        for item in order.items.all():
+            if item.product is not None:
+                adjust_stock(item.product, item.quantity)
+        released_code = DiscountCode.objects.filter(order=order).update(
+            order=None, date_used=None
+        )
+        send_payment_failed_emails(order, released_code=bool(released_code))
+
+    @classmethod
+    def get_request_basket(cls, request):
+        return Basket.get_existing(request)
+
+    @classmethod
+    def get_view_context(cls, request):
+        return {"hide_basket": True}

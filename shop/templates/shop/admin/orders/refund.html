@@ -1,0 +1,65 @@
+{% extends "wagtailadmin/generic/base.html" %}
+{% load wagtailadmin_tags shoptags %}
+
+{% block main_content %}
+    <div class="w-mt-8">
+    <h2 class="w-h2">{{ action_label }}</h2>
+    {% if order.status == order.Status.REFUNDED %}
+        <p>Order <strong>{{ order.ref }}</strong> has already been refunded.</p>
+        <a href="{{ order_url }}" class="button button-secondary">Go back</a>
+    {% elif not stripe_payments %}
+        <p>Order <strong>{{ order.ref }}</strong> has no Stripe payments to refund.</p>
+        <a href="{{ order_url }}" class="button button-secondary">Go back</a>
+    {% else %}
+        <p>Are you sure you want to refund order <strong>{{ order.ref }}</strong>?</p>
+        <p>
+            <strong>{{ refund_amount|gbp }}</strong> will be refunded to the
+            customer{% if order.amount_refunded %} (the amount paid, less
+            {{ order.amount_refunded|gbp }} already refunded){% endif %}, and
+            <strong>the customer will be emailed</strong>.
+            To refund only part of an order, ask a Stripe admin to refund it in
+            the Stripe dashboard.
+        </p>
+        <div class="help-block help-warning">
+            <p>
+                <strong>Refunding doesn't change stock.</strong> If any of these items
+                are going back into stock, update their stock manually in Shop stock > Products:
+            </p>
+            <ul>
+                {% for item in order.items.all %}
+                    <li>{{ item.quantity }} x {{ item.name }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            {% if items_to_send %}
+                <div class="shop-refund__items">
+                    <p>These items haven't been {% if order.is_collected %}collected{% else %}shipped{% endif %}:</p>
+                    <ul>
+                        {% for item in items_to_send %}
+                            <li>{{ item.quantity }} x {{ item.name }}</li>
+                        {% endfor %}
+                    </ul>
+                    <label class="shop-refund__not-sent">
+                        <input type="checkbox" name="mark_not_sent" value="1" checked>
+                        Also mark them as won't be sent
+                    </label>
+                </div>
+            {% endif %}
+            <button type="submit" class="button no">Yes, refund this order</button>
+            <a href="{{ order_url }}" class="button button-secondary">No, go back</a>
+        </form>
+    {% endif %}
+    </div>
+{% endblock %}
+
+{% block extra_css %}
+    {{ block.super }}
+    <style>
+        .shop-refund__items { margin: 1.5rem 0 2rem; }
+        .shop-refund__items ul { margin-bottom: 1.25rem; }
+        .shop-refund__items li + li { margin-top: 0.4rem; }
+        .shop-refund__not-sent { display: flex; align-items: center; gap: 0.5rem; }
+    </style>
+{% endblock %}

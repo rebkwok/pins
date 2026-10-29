@@ -1,0 +1,390 @@
+{% extends "wagtailadmin/generic/base.html" %}
+{% comment %}
+Shop help (ShopHelpView), in sections by role (show): handling orders, products
+and stock, and for dispatchers (last; without its heading for dispatchers, whose
+only section it is). Contents on the left on wide screens (staying
+in view), above on phones.
+{% endcomment %}
+
+{% block main_content %}
+    <div class="shop-help">
+        <nav class="shop-help__contents" aria-labelledby="shop-help-contents">
+            <h2 id="shop-help-contents" class="w-h4">Contents</h2>
+            <ul>
+                {% if show.orders %}
+                    <li>
+                        <a href="#orders" class="shop-help__contents-group">Handling orders</a>
+                        <ul>
+                            <li><a href="#new-orders">New orders</a></li>
+                            <li><a href="#statuses">Order statuses</a></li>
+                            <li><a href="#sending">Sending and collecting items</a></li>
+                            <li><a href="#not-sent">Items that won't be sent</a></li>
+                            <li><a href="#mistakes">Undoing a mistake</a></li>
+                            <li><a href="#completing">Completing an order</a></li>
+                            <li><a href="#refunds">Refunds</a></li>
+                            <li><a href="#disputes">Disputes</a></li>
+                            <li><a href="#cancelling">Cancelling an unpaid order</a></li>
+                            <li><a href="#customers">Contacting customers</a></li>
+                        </ul>
+                    </li>
+                {% endif %}
+                {% if show.products %}
+                    <li>
+                        <a href="#products" class="shop-help__contents-group">Products and stock</a>
+                        <ul>
+                            <li><a href="#products-variants">Products and variants</a></li>
+                            <li><a href="#stock">Stock</a></li>
+                            <li><a href="#shipping-dispatchers">Shipping and dispatchers</a></li>
+                            <li><a href="#images-categories">Images and categories</a></li>
+                            <li><a href="#sales">Sales</a></li>
+                            <li><a href="#discount-codes">Discount codes</a></li>
+                            <li><a href="#faqs-settings">FAQs, settings and activity</a></li>
+                        </ul>
+                    </li>
+                {% endif %}
+                {% if dispatcher_only %}
+                    <li><a href="#items-to-send">Your items to send</a></li>
+                    <li><a href="#marking-sent">Marking items sent</a></li>
+                    <li><a href="#dispatch-problems">If something goes wrong</a></li>
+                {% elif show.dispatch %}
+                    <li>
+                        <a href="#dispatchers" class="shop-help__contents-group">For dispatchers</a>
+                        <ul>
+                            <li><a href="#items-to-send">Your items to send</a></li>
+                            <li><a href="#marking-sent">Marking items sent</a></li>
+                            <li><a href="#dispatch-problems">If something goes wrong</a></li>
+                        </ul>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+
+        <div class="shop-help__body">
+            {% if show.orders %}
+                <h2 class="w-h2 shop-help__group" id="orders">Handling orders</h2>
+                <section id="new-orders">
+                    <h3 class="w-h3">New orders</h3>
+                    <p>
+                        Every new order is emailed to the addresses in the shop settings. The email
+                        lists each item and who sends it: dispatchers are only emailed about the
+                        products set to email them, so pass the rest on (the email says when there's
+                        anything to pass on). Items of products without a dispatcher are sent by the
+                        shop team.
+                    </p>
+                    <p>To keep track:</p>
+                    <ul>
+                        <li><a href="{% url 'shop_orders:index' %}">Orders</a>: filter by status, "Has items to ship or collect", dispatcher or product, and download them to Excel.</li>
+                        <li><a href="{% url 'shop_dispatchers:index' %}">Dispatcher activity</a>: who has items to send, oldest first. Items waiting more than {{ overdue_days }} days are highlighted.</li>
+                    </ul>
+                </section>
+
+                <section id="statuses">
+                    <h3 class="w-h3">Order statuses</h3>
+                    <table class="listing shop-help__statuses">
+                        <thead>
+                            <tr><th>Status</th><th>What it means</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Awaiting payment</td><td>The payment hasn't arrived yet: some payment methods (e.g. bank debits) take a few days. Don't send anything until it's paid; you'll get the usual emails then. A bank debit (Bacs) can take up to 7 working days for a new customer. Any other payment that hasn't arrived after 7 days is cancelled automatically, with the order.</td></tr>
+                            <tr><td>Payment failed</td><td>The payment didn't go through: its items have been put back in stock, and the customer and shop emailed. Nothing needs doing.</td></tr>
+                            <tr><td>Paid – ready to ship<br>Paid – ready to collect</td><td>Paid, and nothing has been sent (or collected) yet.</td></tr>
+                            <tr><td>Paid – nothing to send</td><td>Paid, but none of its items will be sent (they were marked won't be sent). Refund it if that hasn't been done, then mark it completed.</td></tr>
+                            <tr><td>Partly shipped<br>Partly collected</td><td>Some of the items have been sent; the rest are still to send.</td></tr>
+                            <tr><td>Shipped<br>Collected</td><td>Everything that needs sending has been sent.</td></tr>
+                            <tr><td>Completed</td><td>Done: marked completed once everything was sent.</td></tr>
+                            <tr><td>Refunded</td><td>The whole order has been refunded.</td></tr>
+                            <tr><td>Cancelled</td><td>An unpaid order that was cancelled.</td></tr>
+                            <tr><td>… (partly refunded)</td><td>Part of the order's payment has been refunded (in Stripe).</td></tr>
+                        </tbody>
+                    </table>
+                    <p>Items that don't need sending (e.g. raffle tickets) are shown as "No shipping needed". An order with nothing to send is completed as soon as it's paid.</p>
+                </section>
+
+                <section id="sending">
+                    <h3 class="w-h3">Sending and collecting items</h3>
+                    <p>
+                        Dispatchers mark their items as sent on their <strong>Items to send</strong> page.
+                        You can also mark any order's items: on the order's page, tick the items, then
+                        "Mark selected items as shipped" (or collected, for collection orders), and
+                        confirm.
+                    </p>
+                    <p>
+                        <strong>The customer is emailed</strong> each time, with the items just sent and
+                        any still to come, so mark items as they go, not before.
+                    </p>
+                    <p>
+                        Collection orders are by prior arrangement: the customer should have contacted
+                        PINS before ordering, and their emails ask them to contact PINS to arrange when
+                        and where to collect.
+                    </p>
+                </section>
+
+                <section id="not-sent">
+                    <h3 class="w-h3">Items that won't be sent</h3>
+                    <p>
+                        If an item can't or won't be sent (e.g. it's out of stock, or the customer no
+                        longer wants it), tick it on the order's page, then "Mark selected items as won't
+                        be sent". <strong>The customer isn't emailed</strong>: contact them, and refund
+                        the item if necessary (see <a href="#refunds">Refunds</a>).
+                    </p>
+                </section>
+
+                <section id="mistakes">
+                    <h3 class="w-h3">Undoing a mistake</h3>
+                    <p>
+                        If an item was marked shipped (or collected) or won't be sent by mistake, press
+                        "Undo" by its status on the order's page: it's ready to send again. The customer
+                        isn't emailed, so if they were told it had been sent, you may want to contact
+                        them. Items can't be changed once the order is completed, refunded or cancelled.
+                    </p>
+                </section>
+
+                <section id="completing">
+                    <h3 class="w-h3">Completing an order</h3>
+                    <p>
+                        Once all its items have been sent (or won't be), "Mark as completed" on the
+                        order's page. <strong>The customer is emailed</strong> that the order is
+                        complete. Orders aren't completed automatically.
+                    </p>
+                </section>
+
+                <section id="refunds">
+                    <h3 class="w-h3">Refunds</h3>
+                    <ul>
+                        <li>
+                            <strong>A whole order</strong>: "Refund" on the order's page. The payment is
+                            refunded in full, the customer is emailed, and any items not yet sent can
+                            be marked won't be sent at the same time.
+                        </li>
+                        <li>
+                            <strong>Part of an order</strong> (e.g. one item): ask whoever looks after
+                            PINS's Stripe account to refund that amount in the Stripe dashboard
+                            (Payments, then the payment, then Refund). It's recorded on the order, and
+                            the customer is emailed, automatically.
+                        </li>
+                    </ul>
+                    <p>
+                        Refunds take 5–10 working days to reach the customer.
+                        <strong>Refunds (and cancelling) don't change stock</strong>: if items are going
+                        back on sale, update their stock in Shop stock.
+                    </p>
+                </section>
+
+                <section id="disputes">
+                    <h3 class="w-h3">Disputes</h3>
+                    <p>
+                        A dispute (or chargeback) is when a customer asks their bank to reverse a
+                        payment, e.g. saying the order never arrived, or they didn't make it. The bank
+                        takes the money back from PINS's Stripe account straight away, and Stripe
+                        charges a dispute fee.
+                    </p>
+                    <p>When it happens:</p>
+                    <ul>
+                        <li>The shop is emailed "payment disputed", with the reason, the amount, and the date to respond by; the same is noted on the order.</li>
+                        <li>
+                            Whoever looks after PINS's Stripe account responds in the Stripe dashboard
+                            (Payments, then Disputes) <strong>before that date</strong>, with evidence:
+                            e.g. proof of postage or delivery, emails with the customer, the order's
+                            details. Or they can accept the dispute, if the customer is right.
+                        </li>
+                        <li>Don't refund a disputed payment: the money has already been taken back.</li>
+                    <li>Bank debit (Bacs) disputes are different: they can be raised at any time, can't be challenged with evidence, and the bank's decision is final. Contact the customer instead. (A debit that fails after Stripe has said it succeeded also arrives as a dispute.)</li>
+                        <li>It's often worth contacting the customer: a misunderstanding can be sorted out, and the customer can withdraw the dispute.</li>
+                    </ul>
+                    <p>
+                        When the bank decides (which can take weeks), the shop is emailed "dispute
+                        closed", saying whether it was won (the money comes back) or lost, and it's
+                        noted on the order.
+                    </p>
+                </section>
+
+                <section id="cancelling">
+                    <h3 class="w-h3">Cancelling an unpaid order</h3>
+                    <p>
+                        Only orders that haven't been paid can be cancelled ("Cancel order" on the
+                        order's page); the customer isn't emailed. To cancel a paid order, refund it.
+                    </p>
+                </section>
+
+                <section id="customers">
+                    <h3 class="w-h3">Contacting customers</h3>
+                    <p>
+                        The customer's email address and phone number are on the order's page.
+                        "Customer's order page" shows the order as the customer sees it (the page
+                        linked from their emails), e.g. to send them the link again. Replies to the
+                        shop's emails go to the reply-to address in the shop settings.
+                    </p>
+                </section>
+            {% endif %}
+
+            {% if show.products %}
+                <h2 class="w-h2 shop-help__group" id="products">Products and stock</h2>
+                <section id="products-variants">
+                    <h3 class="w-h3">Products and variants</h3>
+                    <p>
+                        A product (e.g. a T-shirt) has one or more <strong>variants</strong>: what
+                        customers actually choose and buy (e.g. Black, M). Variants can differ by
+                        colour, size or name, and can have their own price (leave it blank for the
+                        product's price) and image. Products with one variant don't show a choice.
+                    </p>
+                    <p>
+                        Untick "Live" to hide a product, or a variant, from the shop. Variants that
+                        have been ordered can't be deleted (so past orders keep them): untick Live
+                        instead.
+                    </p>
+                </section>
+                <section id="stock">
+                    <h3 class="w-h3">Stock</h3>
+                    <ul>
+                        <li>
+                            The stock shown is what's <strong>still available</strong>: items in
+                            customers' baskets have already been taken off it (they go back if the
+                            basket expires or the item is removed). Because baskets change it while
+                            you're editing, <strong>your change is added to the current stock</strong>
+                            when you save (e.g. changing 10 to 12 adds 2), so nothing customers did
+                            meanwhile is lost.
+                        </li>
+                        <li>
+                            <strong>Shared stock</strong>: for variants sold from the same pile, e.g.
+                            single cards and packs of 5. Tick "Variants share stock", set the product's stock
+                            (in single items), and each variant's pack size: a pack of 5 uses 5.
+                        </li>
+                        <li>
+                            <strong>No stock limit</strong>: for things that can't run out, e.g.
+                            competition entries or items made to order. Stock isn't counted.
+                        </li>
+                        <li>Refunds and cancelled orders don't put items back in stock: update it by hand if they're going back on sale.</li>
+                    </ul>
+                </section>
+                <section id="shipping-dispatchers">
+                    <h3 class="w-h3">Shipping and dispatchers</h3>
+                    <ul>
+                        <li>
+                            Each product has a <strong>shipping rate</strong> (Shop admin &gt;
+                            Shipping rates). A basket is charged the highest of its products' rates,
+                            once. New products start with the default rate. Collection is free.
+                        </li>
+                        <li>
+                            Untick "Needs shipping" for products that aren't posted or collected
+                            (e.g. competition entries): they have no shipping cost, and an order of
+                            only these is completed once paid.
+                        </li>
+                        <li>
+                            A product's <strong>dispatcher</strong> sends it (or holds it, for
+                            collection); tick "Email the dispatcher about new orders" to email them about each order.
+                            Changing the dispatcher moves the product's unsent items in existing
+                            orders to the new one. Products without a dispatcher are sent by the
+                            shop team.
+                        </li>
+                    </ul>
+                </section>
+                <section id="images-categories">
+                    <h3 class="w-h3">Images and categories</h3>
+                    <p>
+                        Add images on the product's page: the first is shown on the shop page, and
+                        all of them (with the variants' own images) on the product's page.
+                    </p>
+                    <p>
+                        Categories are the buttons on the shop page. Drag them into order in
+                        Shop stock &gt; Categories, and drag a category's products into order on
+                        the category's page.
+                    </p>
+                </section>
+                <section id="sales">
+                    <h3 class="w-h3">Sales</h3>
+                    <p>
+                        A sale takes a percentage off chosen products, or whole categories, between
+                        its start and end dates, with an optional banner on every shop page. Only
+                        one sale can run at a time, and it's only shown if it has products or
+                        categories.
+                    </p>
+                </section>
+                <section id="discount-codes">
+                    <h3 class="w-h3">Discount codes</h3>
+                    <ul>
+                        <li>A code takes a fixed amount off the <strong>whole basket, including shipping</strong>, and works with sale prices.</li>
+                        <li>Each code can be used <strong>once</strong>. Leave the code blank for a random one; untick "Active" to stop it being used.</li>
+                        <li>If it's more than the basket's total, the order is free, and what's left on the code is lost. It can't leave less than £0.30 to pay (Stripe's minimum), so a basket like that can't use it.</li>
+                    </ul>
+                </section>
+                <section id="faqs-settings">
+                    <h3 class="w-h3">FAQs, settings and activity</h3>
+                    <ul>
+                        <li><strong>Shop FAQs</strong> (e.g. delivery and returns) are on the FAQs page, linked from the shop, products, basket and checkout. Drag them into order.</li>
+                        <li><strong>Shop settings</strong>: who's emailed about new orders, the reply-to address for the shop's emails, and the footer on emails to customers (with the charity number).</li>
+                        <li><strong>Shop activity</strong> shows who changed what in the shop, and when.</li>
+                    </ul>
+                </section>
+            {% endif %}
+
+            {% if show.dispatch %}
+                {# (no heading for dispatchers, whose only section it is) #}
+                {% if not dispatcher_only %}<h2 class="w-h2 shop-help__group" id="dispatchers">For dispatchers</h2>{% endif %}
+                <section id="items-to-send">
+                    <h3 class="w-h3">Your items to send</h3>
+                    <p>
+                        Dispatchers send (or hold, for collection) some of the shop's products.
+                        <strong>Items to send</strong> lists your items in paid orders, oldest
+                        orders first, with the customer's name and address (or, for collection,
+                        their phone number and email). If a product is set to email you, you're
+                        emailed about each order with it too. "Download (Excel)" gives you the list
+                        as a spreadsheet.
+                    </p>
+                </section>
+                <section id="marking-sent">
+                    <h3 class="w-h3">Marking items sent</h3>
+                    <p>
+                        When you've posted an order's items, press "Mark as shipped" on the order,
+                        and confirm. <strong>The customer is emailed</strong>, so do it once
+                        they've gone, not before. It marks only your items in the order: other
+                        dispatchers mark theirs.
+                    </p>
+                    <p>
+                        For a <strong>collection</strong> order, the customer arranges with PINS
+                        when and where to collect. Hand the items over when they do, then press
+                        "Mark as collected".
+                    </p>
+                    <p>
+                        An order marked "Outside the UK" needs shipping arranged with the shop
+                        first: check with them before sending it.
+                    </p>
+                    <p>The <strong>Sent</strong> tab shows what you've sent (the latest 100 items).</p>
+                </section>
+                <section id="dispatch-problems">
+                    <h3 class="w-h3">If something goes wrong</h3>
+                    <p>
+                        If you can't send something (e.g. it's out of stock or damaged), or you
+                        marked an order by mistake, tell the shop team (reply to the order email):
+                        they can mark items as won't be sent, or undo marking them sent.
+                    </p>
+                </section>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_css %}
+    {{ block.super }}
+    <style>
+        .shop-help { display: grid; gap: 2rem; margin-top: 2rem; }
+        /* the groups in bold, their sections indented under them (no numbers) */
+        .shop-help__contents ul { list-style: none; padding: 0; margin: 0; }
+        .shop-help__contents li { margin-bottom: 0.35rem; }
+        .shop-help__contents > ul > li { margin-bottom: 1.25rem; }
+        .shop-help__contents ul ul { margin-top: 0.5rem; padding-inline-start: 1rem; border-inline-start: 2px solid var(--w-color-border-furniture); }
+        .shop-help__contents-group { font-weight: 700; font-size: 1.05em; }
+        .shop-help__group { margin: 0 0 1.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--w-color-border-furniture); scroll-margin-top: 1rem; }
+        .shop-help__body section + .shop-help__group { margin-top: 3.5rem; }
+        .shop-help__body { max-width: 50rem; }
+        .shop-help__body section { margin-bottom: 2.5rem; scroll-margin-top: 1rem; }
+        .shop-help__body li { margin-bottom: 0.5rem; }
+        .shop-help__statuses td:first-child { font-weight: 600; white-space: nowrap; }
+        @media (min-width: 60em) {
+            .shop-help { grid-template-columns: 14rem minmax(0, 1fr); align-items: start; }
+            .shop-help__contents { position: sticky; top: 1rem; }
+        }
+        @media (max-width: 50em) {
+            .shop-help__statuses td:first-child { white-space: normal; }
+        }
+    </style>
+{% endblock %}

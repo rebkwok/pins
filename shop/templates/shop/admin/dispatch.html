@@ -1,0 +1,112 @@
+{% extends "wagtailadmin/generic/base.html" %}
+{% load wagtailadmin_tags %}
+
+{% block main_content %}
+    <div class="dispatch">
+        {% if read_only %}
+            <p class="help-block help-info">
+                {{ dispatcher_name }}'s items to send, as they see them. (Only
+                {{ dispatcher_name }} can mark them as shipped here; you can mark
+                items shipped on the order's page.)
+            </p>
+        {% endif %}
+        <nav class="dispatch__tabs" aria-label="Orders">
+            <a href="{{ to_send_url }}" {% if not showing_sent %}aria-current="page"{% endif %}>To send ({{ to_send_count }} item{{ to_send_count|pluralize }})</a>
+            <a href="{{ sent_url }}" {% if showing_sent %}aria-current="page"{% endif %}>Sent</a>
+        </nav>
+
+        {% if not showing_sent %}
+            {% if orders %}
+                <div class="dispatch__intro">
+                    <p class="help">
+                        {% if read_only %}
+                            Oldest orders first.
+                        {% else %}
+                            Your items to send (or hand over, for collection), oldest orders
+                            first. When you've sent an order's items, mark it as shipped: the
+                            customer is emailed.
+                        {% endif %}
+                    </p>
+                    <a href="{{ download_url }}" class="button button-secondary button--icon">{% icon name="download" wrapped=1 %}Download (Excel)</a>
+                </div>
+            {% else %}
+                <p class="dispatch__empty">{% if read_only %}{{ dispatcher_name }} has nothing{% else %}Nothing{% endif %} to send at the moment.</p>
+            {% endif %}
+        {% elif not orders %}
+            <p class="dispatch__empty">{% if read_only %}{{ dispatcher_name }} hasn't{% else %}You haven't{% endif %} sent anything yet.</p>
+        {% endif %}
+
+        {% for order, items in orders %}
+            <article class="dispatch-order">
+                <header class="dispatch-order__header">
+                    <h2 class="w-h3">Order {{ order.ref }}</h2>
+                    <span>{{ order.date_created|date:"j M Y" }}</span>
+                    <strong class="dispatch-order__method">{% if order.is_collected %}Collection{% else %}Delivery{% endif %}</strong>
+                </header>
+                <dl class="dispatch-order__details">
+                    <dt>Customer</dt>
+                    <dd>{{ order.name|default:"-" }}</dd>
+                    {% if order.phone %}
+                        <dt>Mobile</dt>
+                        <dd><a href="tel:{{ order.phone }}">{{ order.phone }}</a></dd>
+                    {% endif %}
+                    {% if order.is_collected %}
+                        <dt>Email</dt>
+                        <dd><a href="mailto:{{ order.email }}">{{ order.email }}</a></dd>
+                    {% else %}
+                        <dt>Address</dt>
+                        <dd>
+                            {{ order.shipping_address|linebreaksbr|default:"-" }}
+                            {% if order.outside_uk %}<br><strong class="dispatch-order__warning">Outside the UK: check shipping has been arranged with the shop.</strong>{% endif %}
+                        </dd>
+                        {% if order.safe_place %}
+                            <dt>Safe place</dt>
+                            <dd>{{ order.safe_place }}</dd>
+                        {% endif %}
+                    {% endif %}
+                </dl>
+                <ul class="dispatch-order__items">
+                    {% for item in items %}
+                        <li>
+                            <strong>{{ item.quantity }} x</strong> {{ item.name }}
+                            {% if showing_sent %}
+                                <small>{% if order.is_collected %}Collected{% else %}Shipped{% endif %} {{ item.shipped_at|date:"j M Y" }}{% if item.shipped_by and item.shipped_by != dispatcher %} by {{ item.shipped_by.get_full_name|default:item.shipped_by.get_username }}{% endif %}</small>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+                {% if read_only %}
+                    <a href="{% url 'shop_orders:edit' order.pk %}" class="button button-secondary">Order page</a>
+                {% elif not showing_sent %}
+                    {# (to a page to confirm, see DispatchView.confirm) #}
+                    <form method="get">
+                        <button type="submit" name="mark" value="{{ order.pk }}" class="button">
+                            Mark as {% if order.is_collected %}collected{% else %}shipped{% endif %}
+                        </button>
+                    </form>
+                {% endif %}
+            </article>
+        {% endfor %}
+    </div>
+    <style>
+        .dispatch-order__warning { color: var(--w-color-critical-200); }
+        .dispatch { max-width: 50rem; margin-top: 1.5rem; }
+        .dispatch__tabs { display: flex; gap: 1.5rem; border-bottom: 1px solid var(--w-color-border-furniture); margin-bottom: 1.5rem; }
+        .dispatch__tabs a { padding: 0.5rem 0; text-decoration: none; color: var(--w-color-text-label); border-bottom: 3px solid transparent; }
+        .dispatch__tabs a[aria-current="page"] { border-bottom-color: currentcolor; font-weight: 600; }
+        .dispatch__intro { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+        .dispatch__intro .help { margin: 0; max-width: 32rem; }
+        .dispatch__intro .button .icon-wrapper { margin-inline-end: 0.5rem; }
+        .dispatch__empty { font-size: 1.1em; }
+        .dispatch-order { border: 1px solid var(--w-color-border-furniture); border-radius: 0.5rem; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+        .dispatch-order__header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 1rem; }
+        .dispatch-order__header h2 { margin: 0; }
+        .dispatch-order__method { margin-inline-start: auto; }
+        .dispatch-order__details { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; margin: 0.75rem 0; }
+        .dispatch-order__details dt { font-weight: 600; }
+        .dispatch-order__details dd { margin: 0; }
+        .dispatch-order__items { margin: 0 0 1rem; padding-inline-start: 1.25rem; }
+        .dispatch-order__items li { margin-bottom: 0.25rem; }
+        .dispatch-order__items small { display: block; color: var(--w-color-text-meta); }
+    </style>
+{% endblock %}

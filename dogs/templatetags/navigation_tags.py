@@ -109,3 +109,25 @@ def get_footer_text(context):
     return {
         "footer_text": footer_text,
     }
+
+
+# Users in only these groups do shop work in the admin
+SHOP_GROUPS = {"Dispatchers", "Shop admins", "Shop manager"}
+
+
+@register.simple_tag
+def admin_link_label(user):
+    """
+    The Account menu's link to the admin: "Shop admin" for users whose groups
+    are all the shop's (dispatchers, shop admins, Shop managers; whatever
+    permissions their user has), otherwise "Admin"; blank for users who can't
+    use the admin
+    """
+    if not user.is_authenticated or not user.has_perm("wagtailadmin.access_admin"):
+        return ""
+    if user.is_superuser:
+        return "Admin"
+    groups = set(user.groups.values_list("name", flat=True))
+    if groups and groups <= SHOP_GROUPS:
+        return "Shop admin"
+    return "Admin"

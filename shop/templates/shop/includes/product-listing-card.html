@@ -1,0 +1,27 @@
+{% load wagtailimages_tags static %}
+{# A product on the shop or a category page. On phones, products with a choice of options link to their page to choose ("Choose options"), as a drop-down doesn't fit #}
+{% with has_choice=product.live_variants|length|default:0 %}
+<article class="shop-card{% if has_choice > 1 and not product.out_of_stock %} shop-card--options{% endif %}">
+    <div class="shop-card__media">
+        <a href="{% url 'shop:product_detail' product.id %}" class="shop-card__image" tabindex="-1" aria-hidden="true">
+            {% with image=product.images.0 %}
+                {% if image %}
+                    {% image image.image fill-400x400-c100 loading="lazy" alt="" %}
+                {% else %}
+                    {% include "shop/includes/no_photo.html" %}
+                {% endif %}
+            {% endwith %}
+        </a>
+        {# "Added!" or a problem: over the image, so the row doesn't change height #}
+        <div id="added_{{ product.id }}" role="status"></div>
+    </div>
+    <h3 class="shop-card__name"><a href="{% url 'shop:product_detail' product.id %}">{{ product.name }}</a></h3>
+    {% include "shop/includes/product_price.html" %}
+    {% include "shop/includes/product_form.html" %}
+    {% if has_choice > 1 and not product.out_of_stock %}
+        {# On phones, where the form is hidden: how many are in the basket, from all its variants (quantity_buttons.js) #}
+        <p class="shop-in-basket shop-in-basket--compact" hidden><a href="{% url 'shop:basket' %}"></a></p>
+        <a href="{% url 'shop:product_detail' product.id %}" class="btn basket-btn shop-card__choose">Choose options</a>
+    {% endif %}
+</article>
+{% endwith %}

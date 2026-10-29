@@ -1,0 +1,14 @@
+{% load wagtailadmin_tags %}
+{% if products %}
+    {% if can_reorder %}
+        <p class="help">
+            The products' order on the shop. Drag them (or use the arrow keys on the
+            drag handle) into order: changes are saved straight away.
+        </p>
+    {% endif %}
+    {% component table %}
+{% elif self.instance.pk %}
+    <p>There are no products in this category yet.</p>
+{% else %}
+    <p>Once the category has been saved, its products are listed here, to drag into their order on the shop.</p>
+{% endif %}

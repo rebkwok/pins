@@ -1,3 +1,4 @@
+from datetime import datetime, UTC
 from unittest.mock import patch
 
 from model_bakery import baker
@@ -20,6 +21,21 @@ from home.models import (
     PDFFormSubmission,
 )
 
+from salesman.core.utils import get_salesman_model
+
+from shop.models import SaleCategory, SaleProduct
+from shop.tests.factories import ShopPageFactory
+
+Basket = get_salesman_model("Basket")
+
+
+@pytest.fixture(autouse=True)
+def media_root(settings, tmp_path):
+    # Files saved by tests (e.g. images) go in a temporary directory, not the
+    # project's media directory
+    settings.MEDIA_ROOT = str(tmp_path / "media")
+
+Order = get_salesman_model("Order")
 
 pytestmark = pytest.mark.django_db
 
@@ -161,3 +177,56 @@ def pdf_form_pre_submission(pdf_form_page):
             PDFFormSubmission, page=pdf_form_page, form_data=data
         )
     return _submission
+
+
+@pytest.fixture
+def shop_page(home_page):
+    yield ShopPageFactory(parent=home_page)
+
+
+@pytest.fixture
+def category(shop_page):
+    # (category pages are served by the shop page)
+    yield baker.make("shop.Category", title="Test Category", slug="test-category")
+
+
+@pytest.fixture
+def product(category):
+    yield baker.make(
+        "shop.Product", name="Test Product", category=category, price=12
+    )
+
+
+@pytest.fixture
+def basket(product):
+    basket = baker.make(
+        "shop.Basket", extra={"name": "Test User"}, shipping_method="collect"
+    )
+    variant = baker.make(
+        "shop.ProductVariant",
+        product=product,
+        variant_name="Small",
+        price=10,
+        stock=5,
+    )
+    basket.add(variant, quantity=2)
+    basket.update(request=None)
+    yield basket
+
+
+@pytest.fixture
+def order(basket):
+    yield Order.objects.create_from_basket(basket, request=None)
+
+
+@pytest.fixture
+def sale_with_items(product):
+    sale = baker.make(
+        "shop.Sale",
+        name="Test Sale",
+        start_date=datetime(2022, 1, 1, tzinfo=UTC),
+        end_date=datetime(2022, 1, 2, tzinfo=UTC),
+    )
+    SaleCategory.objects.create(category=product.category, discount=10, sale=sale)
+    SaleProduct.objects.create(product=product, discount=20, sale=sale)
+    yield sale

@@ -1,0 +1,19 @@
+{% comment %}
+Dispatcher activity: a dispatcher's pending items (or those without a
+dispatcher), linking to them (url), with the oldest pending order's date
+(highlighted if it's overdue, see admin_views.DispatchersView). (In one
+element, so its lines stay stacked in the phone layout's cards.)
+{% endcomment %}
+<div>
+    {% if pending %}
+        <a href="{{ url }}">Pending items ({{ pending.count }})</a>
+        <div class="shop-dispatchers__detail">
+            {% if pending.to_send %}{{ pending.to_send }} to send{% endif %}{% if pending.to_send and pending.to_collect %}, {% endif %}{% if pending.to_collect %}{{ pending.to_collect }} to collect{% endif %}
+        </div>
+        <div class="shop-dispatchers__detail{% if pending.overdue %} shop-dispatchers__overdue{% endif %}">
+            Oldest: {{ pending.oldest|date:"j M" }}{% if pending.overdue %} (over {{ overdue_days }} days){% endif %}
+        </div>
+    {% else %}
+        None pending
+    {% endif %}
+</div>

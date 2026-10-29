@@ -1,0 +1,25 @@
+{% extends "shop/base.html" %}
+
+{% block title %}Basket{% endblock %}
+
+{% block content %}
+    {% include "shop/includes/header-hero.html" with title="Basket" %}
+
+    <div class="container shop-basket">
+        <div class="row">
+            <div class="col-md-12">
+                <h3>Payment in progress</h3>
+                <p class="mt-4">You have started paying for this basket, so it can't be changed until the payment is completed or cancelled.</p>
+                <div class="shop-payment-actions d-flex flex-wrap align-items-center gap-2 mt-2 mb-2">
+                    {% if stripe_session_url %}
+                        <a class="btn basket-btn shop-main-btn shop-main-btn--inline" href="{{ stripe_session_url }}">Continue to payment</a>
+                    {% endif %}
+                    <form action="{% url 'shop:cancel_payment' %}" method="POST">
+                        {% csrf_token %}
+                        <input class="btn btn-outline-secondary shop-secondary-btn" type="submit" value="Cancel payment and return to basket">
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

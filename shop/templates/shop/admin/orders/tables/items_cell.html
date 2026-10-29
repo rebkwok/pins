@@ -1,0 +1,16 @@
+{# The order's items, collapsed (ItemsColumn) #}
+<td class="shop-orders-items">
+    {% with items=instance.items.all %}
+        <details>
+            <summary>{{ items|length }} item{{ items|length|pluralize }}</summary>
+            <ul>
+                {% for item in items %}
+                    <li>
+                        {{ item.quantity }} x {{ item.name }}
+                        <small>({{ item.status_label|lower }})</small>
+                    </li>
+                {% endfor %}
+            </ul>
+        </details>
+    {% endwith %}
+</td>

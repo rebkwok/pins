@@ -1,0 +1,19 @@
+{% comment %}
+The basket's extra rows (shipping, discounts), each a label and amount; an
+applied discount code can be removed on the basket page.
+{% endcomment %}
+{% for extra_row in extra_rows %}
+    <div class="basket-line">
+        <span>
+            {{ extra_row.label }}
+            {% if extra_row.extra.code and not is_checkout %}
+                <form method="post" action="{% url 'shop:remove_discount_code' %}" class="d-inline" hx-post="{% url 'shop:remove_discount_code' %}" hx-target="#basket-summary" hx-swap="outerHTML">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-link p-0 ms-2 align-baseline">Remove</button>
+                </form>
+            {% endif %}
+        </span>
+        {# e.g. -£5.00 for a discount #}
+        <span>{% if extra_row.amount|slice:":1" == "-" %}-£{{ extra_row.amount|slice:"1:" }}{% else %}£{{ extra_row.amount }}{% endif %}</span>
+    </div>
+{% endfor %}

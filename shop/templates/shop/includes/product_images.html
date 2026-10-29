@@ -1,0 +1,26 @@
+{% load wagtailimages_tags static %}
+{# The product's images, on its own page #}
+{% with images=product.images %}
+    {% if images %}
+        <div id="shop-carousel-{{ product.id }}" class="carousel slide shop-carousel shop-carousel--detail"{% if images|length > 1 %} data-bs-ride="carousel"{% endif %}>
+            {% if images|length > 1 %}
+                <div class="carousel-indicators">
+                    {% for im in images %}
+                        <button type="button" data-bs-target="#shop-carousel-{{ product.id }}" data-bs-slide-to="{{ forloop.counter0 }}" aria-label="Image {{ forloop.counter }}"{% if forloop.first %} class="active" aria-current="true"{% endif %}></button>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            <div class="carousel-inner">
+                {% for item in images %}
+                    <div class="carousel-item{% if forloop.first %} active{% endif %}">
+                        <a href="{{ item.image.file.url }}">
+                            {% image item.image fill-600x600-c100 loading="lazy" class="d-block w-100" alt=item.alt %}
+                        </a>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% else %}
+        {% include "shop/includes/no_photo.html" %}
+    {% endif %}
+{% endwith %}

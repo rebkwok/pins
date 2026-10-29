@@ -1,0 +1,25 @@
+{% extends "shop/base.html" %}
+{% load wagtailcore_tags shoptags %}
+
+{% block title %}Shop FAQs{% endblock %}
+
+{% block content %}
+    {% include "shop/includes/header-hero.html" with title="Shop FAQs" %}
+
+    <div class="container shop-faqs">
+      <div class="shop-faqs__list">
+        {% for faq in faqs %}
+            <section class="shop-faq">
+                <h2 class="shop-faq__question">{{ faq.question }}</h2>
+                <div class="shop-faq__answer">{{ faq.answer|richtext }}</div>
+            </section>
+        {% empty %}
+            <p>No FAQs yet.</p>
+        {% endfor %}
+        <p class="shop-faqs__more">
+            Any other questions? Please <a href="{{ contact_url }}">contact us</a>.
+        </p>
+        <p class="basket-continue"><a href="{% shop_url %}">Go to shop</a></p>
+      </div>
+    </div>
+{% endblock content %}

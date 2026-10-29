@@ -6,7 +6,7 @@ import pytest
 pytestmark = pytest.mark.django_db
 
 
-def test_collections_admin_menu_item(client, admin_user, home_page):
+def test_admin_menu_top_level_items(client, admin_user, home_page):
     client.force_login(admin_user)
     resp = client.get(f"/admin/pages/{home_page.id}/edit", follow=True)
     soup = BeautifulSoup(resp.rendered_content, "html.parser")
@@ -25,4 +25,6 @@ def test_collections_admin_menu_item(client, admin_user, home_page):
         for arg_ in item["_args"]
         if isinstance(arg_, dict)
     }
-    assert "Collections" in top_level_side_bar_labels
+    # (Collections is under Settings, not a top-level item)
+    assert "Collections" not in top_level_side_bar_labels
+    assert "Dog pages" not in top_level_side_bar_labels

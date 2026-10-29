@@ -1,0 +1,59 @@
+{% extends "shop/base.html" %}
+{% load wagtailcore_tags shoptags %}
+
+{% block content %}
+    {% include "shop/includes/header-hero.html" with shop=True %}
+
+    <div class="container shop-detail">
+        {% if page.introduction %}
+            <p class="shop-detail__introduction">{{ page.introduction }}</p>
+        {% endif %}
+        {{ page.body|richtext }}
+        <p class="shop-detail__faqs"><a href="{% url 'shop:faqs' %}">Delivery and other FAQs</a></p>
+
+        {# searches every category (the category buttons then narrow the results) #}
+        <form method="get" class="shop-filters" role="search" aria-label="Search the shop">
+            <div class="shop-filters__search">
+                <label class="visually-hidden" for="shop-search">Search the shop</label>
+                <input type="search" id="shop-search" name="q" value="{{ query }}" placeholder="Search the shop" class="form-control">
+                <button type="submit" class="btn basket-btn">Search</button>
+            </div>
+        </form>
+
+        {% if filter_categories|length > 1 %}
+            <nav class="shop-categories" aria-label="Categories">
+                <a href="{% shop_filter_url category='' %}"{% if not category_slug %} aria-current="true"{% endif %}>All</a>
+                {% for category in filter_categories %}
+                    <a href="{% shop_filter_url category=category.slug %}"{% if category.slug == category_slug %} aria-current="true"{% endif %}>{{ category.title }}</a>
+                {% endfor %}
+            </nav>
+        {% endif %}
+
+        {% if query %}
+            <p class="shop-results">
+                {% if products %}
+                    {{ products|length }} of {{ total }} product{{ total|pluralize }} shown.
+                {% else %}
+                    No products match.
+                {% endif %}
+                <a href="{% shop_filter_url q='' %}">Clear the search</a>
+            </p>
+        {% elif category_slug and not products %}
+            <p class="shop-results">There's nothing in this category at the moment.</p>
+        {% endif %}
+
+        {% for category, category_products in product_groups %}
+            <section class="shop-category">
+                <h2 class="shop-category__title">{{ category.title }}</h2>
+                {% if category_slug and category.description %}
+                    <div class="shop-category__description">{{ category.description|richtext }}</div>
+                {% endif %}
+                <div class="shop-grid">
+                    {% for product in category_products %}
+                        {% include "shop/includes/product-listing-card.html" %}
+                    {% endfor %}
+                </div>
+            </section>
+        {% endfor %}
+    </div>
+{% endblock content %}

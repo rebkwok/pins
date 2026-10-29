@@ -20,6 +20,8 @@ dependencies = [
     "whitenoise<=6.12.0",
     "facebook-sdk<=3.1.0",
     "wagtail-json-widget<=0.0.9",
+    "django-salesman",
+    "django-salesman-stripe-connect",
     "django-storages[boto3]<=1.14.6",
     "django-recaptcha<=4.1.0",
     "wagtail-django-recaptcha<=2.2.0",
@@ -30,6 +32,8 @@ dependencies = [
     "html2text<=2025.4.15",
     "envdir<=1.0.1",
     "django-ses[events]<=4.8.2",
+    "pygments<=2.21.0",
+    "stripe>=16.0.0,<17",
 ]
 
 [dependency-groups]
@@ -45,10 +49,21 @@ dependencies = [
         "ipython<=9.17.1",
         "model-bakery<=1.24.2",
         "ipdb<=0.13.13",
+        "requests-mock>=1.12.1",
+        "pytest-playwright>=0.10.0",
+        "axe-playwright-python>=0.1.8",
 ]
 
+[tool.uv.sources]
+# Fork to allow django 6+
+django-salesman = { git = "https://github.com/rebkwok/django-salesman.git", rev="12a6cdb0d36bbd544590c151aa2e0422fb72489e" }
+django-salesman-stripe-connect = { git = "https://github.com/rebkwok/django-salesman-stripe-connect.git", rev="2a8c4d70e480fc65c4a00e901521f9fffa659a70" }
+
+
 [tool.pytest]
-    addopts = ["--reuse-db", "-n" , "auto"]
+    # (the browser tests, marked e2e, are run separately: pytest -m e2e)
+    addopts = ["--reuse-db", "-n" , "auto", "-m", "not e2e"]
+    markers = ["e2e: browser (end-to-end) tests, with Playwright; run with -m e2e"]
     DJANGO_SETTINGS_MODULE = "pins.settings"
 
     env = [
@@ -66,6 +81,9 @@ dependencies = [
         "FIELD_ENCRYPTION_KEY='ddD0dDddD0DddD00DDDDDd0DDdd0DddDdd-DdD0ddDd='",
         "PDF_ENCRYPTION_KEY=dummy",
         "RECIPE_SUBMISSIONS_OPEN=True",
+        "SALESMAN_STRIPE_CONNECT_SECRET_KEY=sk_test_dummy",
+        "SALESMAN_STRIPE_CONNECT_WEBHOOK_SECRET=whsec_dummy",
+        "SALESMAN_STRIPE_CONNECT_CLIENT_ID=ca_dummy",
     ]
 
 [tool.coverage.run]

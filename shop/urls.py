@@ -1,0 +1,51 @@
+from django.urls import path
+
+from .views import (
+    ProductDetailView,
+    add_to_basket,
+    apply_discount_code,
+    basket_view,
+    basket_timeout,
+    cancel_payment,
+    checkout_view,
+    decrease_quantity,
+    delete_basket_item,
+    faqs_view,
+    increase_quantity,
+    new_order_view,
+    order_status_view,
+    remove_discount_code,
+    update_quantity,
+    update_shipping_method,
+)
+
+
+app_name = "shop"
+urlpatterns = [
+    path(
+        "product/<int:pk>/",
+        ProductDetailView.as_view(),
+        name="product_detail",
+    ),
+    path("quantity/dec/<int:form_id>", decrease_quantity, name="decrease_quantity"),
+    path("quantity/inc/<int:form_id>", increase_quantity, name="increase_quantity"),
+    path("basket/add/<int:product_id>", add_to_basket, name="add_to_basket"),
+    path("basket/update/<str:ref>", update_quantity, name="update_quantity"),
+    path("basket/delete/<str:ref>", delete_basket_item, name="delete_basket_item"),
+    path("basket/", basket_view, name="basket"),
+    path("faqs/", faqs_view, name="faqs"),
+    path("basket/discount/", apply_discount_code, name="apply_discount_code"),
+    path(
+        "basket/discount/remove/", remove_discount_code, name="remove_discount_code"
+    ),
+    path(
+        "basket/shipping-method/",
+        update_shipping_method,
+        name="update_shipping_method",
+    ),
+    path("basket-timeout/<int:basket_id>", basket_timeout, name="basket_timeout"),
+    path("checkout/", checkout_view, name="checkout"),
+    path("checkout/cancel/", cancel_payment, name="cancel_payment"),
+    path("order/<str:token>/new/", new_order_view, name="new_order_status"),
+    path("order/<str:token>/", order_status_view, name="order_status"),
+]

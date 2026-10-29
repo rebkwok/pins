@@ -10,6 +10,9 @@ from wagtail.admin.views.pages.bulk_actions.page_bulk_action import PageBulkActi
 
 from wagtail.admin.panels import FieldPanel, TabbedInterface, ObjectList, InlinePanel
 from wagtail.admin.menu import Menu, MenuItem, SubmenuMenuItem
+from wagtail.admin.auth import permission_required
+
+from common.admin_menu import PermissionMenuItem
 
 from django_filters.filters import ChoiceFilter
 
@@ -138,7 +141,8 @@ class RecipeBookGroup(SnippetViewSetGroup):
     menu_label = "Recipe Book"
     menu_icon = "tablet-alt"
     items = (RecipeBookSubmissionViewSet, PayPalIPNViewSet)
-    menu_order = 200
+    # (fundraising, after the shop: see dashboard/wagtail_hooks.py)
+    menu_order = 600
 
 
 @hooks.register("register_bulk_action")
@@ -265,32 +269,44 @@ class AuctionItemLogViewSet(SnippetViewSet):
     filterset_class = BidFilterSet
 
 
+AUCTIONS_PERMISSION = "fundraising.manage_auctions"
+
+
 @hooks.register('register_admin_urls')
 def register_auction_url():
+    # (only for users who can manage auctions)
+    manage_auctions = permission_required(AUCTIONS_PERMISSION)
     return [
-        path('auctions/', auctions_index, name='auctions'),
-        path('auction/<pk>/', auction_detail, name='auction_detail'),
-        path('auctions/docs/', auction_docs, name='auction_docs'),
-        path('auction/item/<pk>/result/', auction_item_result, name='auction_item_result'),
-        path('auction/item/<pk>/log/', auction_item_log, name='auction_item_log'),
-        path('auction/item/<pk>/bids/', auction_item_bids, name='auction_item_bids'),
-        path('auction/item/bid/<pk>/', auction_item_bid, name='auction_item_bid'),
+        path('auctions/', manage_auctions(auctions_index), name='auctions'),
+        path('auction/<pk>/', manage_auctions(auction_detail), name='auction_detail'),
+        path('auctions/docs/', manage_auctions(auction_docs), name='auction_docs'),
+        path('auction/item/<pk>/result/', manage_auctions(auction_item_result), name='auction_item_result'),
+        path('auction/item/<pk>/log/', manage_auctions(auction_item_log), name='auction_item_log'),
+        path('auction/item/<pk>/bids/', manage_auctions(auction_item_bids), name='auction_item_bids'),
+        path('auction/item/bid/<pk>/', manage_auctions(auction_item_bid), name='auction_item_bid'),
     ]
+
+
+class AuctionCategoriesMenuItem(MenuItem):
+    """Shown to users who can do anything with auction categories"""
+
+    def is_shown(self, request):
+        return AuctionCategoryViewSet().permission_policy.user_has_any_permission(
+            request.user, ["add", "change", "delete", "view"]
+        )
 
 
 @hooks.register('register_admin_menu_item')
 def register_auction_menu_item():
+    # (hidden if neither item is shown)
     submenu = Menu(items=[
-        MenuItem('Auction Categories', reverse(AuctionCategoryViewSet().get_url_name("list")), icon_name='tablet-alt'),
-        MenuItem('Auctions', reverse('auctions'), icon_name='tablet-alt'),
+        AuctionCategoriesMenuItem('Auction Categories', reverse(AuctionCategoryViewSet().get_url_name("list")), icon_name='tablet-alt', order=100),
+        PermissionMenuItem('Auctions', reverse('auctions'), icon_name='tablet-alt', permission=AUCTIONS_PERMISSION, order=200),
+        PermissionMenuItem('Auctions help', reverse('auction_docs'), icon_name='help', permission=AUCTIONS_PERMISSION, order=300),
     ])
 
-    return SubmenuMenuItem('Auctions', submenu, icon_name='hammer')
-
-
-@hooks.register('register_admin_menu_item')
-def register_auction_docs_menu_item():
-    return MenuItem('Auctions help', reverse('auction_docs'), icon_name='page', order=1000)
+    # (after the Recipe Book)
+    return SubmenuMenuItem('Auctions', submenu, icon_name='hammer', order=610)
 
 
 register_snippet(RecipeBookGroup)

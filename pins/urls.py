@@ -1,20 +1,24 @@
 from django.conf import settings
-from django.urls import include, path
 from django.contrib import admin
-
-from wagtail.admin import urls as wagtailadmin_urls
+from django.urls import include, path
 from wagtail import urls as wagtail_urls
+from wagtail.admin import urls as wagtailadmin_urls
 from wagtail.documents import urls as wagtaildocs_urls
 
-from search import views as search_views
 from home import orders_urls
 from home import views as home_views
 from fundraising import urls
+from salesman.checkout.payment import payment_methods_pool
+from search import views as search_views
+from shop import urls as shop_urls
+
 
 urlpatterns = [
     path("", include('allauth.urls')),
     path("django-admin/", admin.site.urls),
     path("admin/", include(wagtailadmin_urls)),
+    # (outside the admin, as the role being viewed as may not be able to use it)
+    path("view-as/", include("dashboard.urls")),
     path("documents/", include(wagtaildocs_urls)),
     path("search/", search_views.search, name="search"),
     path("orders/", include(orders_urls)),
@@ -40,7 +44,13 @@ urlpatterns = [
         "merchandise-information/",
         home_views.merch_info,
         name="merch_info"
-    )
+    ),
+    path("shop/", include(shop_urls)),
+    path("stripe/", include("salesman_stripe_connect.urls")),
+    # Only the payment urls (stripe success and cancel) from salesman;
+    # its basket, checkout and orders API would bypass the shop views' checks
+    # (stock, live products, basket locked during payment)
+    path("api/", include(payment_methods_pool.get_urls())),
 ]
 
 
@@ -52,7 +62,8 @@ if settings.DEBUG or settings.TESTING:
     urlpatterns += staticfiles_urlpatterns()
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-urlpatterns += (path(r'django-admin/django-ses/', include('django_ses.urls')),)
+urlpatterns += (path(r"django-admin/django-ses/", include("django_ses.urls")),)
+
 
 urlpatterns = urlpatterns + [
     # For anything not caught by a more specific rule above, hand over to

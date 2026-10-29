@@ -1,0 +1,35 @@
+{% extends "shop/base.html" %}
+{% load wagtailcore_tags wagtailimages_tags %}
+
+{# (payment_pending: a payment that completes later, e.g. a bank debit) #}
+{% block title %}{% if payment_pending %}Order received{% else %}Order confirmed{% endif %}{% endblock %}
+
+{% block content %}
+    {% if payment_pending %}
+        {% include "shop/includes/header-hero.html" with title="Order received" %}
+    {% else %}
+        {% include "shop/includes/header-hero.html" with title="Order confirmed" %}
+    {% endif %}
+
+    <div class="container shop-basket">
+        <div class="row">
+            <div class="col-md-12">
+                <p class="mt-4">Thank you for your order!</p>
+                {% if order %}
+                    <p>Your order reference is <strong>{{ order.ref }}</strong>.</p>
+                {% endif %}
+                {% if payment_pending %}
+                    <p>Your order will be processed once your payment of £{{ total|floatformat:2 }} has been received. We'll email you when it has.</p>
+                {% elif total %}
+                    <p>You have been charged £{{ total|floatformat:2 }}.</p>
+                {% endif %}
+                {% if order %}
+                    <p>Your order confirmation has been emailed to {{ email }}.</p>
+                    <p><a class="btn basket-btn shop-main-btn shop-main-btn--inline" href="{% url 'shop:order_status' order.token %}">View your order</a></p>
+                {% else %}
+                    <p>Your order is being processed. You will receive a confirmation email{% if email %} at {{ email }}{% endif %} shortly.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock content %}

@@ -3,18 +3,36 @@ from django.urls import path, reverse
 from django.utils.safestring import mark_safe
 
 from wagtail import hooks
-from wagtail.admin.menu import MenuItem
+from wagtail.admin.auth import permission_required
+
+from common.admin_menu import PermissionMenuItem
 
 from dogs.models import DogPage, DogStatusPage, FacebookAlbums
 
 
+FACEBOOK_CHANGES_PERMISSION = "dogs.review_facebook_changes"
+
+
+class FacebookChangesMenuItem(PermissionMenuItem):
+    """Facebook Changes, with a dot when there are changes to review"""
+
+    def render_component(self, request):
+        # (checked for each request; the menu items are only created once)
+        changes = FacebookAlbums.instance().pending_changes()
+        self.classname = "facebook-changes-pending" if any(changes.values()) else ""
+        return super().render_component(request)
+
+
 @hooks.register('register_admin_menu_item')
 def register_facebook_changes_menu_item():
-    albums_obj = FacebookAlbums.instance()
-    changes = albums_obj.pending_changes()
-    has_changes = any(changes.values())
-    classname = "facebook-changes-pending" if has_changes else ""
-    return MenuItem('Facebook Changes', reverse('facebook_changes'), icon_name='image', classname=classname, order=250)
+    return FacebookChangesMenuItem(
+        'Facebook Changes',
+        reverse('facebook_changes'),
+        icon_name='image',
+        # (after Footer Text, see dashboard/wagtail_hooks.py)
+        order=460,
+        permission=FACEBOOK_CHANGES_PERMISSION,
+    )
 
 
 @hooks.register('insert_global_admin_css')
@@ -90,6 +108,7 @@ def _enrich_changes(changes):
     return result
 
 
+@permission_required(FACEBOOK_CHANGES_PERMISSION)
 def facebook_changes_view(request):
     albums_obj = FacebookAlbums.instance()
     changes = albums_obj.pending_changes()
@@ -100,6 +119,7 @@ def facebook_changes_view(request):
     })
 
 
+@permission_required(FACEBOOK_CHANGES_PERMISSION)
 def facebook_acknowledge_view(request):
     if request.method == 'POST':
         FacebookAlbums.instance().acknowledge()

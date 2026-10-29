@@ -1,0 +1,20 @@
+{% load navigation_tags %}
+{# The header's Login link (if show_login, see SHOW_LOGIN), or when logged in, the Account menu: the admin (if they can use it) and Logout. (menu_id: the menu button's id, as it's in both the mobile and desktop menus) #}
+{% if user.is_authenticated %}
+    <li class="navigation__account">
+        <div class="dropdown">
+            <button class="account-nav-button dropdown-toggle" type="button" id="{{ menu_id }}" data-bs-toggle="dropdown" aria-expanded="false">
+                Account
+            </button>
+            <div class="dropdown-menu" aria-labelledby="{{ menu_id }}">
+                {% admin_link_label user as admin_label %}
+                {% if admin_label %}<a class="dropdown-item" href="{% url 'wagtailadmin_home' %}">{{ admin_label }}</a>{% endif %}
+                <a class="dropdown-item" href="{% url 'account_logout' %}">Logout</a>
+            </div>
+        </div>
+    </li>
+{% elif show_login %}
+    <li class="navigation__account">
+        <a class="account-nav-button" href="{% url 'account_login' %}?next={{ request.get_full_path|urlencode }}">Login</a>
+    </li>
+{% endif %}

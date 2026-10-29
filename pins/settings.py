@@ -16,7 +16,10 @@ import logging
 import os
 import sys
 
+from decimal import Decimal
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
 
 from .custom_logging import GroupWriteRotatingFileHandler, log_file_permissions
 
@@ -27,19 +30,22 @@ root = environ.Path(__file__) - 2  # two folders back (/a/b/ - 3 = /)
 
 # defaults
 env = environ.Env(DEBUG=(bool, False),
-                  SHOW_DEBUG_TOOLBAR=(bool, False),
                   USE_MAILCATCHER=(bool, False),
                   LOCAL=(bool, False),
                   TESTING=(bool, False),
                   CI=(bool, False),
-                  LOCAL_S3=(bool, False)
+                  LOCAL_S3=(bool, False),
+                  LOG_LEVEL=(str, "INFO"),
                   )
 
 environ.Env.read_env(root('pins/.env'))  # reading .env file
 
 TESTING = env("TESTING")
 if not TESTING:  # pragma: no cover
-    TESTING = any([test_str in arg for arg in sys.argv for test_str in ["test", "pytest"]])
+    # Running pytest (loaded before the settings), or Django's test command.
+    # (Not any argument containing "test": e.g. clear_shop_test_data runs in
+    # production, with production settings.)
+    TESTING = "pytest" in sys.modules or sys.argv[1:2] == ["test"]
 
 BASE_DIR = root()
 PROJECT_DIR = root("pins")
@@ -118,6 +124,14 @@ INSTALLED_APPS = [
     "crispy_bootstrap5",
     "paypal.standard.ipn",
     "payments",
+    "salesman.core",
+    "salesman.basket",
+    "salesman.checkout",
+    "salesman.orders",
+    "salesman.admin",
+    "rest_framework",
+    "shop",
+    "salesman_stripe_connect",
 ]
 
 
@@ -132,6 +146,8 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    "shop.middleware.clear_expired_baskets_middleware",
+    "dashboard.middleware.admin_start_page_middleware",
 ]
 
 # Auth stuff
@@ -182,6 +198,7 @@ TEMPLATES = [
                 "wagtail.contrib.settings.context_processors.settings",
                 "home.context_processors.home",
                 "fundraising.context_processors.recipes",
+                "shop.context_processors.shop_context",
             ],
         },
     },
@@ -328,20 +345,6 @@ SERVER_EMAIL = SUPPORT_EMAIL
 
 if env("LOCAL") or env("CI"):
     MAILERS = {"default": {"BACKEND": "django.core.mail.backends.console.EmailBackend"}}
-# MAILCATCHER
-elif env("USE_MAILCATCHER"):  # pragma: no cover
-    MAILERS = {
-        "default": {
-            "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
-            "OPTIONS": {
-                "host": "127.0.0.1",
-                "host_user": "",
-                "host_password": "",
-                "port": 1025,
-                "use_tls": False,
-            },
-        }
-    }
 else:  # pragma: no cover
     AWS_SES_ACCESS_KEY_ID = env("AWS_SES_ACCESS_KEY_ID")
     AWS_SES_SECRET_ACCESS_KEY = env("AWS_SES_SECRET_ACCESS_KEY")
@@ -351,8 +354,25 @@ else:  # pragma: no cover
         "default": {"BACKEND": "django_ses.SESBackend"},
     }
 
+# MAILCATCHER
+if env("USE_MAILCATCHER"):  # pragma: no cover
+    MAILERS = {
+        "default": {
+            "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+            "OPTIONS": {
+                "host": "127.0.0.1",
+                "port": 1025,
+                "use_tls": False,
+            },
+        }
+    }
 
 # #####LOGGING######
+# The level for the site's own apps' logs (and the log file): LOG_LEVEL in the
+# environment, e.g. DEBUG to see the shop's stock checks. Django's request logs
+# are always INFO.
+LOG_LEVEL = env("LOG_LEVEL").upper() or "INFO"
+
 if not TESTING and not env("LOCAL"):  # pragma: no cover
     LOG_FOLDER = env('LOG_FOLDER')
     LOG_FILE = os.path.join(LOG_FOLDER, 'pins.log')
@@ -370,7 +390,7 @@ if not TESTING and not env("LOCAL"):  # pragma: no cover
         },
         'handlers': {
             'file_app': {
-                'level': 'INFO',
+                'level': LOG_LEVEL,
                 'class': "logging.handlers.GroupWriteRotatingFileHandler",
                 'filename': LOG_FILE,
                 'maxBytes': 1024*1024*5,  # 5 MB
@@ -399,27 +419,27 @@ if not TESTING and not env("LOCAL"):  # pragma: no cover
             },
             'home': {
                 'handlers': ['console', 'file_app', 'mail_admins'],
-                'level': 'INFO',
+                'level': LOG_LEVEL,
                 'propagate': False,
             },
             'dogs': {
                 'handlers': ['console', 'file_app', 'mail_admins'],
-                'level': 'INFO',
+                'level': LOG_LEVEL,
                 'propagate': False,
             },
             'dashboard': {
                 'handlers': ['console', 'file_app', 'mail_admins'],
-                'level': 'INFO',
+                'level': LOG_LEVEL,
                 'propagate': False,
             },
             'search': {
                 'handlers': ['console', 'file_app', 'mail_admins'],
-                'level': 'INFO',
+                'level': LOG_LEVEL,
                 'propagate': False,
             },
             "shop": {
                 "handlers": ["console", "file_app", "mail_admins"],
-                "level": "INFO",
+                "level": LOG_LEVEL,
                 "propagate": False,
             },
         },
@@ -442,24 +462,29 @@ else:
             },
             'home': {
                 'handlers': ['console'],
-                'level': 'INFO',
-                'propogate': True,
+                'level': LOG_LEVEL,
+                'propagate': True,
             },
             'dogs': {
                 'handlers': ['console'],
-                'level': 'INFO',
-                'propogate': True,
+                'level': LOG_LEVEL,
+                'propagate': True,
             },
             'dashboard': {
                 'handlers': ['console'],
-                'level': 'INFO',
-                'propogate': True,
+                'level': LOG_LEVEL,
+                'propagate': True,
             },
             'search': {
                 'handlers': ['console'],
-                'level': 'INFO',
-                'propogate': True,
+                'level': LOG_LEVEL,
+                'propagate': True,
             },
+            "shop": {
+                "handlers": ["console"],
+                "level": LOG_LEVEL,
+                "propagate": True,
+            }
         },
     }
 
@@ -538,7 +563,7 @@ if not TESTING:  # pragma: no cover
     NOCAPTCHA = True
 
 # silence the test key check for management commands
-SILENCED_SYSTEM_CHECKS = ['captcha.recaptcha_test_key_error']
+SILENCED_SYSTEM_CHECKS = ['django_recaptcha.recaptcha_test_key_error']
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 
@@ -565,6 +590,71 @@ PDF_ENCRYPTION_KEY=env.str("PDF_ENCRYPTION_KEY")
 
 RECIPE_SUBMISSIONS_OPEN=env.bool("RECIPE_SUBMISSIONS_OPEN", default=False)
 
+# Hide the site search box and breadcrumbs
+HIDE_SEARCH = env.bool("HIDE_SEARCH", default=False)
+HIDE_BREADCRUMBS = env.bool("HIDE_BREADCRUMBS", default=False)
+# The header's Login link: off, as only auctions need users to log in (users
+# who are logged in still see the Account menu; /login/ still works)
+SHOW_LOGIN = env.bool("SHOW_LOGIN", default=False)
+# While the new shop is a hidden preview: its pages ask search engines not to
+# list them (a "noindex" robots meta tag), in case the address gets out
+SHOP_PREVIEW = env.bool("SHOP_PREVIEW", default=False)
+
 
 # Image uploads
 WAGTAILIMAGES_EXTENSIONS =  ["jpg", "jpeg", "png"]
+
+
+# Salesman
+
+SALESMAN_ADMIN_REGISTER = False
+SALESMAN_BASKET_MODEL = "shop.Basket"
+SALESMAN_BASKET_ITEM_MODEL = "shop.BasketItem"
+SALESMAN_ORDER_MODEL = "shop.Order"
+SALESMAN_ORDER_ITEM_MODEL = "shop.OrderItem"
+SALESMAN_ORDER_PAYMENT_MODEL = "shop.OrderPayment"
+SALESMAN_ORDER_NOTE_MODEL = "shop.OrderNote"
+# Salesman's statuses, with "Partially shipped"
+SALESMAN_ORDER_STATUS = "shop.status.OrderStatus"
+SALESMAN_PRODUCT_TYPES = {
+    "shop.ProductVariant": "shop.serializers.ProductVariantSerializer",
+}
+SALESMAN_PAYMENT_METHODS = [
+    # "shop.payment.PayInAdvance",
+    "shop.payment.PayByStripe",
+]
+SALESMAN_BASKET_MODIFIERS = [
+    "shop.modifiers.ShippingCostModifier",
+    "shop.modifiers.SaleModifier",
+    "shop.modifiers.DiscountModifier",
+]
+
+# Stripe payments (salesman_stripe_connect), as direct charges on the connected
+# (PINS) account
+SALESMAN_STRIPE_CONNECT_SECRET_KEY = env.str("SALESMAN_STRIPE_CONNECT_SECRET_KEY")
+# Signing secret of the webhook endpoint for connected accounts' events
+SALESMAN_STRIPE_CONNECT_WEBHOOK_SECRET = env.str("SALESMAN_STRIPE_CONNECT_WEBHOOK_SECRET")
+# Connecting the PINS Stripe account at /stripe/connect/ (for users with the
+# connect_stripe_account permission): the platform's Connect client id (ca_...).
+# Set SALESMAN_STRIPE_CONNECT_PAGES_ENABLED to False to disable the connect pages
+# (e.g. after the account is connected).
+SALESMAN_STRIPE_CONNECT_CLIENT_ID = env.str("SALESMAN_STRIPE_CONNECT_CLIENT_ID")
+SALESMAN_STRIPE_CONNECT_PAGES_ENABLED = env.bool(
+    "SALESMAN_STRIPE_CONNECT_PAGES_ENABLED", default=True
+)
+SALESMAN_STRIPE_CONNECT_PAYMENT_LABEL = "Pay with Stripe"
+SALESMAN_STRIPE_CONNECT_CURRENCY = "gbp"
+# Status of orders when they're paid
+SALESMAN_STRIPE_CONNECT_PAID_STATUS = "PROCESSING"
+
+# How long items are held in a basket. The Stripe checkout session expires 1 minute
+# after the basket timeout, and Stripe requires sessions to expire between 30
+# minutes and 24 hours after they're created.
+# Flat shipping cost for shop orders that are delivered (not collected)
+
+BASKET_TIMEOUT_MINUTES = env.int("BASKET_TIMEOUT_MINUTES", 30)
+if not 30 <= BASKET_TIMEOUT_MINUTES < 24 * 60:
+    raise ImproperlyConfigured(
+        "BASKET_TIMEOUT_MINUTES must be at least 30 and less than 1440 (24 hours); "
+        f"got {BASKET_TIMEOUT_MINUTES}"
+    )

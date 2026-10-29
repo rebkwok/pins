@@ -22,14 +22,14 @@
                             </figure>
                         {% else %}
                             <figure class="user-bid__image">
-                                <img src={% static 'images/logo.png' %} height="180" width="180" loading="lazy">
+                                <img src="{% static 'images/logo.png' %}" alt="" height="180" width="180" loading="lazy">
                                 <div class="layer"></div>
                                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">No photo available</div>
                             </figure>
                         {% endif %}
                     </div>
                     <div class="col-9 col-md-10 mb-2">
-                    <h4><a href={{  bid.auction_item.get_url }}>{{ bid.auction_item.title }}</a></h4>
+                    <h2 class="h4"><a href={{  bid.auction_item.get_url }}>{{ bid.auction_item.title }}</a></h2>
                     <strong>Your bid: </strong> 
                     £{{ bid.amount|floatformat:2 }} {% if bid.withdrawn %}(withdrawn){% endif %}<br/>
                     {% if bid.amount == bid.auction_item.current_winning_bid %}

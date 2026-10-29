@@ -1,0 +1,28 @@
+{% extends "wagtailadmin/generic/base.html" %}
+{% comment %}
+Confirm marking items (shipped or collected, won't be sent, or ready to send again),
+before it's done (it may email the customer). Posts the same fields.
+{% endcomment %}
+
+{% block main_content %}
+    <div class="w-mt-8">
+        <h2 class="w-h2">{{ question }}</h2>
+        <p>Order <strong>{{ order.ref }}</strong>:</p>
+        <ul>
+            {% for item in items %}
+                <li>{{ item.quantity }} x {{ item.name }}</li>
+            {% endfor %}
+        </ul>
+        {% for note in notes %}
+            <p>{{ note }}</p>
+        {% endfor %}
+        <form method="post">
+            {% csrf_token %}
+            {% for name, value in fields %}
+                <input type="hidden" name="{{ name }}" value="{{ value }}">
+            {% endfor %}
+            <button type="submit" class="button">{{ yes_label }}</button>
+            <a href="{{ back_url }}" class="button button-secondary">No, go back</a>
+        </form>
+    </div>
+{% endblock %}

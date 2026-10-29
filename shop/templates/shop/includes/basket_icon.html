@@ -1,0 +1,8 @@
+{# The header's basket link (replaced by htmx when the basket changes, see views._basket_icon_html) #}
+{% if not hide_basket %}
+    <a class="btn shop-basket-link" href="{% url 'shop:basket' %}" aria-label="Basket ({{ basket_quantity }} items)">
+        <i class="fa-solid fa-basket-shopping" aria-hidden="true"></i>
+        <span class="shop-basket-link__label">Basket</span>
+        <span class="shop-basket-link__count">{{ basket_quantity }}</span>
+    </a>
+{% endif %}

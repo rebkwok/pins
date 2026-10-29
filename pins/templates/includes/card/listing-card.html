@@ -12,7 +12,11 @@
             </figure>
         {% endif %}
         <div class="listing-card__contents">
-            <h3 class="listing-card__title">{{ page.title }}</h3>
+            {% if heading_level == 2 %}
+                <h2 class="h3 listing-card__title">{{ page.title }}</h2>
+            {% else %}
+                <h3 class="listing-card__title">{{ page.title }}</h3>
+            {% endif %}
             {% if page.location or page.description or page.caption%}
                 <table class="listing-card__meta">
                     {% if page.location %}

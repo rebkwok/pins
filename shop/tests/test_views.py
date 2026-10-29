@@ -1,0 +1,961 @@
+from datetime import datetime, timezone
+from unittest import mock
+
+import pytest
+
+from model_bakery import baker
+
+from django.contrib.auth.models import AnonymousUser
+from django.http import Http404
+from django.contrib.messages import get_messages
+from django.urls import reverse
+
+from salesman.checkout.payment import PaymentError, payment_methods_pool
+from salesman.core.utils import get_salesman_model
+
+from ..payment import PayByStripe, PayInAdvance
+
+from ..views import (
+    add_to_basket,
+    basket_view,
+    decrease_quantity,
+    get_or_create_basket,
+    serialize_basket,
+    get_basket_item_data,
+    _can_increase_quantity,
+    increase_quantity,
+    update_quantity,
+    delete_basket_item,
+    checkout_view,
+    new_order_view,
+    order_status_view,
+)
+
+
+Basket = get_salesman_model("Basket")
+
+COLLECT_NOTE = (
+    "Not available for most items. Only choose this if you have contacted PINS "
+    "and confirmed that you can collect all items in your order in person."
+)
+Order = get_salesman_model("Order")
+
+pytestmark = pytest.mark.django_db
+
+
+def test_get_or_create_basket(rf):
+    request = rf.get("/")
+    request.session = {}
+    basket = get_or_create_basket(request)
+    assert Basket.objects.get() == basket
+    assert request.session["BASKET_ID"] == basket.id
+    # the same basket is returned for the session
+    assert get_or_create_basket(request) == basket
+    assert Basket.objects.count() == 1
+
+
+def test_serialize_empty_basket(rf, freezer):
+    freezer.move_to("2023-10-10 10:00")
+    basket = baker.make(Basket)
+    request = rf.get("/")
+
+    assert serialize_basket(request, basket) == {
+        "extra": {},
+        "extra_rows": [],
+        "id": basket.id,
+        "items": [],
+        "subtotal": "0.00",
+        "total": "0.00",
+        # serializing updates the basket, which resets its timeout
+        "timeout": datetime(2023, 10, 10, 10, 30, tzinfo=timezone.utc),
+    }
+
+
+def test_serialize_basket_with_items(rf, basket):
+    request = rf.get("/")
+    basket_data = serialize_basket(request, basket)
+    items_data = basket_data.pop("items")
+    basket_data.pop("timeout")
+    assert basket_data == {
+        "extra": {"name": "Test User"},
+        "extra_rows": [],
+        "id": basket.id,
+        "subtotal": "20.00",
+        "total": "20.00",
+    }
+    assert len(items_data) == 1
+    item_data = items_data[0]
+    assert item_data["quantity"] == 2
+    assert item_data["product"]["name"] == "Test Product - Small"
+    # no link to salesman's basket API, which isn't exposed
+    assert "url" not in item_data
+
+
+def test_get_basket_item_data_no_item(rf, basket):
+    ref = basket.items.first().ref
+    basket_data = serialize_basket(rf.get("/"), baker.make(Basket))
+    assert get_basket_item_data(basket_data, ref) == {}
+
+
+def test_get_basket_item_data(rf, basket):
+    ref = basket.items.first().ref
+    basket_data = serialize_basket(rf.get("/"), basket)
+    item_data = get_basket_item_data(basket_data, ref)
+    assert item_data["product"]["name"] == "Test Product - Small"
+
+
+def test_get_product_detail_view(client, product):
+    resp = client.get(reverse("shop:product_detail", args=(product.id,)))
+    assert resp.status_code == 200
+
+
+@pytest.mark.parametrize(
+    "current_stock,increase_to,in_basket,expected",
+    [
+        # changing quantity to 1
+        # out of stock
+        (0, 1, False, False),
+        # But if we're in the basket, it's actually a decrease (basket quantity is 2)
+        (0, 1, True, True),
+        # stock 1; can increase to 1 from in and out of basket
+        (1, 1, False, True),
+        (1, 1, True, True),
+        # can increase basket quantity to 3 (currently 2) from in basket but not outside
+        (1, 3, True, True),
+        (1, 3, False, False),
+    ],
+)
+def test_can_increase_quantity(
+    rf, basket, product, current_stock, increase_to, in_basket, expected
+):
+    # 2 items in basket already
+    variant = product.variants.first()
+    variant.stock = current_stock
+    variant.save()
+
+    request = rf.get("/")
+    request.session = {"BASKET_ID": basket.id}
+
+    assert _can_increase_quantity(request, variant, increase_to, in_basket) == expected
+
+
+def test_increase_quantity_can_increase(rf, basket, product):
+    # 2 items in basket already, ensure we can increase
+    variant = product.variants.first()
+    variant.stock = 2
+    variant.save()
+    url = (
+        reverse("shop:increase_quantity", args=(product.id,))
+        + f"?variant_id={variant.id}&quantity=1"
+    )
+    request = rf.get(url)
+    request.session = {"BASKET_ID": basket.id}
+
+    response = increase_quantity(request, product.id)
+    # (named after the id in the URL: the product's, on the shop page)
+    assert response.headers["HX-Trigger-After-Swap"] == f"quantity-changed-{product.id}"
+    assert 'value="2"' in response.content.decode()
+
+
+def test_increase_quantity_cannot_increase(rf, basket, product):
+    # 2 items in basket already, can't increase
+    variant = product.variants.first()
+    variant.stock = 0
+    variant.save()
+    url = (
+        reverse("shop:increase_quantity", args=(product.id,))
+        + f"?variant_id={variant.id}&quantity=2"
+    )
+    request = rf.get(url)
+    request.session = {"BASKET_ID": basket.id}
+
+    response = increase_quantity(request, product.id)
+    assert "HX-Trigger-After-Swap" not in response.headers
+    assert 'value="2"' in response.content.decode()
+
+
+def test_increase_quantity_from_basket(rf, basket, product):
+    # 2 items in basket already, ensure we can increase
+    variant = product.variants.first()
+    variant.stock = 0
+    variant.save()
+    # (in the basket, the URL has the item's variant's id)
+    url = (
+        reverse("shop:increase_quantity", args=(variant.id,))
+        + f"?variant_id={variant.id}&quantity=1&ref=basket"
+    )
+    request = rf.get(url)
+    request.session = {"BASKET_ID": basket.id}
+
+    response = increase_quantity(request, variant.id)
+    # the item's update forms listen for this event
+    assert response.headers["HX-Trigger-After-Swap"] == f"quantity-changed-{variant.id}"
+    assert 'value="2"' in response.content.decode()
+
+
+@pytest.mark.parametrize("current_quantity,expected", [(1, 1), (2, 1), (3, 2)])
+def test_decrease_quantity(rf, basket, product, current_quantity, expected):
+    variant = product.variants.first()
+    variant.stock = 0
+    variant.save()
+    url = (
+        reverse("shop:decrease_quantity", args=(product.id,))
+        + f"?variant_id={variant.id}&quantity={current_quantity}"
+    )
+    request = rf.get(url)
+    request.session = {"BASKET_ID": basket.id}
+
+    response = decrease_quantity(request, product.id)
+    # (named after the id in the URL: the product's, on the shop page)
+    assert response.headers["HX-Trigger-After-Swap"] == f"quantity-changed-{product.id}"
+    assert f'value="{expected}"' in response.content.decode()
+
+
+def test_basket_view(rf, basket, product):
+    request = rf.get(reverse("shop:basket"))
+    request.session = {"BASKET_ID": basket.id}
+    resp = basket_view(request)
+    assert resp.context_data["payment_methods"] == [
+        {
+            "identifier": "stripe",
+            "label": "Pay with Stripe",
+            "help": "Pay with stripe",
+        }
+    ]
+    # delivery is shown first
+    assert resp.context_data["shipping_methods"] == [
+        ("deliver", "Delivery", ""),
+        ("collect", "Collect in person (prior arrangement only)", COLLECT_NOTE),
+    ]
+    # the basket's method (collect) is selected, and the total has no
+    # shipping cost
+    assert resp.context_data["selected_shipping_method"] == "collect"
+    assert Basket.objects.get(id=basket.id).shipping_method == "collect"
+    assert resp.context_data["basket"]["total"] == "20.00"
+    content = " ".join(resp.rendered_content.split())
+    assert 'id="id_deliver" value="deliver" hx-post' in content
+    assert 'id="id_collect" value="collect" checked' in content
+    # changing the method updates the basket
+    assert f'hx-post="{reverse("shop:update_shipping_method")}"' in content
+    # the note is shown with the collection option
+    assert '<label class="form-check-label" for="id_collect">Collect in person (prior arrangement only)</label>' in content
+    assert f'<div class="basket-options__help basket-options__warning">{COLLECT_NOTE}</div>' in content
+    # basket items are converted to a dict keyed by product, with product type and category added
+    assert list(resp.context_data["basket"]["items"].keys()) == [product.identifier]
+    item = resp.context_data["basket"]["items"][product.identifier][0]
+    assert item["product_type"] == product.name
+    assert item["category"] == product.category.title
+
+
+@pytest.mark.parametrize("has_basket", [True, False])
+def test_basket_view_delivery_default(rf, product, has_basket):
+    request = rf.get(reverse("shop:basket"))
+    request.session = {}
+    request.user = AnonymousUser()
+    if has_basket:
+        # a new basket is delivered
+        basket = baker.make(Basket)
+        assert basket.shipping_method == "deliver"
+        request.session = {"BASKET_ID": basket.id}
+    resp = basket_view(request)
+    assert resp.context_data["selected_shipping_method"] == "deliver"
+
+
+@pytest.mark.parametrize(
+    "shipping_method,expected",
+    [
+        # the customer's choice is kept, e.g. after applying a discount code
+        ("collect", "collect"),
+        ("deliver", "deliver"),
+        # "No shipping needed" (from the checkout) becomes delivery
+        ("none", "deliver"),
+    ],
+)
+def test_basket_view_keeps_shipping_method(client, basket, shipping_method, expected):
+    basket.shipping_method = shipping_method
+    basket.save()
+    set_session_basket(client, basket)
+    resp = client.get(reverse("shop:basket"))
+    assert resp.context_data["selected_shipping_method"] == expected
+    assert Basket.objects.get(id=basket.id).shipping_method == expected
+    assert f'id="id_{expected}" value="{expected}" checked' in " ".join(resp.content.decode().split())
+
+
+def post_shipping_method(client, shipping_method):
+    return client.post(
+        reverse("shop:update_shipping_method"), {"shipping-method": shipping_method}
+    )
+
+
+@pytest.mark.parametrize("shipping_method,total", [("collect", "20.00"), ("deliver", "24.99")])
+def test_update_shipping_method(client, basket, shipping_method, total):
+    set_session_basket(client, basket)
+    basket.shipping_method = "deliver" if shipping_method == "collect" else "collect"
+    basket.save()
+    resp = post_shipping_method(client, shipping_method)
+    assert resp.status_code == 200
+    assert Basket.objects.get(id=basket.id).shipping_method == shipping_method
+    content = resp.content.decode()
+    # the total and shipping cost are updated
+    assert f"<span id='total' hx-swap-oob='true'>{total}</span>" in content
+    assert ("Shipping" in content) == (shipping_method == "deliver")
+
+
+@pytest.mark.parametrize("shipping_method", ["none", "unknown", ""])
+def test_update_shipping_method_invalid(client, basket, shipping_method):
+    set_session_basket(client, basket)
+    resp = post_shipping_method(client, shipping_method)
+    assert resp.content == b""
+    assert Basket.objects.get(id=basket.id).shipping_method == "collect"
+
+
+def test_update_shipping_method_no_basket(client):
+    assert post_shipping_method(client, "collect").content == b""
+    assert not Basket.objects.exists()
+
+
+def test_update_shipping_method_payment_in_progress(client, basket):
+    set_session_basket(client, basket)
+    basket.start_payment("cs_1", "https://stripe", hold_until=None)
+    assert post_shipping_method(client, "deliver").content == b""
+    assert Basket.objects.get(id=basket.id).shipping_method == "collect"
+
+
+def test_update_shipping_method_get_not_allowed(client):
+    assert client.get(reverse("shop:update_shipping_method")).status_code == 405
+
+
+def test_add_to_basket(rf, product):
+    # setup empty basket
+    basket_id = baker.make(Basket).id
+    variant = baker.make(
+        "shop.ProductVariant", product=product, variant_name="Small", price=10, stock=4
+    )
+    request = rf.post(
+        reverse("shop:add_to_basket", args=(product.id,)),
+        {
+            "quantity": 3,
+            "variant_id": variant.id,
+        },
+    )
+    request.session = {"BASKET_ID": basket_id}
+    resp = add_to_basket(request, product.id)
+    content = resp.content.decode()
+    # 3 items in basket
+    assert 'aria-label="Basket (3 items)"' in content
+    # the "Added!" message, with a link to the basket
+    assert "Added!" in content
+    assert f"<a href='{reverse('shop:basket')}'>Go to basket</a>" in content
+    # quantity reset to 1
+    assert (
+        f'id="id_quantity_{product.id}" name="quantity" value="1"'
+        in content
+    )
+    # (the product's only variant: no drop-down)
+    assert f'name="variant_id" id="id_variant_{product.id}" value="{variant.id}"' in content
+    assert "Only 1 left" in content
+
+
+def test_add_to_basket_out_of_stock(rf, basket, product):
+    # setup empty basket
+    variant1 = product.variants.first()
+    variant1.stock = 2
+    variant1.save()
+    variant2 = baker.make(
+        "shop.ProductVariant", product=product, variant_name="Medium", price=10, stock=2
+    )
+    # add to basket so variant1 becomes out of stock
+    request = rf.post(
+        reverse("shop:add_to_basket", args=(product.id,)),
+        {
+            "quantity": 2,
+            "variant_id": variant1.id,
+        },
+    )
+    request.session = {"BASKET_ID": basket.id}
+    resp = add_to_basket(request, product.id)
+    content = resp.content.decode()
+    # 4 item now in basket
+    assert 'aria-label="Basket (4 items)"' in content
+
+    # variant 1 out of stock; another variant still in stock, so quantity and +/- buttons still shown
+    assert (
+        f'id="id_quantity_{product.id}" name="quantity" value="1"'
+        in content
+    )
+    options = " ".join(content.split())
+    assert f'<option value="{variant1.id}" data-available="0" data-in-basket="4" data-name="Small" disabled> Small (out of stock) </option>' in options
+    assert f'<option value="{variant2.id}" data-available="2" data-in-basket="0" data-name="Medium"> Medium (only 2 left) </option>' in options
+
+    # add to basket so variant2 now also out of stock
+    request = rf.post(
+        reverse("shop:add_to_basket", args=(product.id,)),
+        {
+            "quantity": 2,
+            "variant_id": variant2.id,
+        },
+    )
+    request.session = {"BASKET_ID": basket.id}
+    resp = add_to_basket(request, product.id)
+    content = resp.content.decode()
+    # 6 items now in basket
+    assert 'aria-label="Basket (6 items)"' in content
+
+    # so quantity and +/- buttons hidden
+    assert (
+        f'id="id_quantity_{product.id}" name="quantity" value="1"'
+        not in content
+    )
+    assert '<p class="shop-card__stock shop-card__stock--out">Out of stock</p>' in content
+
+
+def test_add_to_basket_cant_increase(rf, product):
+    # setup empty basket
+    basket_id = baker.make(Basket).id
+    # variant with 1 in stock
+    variant = baker.make(
+        "shop.ProductVariant", product=product, variant_name="Small", price=10, stock=1
+    )
+    # try to add 2 to basked
+    request = rf.post(
+        reverse("shop:add_to_basket", args=(product.id,)),
+        {
+            "quantity": 2,
+            "variant_id": variant.id,
+        },
+    )
+    request.session = {"BASKET_ID": basket_id}
+    resp = add_to_basket(request, product.id)
+    content = resp.content.decode()
+    # no items in basket
+    assert 'aria-label="Basket (0 items)"' in content
+    # how many are available, with the stock note and quantity up to date
+    assert "Only 1 available</div>" in content
+    assert "Only 1 left" in content
+    assert 'value="1" max="1"' in content
+
+
+### Update quantity from basket
+
+
+def test_update_quantity(rf, basket):
+    # basket has 1 variant, quantity 2
+    assert basket.items.count() == 1
+    basket_item = basket.items.first()
+    assert basket_item.quantity == 2
+    variant_id = basket_item.product.id
+
+    # product ID in post is the product variant
+    data = {"quantity": 3, "variant_id": variant_id}
+    request = rf.post(
+        reverse("shop:update_quantity", args=(basket_item.ref,)), data=data
+    )
+    request.session = {"BASKET_ID": basket.id}
+
+    update_quantity(request, basket_item.ref)
+
+    # refresh_from_db isn't enough to get the update basket here
+    basket = Basket.objects.get(id=basket.id)
+    assert basket.quantity == 3
+
+
+@pytest.mark.parametrize(
+    "new_quantity,updated,expected_stock",
+    [
+        # 5 in stock initially; basket has 2, so 3 left in stock
+        (5, True, 0),
+        (6, False, 3),
+        (1, True, 4),
+    ],
+)
+def test_update_quantity_checks_stock(rf, basket, new_quantity, updated, expected_stock):
+    basket_item = basket.items.first()
+    variant = basket_item.product
+    assert variant.stock == 3
+    data = {"quantity": new_quantity, "variant_id": variant.id}
+    request = rf.post(
+        reverse("shop:update_quantity", args=(basket_item.ref,)), data=data
+    )
+    request.session = {"BASKET_ID": basket.id}
+
+    resp = update_quantity(request, basket_item.ref)
+
+    basket = Basket.objects.get(id=basket.id)
+    variant.refresh_from_db()
+    assert variant.stock == expected_stock
+    if updated:
+        assert basket.quantity == new_quantity
+        assert "Basket updated" in resp.content.decode()
+    else:
+        assert basket.quantity == 2
+        content = resp.content.decode()
+        assert "Quantity requested is not available" in content
+        # the quantity field back to the item's quantity (e.g. if it was typed),
+        # with the most it can be: the stock and what's in the basket
+        assert (
+            f'<input type="number" min="1" inputmode="numeric" class="form-control quantity" '
+            f'aria-label="Quantity" id="id_quantity_{variant.id}" name="quantity" value="2" max="5">'
+        ) in content
+
+
+def test_update_quantity_unchanged(rf, basket):
+    # e.g. the second of the item's update posts for one change: the page is
+    # left as it is (so "Basket updated" isn't cleared)
+    basket_item = basket.items.first()
+    data = {"quantity": 2, "variant_id": basket_item.product.id}
+    request = rf.post(reverse("shop:update_quantity", args=(basket_item.ref,)), data=data)
+    request.session = {"BASKET_ID": basket.id}
+    resp = update_quantity(request, basket_item.ref)
+    assert resp.status_code == 200
+    assert resp.content == b""
+
+
+def test_update_quantity_wrong_variant(rf, basket, product):
+    # The posted variant_id must be the basket item's variant
+    basket_item = basket.items.first()
+    other_variant = baker.make(
+        "shop.ProductVariant", product=product, variant_name="Large", stock=100
+    )
+    data = {"quantity": 50, "variant_id": other_variant.id}
+    request = rf.post(
+        reverse("shop:update_quantity", args=(basket_item.ref,)), data=data
+    )
+    request.session = {"BASKET_ID": basket.id}
+    request.user = AnonymousUser()
+
+    with pytest.raises(Http404):
+        update_quantity(request, basket_item.ref)
+    assert Basket.objects.get(id=basket.id).quantity == 2
+
+
+def test_update_quantity_nothing_to_update(rf, basket):
+    # basket has 1 variant, quantity 2
+    basket_item = basket.items.first()
+    variant_id = basket_item.product.id
+    # product ID in post is the product variant
+    # update to same quantity
+    data = {"quantity": 2, "variant_id": variant_id}
+    request = rf.post(
+        reverse("shop:update_quantity", args=(basket_item.ref,)), data=data
+    )
+    request.session = {"BASKET_ID": basket.id}
+
+    update_quantity(request, basket_item.ref)
+
+    # refresh_from_db isn't enough to get the update basket here
+    basket = Basket.objects.get(id=basket.id)
+    assert basket.quantity == 2
+
+
+### Delete items from basket
+
+
+def test_sole_delete_basket_item(rf, basket):
+    # basket has 1 variant, quantity 2
+    assert basket.items.count() == 1
+    basket_item = basket.items.first()
+    variant_id = basket_item.product.id
+    # product ID in post is the product variant
+    data = {"variant_id": variant_id}
+    request = rf.post(
+        reverse("shop:delete_basket_item", args=(basket_item.ref,)), data=data
+    )
+    request.session = {"BASKET_ID": basket.id}
+
+    resp = delete_basket_item(request, basket_item.ref)
+    # the page is reloaded, showing the empty basket
+    assert resp.headers["HX-Refresh"] == "true"
+    # refresh_from_db isn't enough to get the update basket here
+    basket = Basket.objects.get(id=basket.id)
+    assert basket.quantity == 0
+
+
+def test_delete_basket_item_other_variants_left(rf, basket):
+    basket_item = basket.items.first()
+    variant = basket_item.product
+    product = variant.product
+
+    # Make another variant for this product and add to basket
+    variant1 = baker.make(
+        "shop.ProductVariant",
+        product=product,
+        variant_name="Medium",
+        price=15,
+        stock=5,
+    )
+    basket.add(variant1, quantity=1)
+    basket.update(request=None)
+    assert basket.quantity == 3
+    assert basket.total == 35
+
+    # product ID in post is the product variant
+    data = {"variant_id": variant.id}
+    request = rf.post(
+        reverse("shop:delete_basket_item", args=(basket_item.ref,)), data=data
+    )
+    request.session = {"BASKET_ID": basket.id}
+    # delete the original variant
+    resp = delete_basket_item(request, basket_item.ref)
+    # this hides just the variant row
+    assert (
+        f"<div id='row-{variant.id}' hx-swap-oob='true'></div>" in resp.content.decode()
+    )
+    # this updates the total
+    assert f"<span id='total' hx-swap-oob='true'>15.00</span>" in resp.content.decode()
+
+    # refresh_from_db isn't enough to get the update basket here
+    basket = Basket.objects.get(id=basket.id)
+    basket.update(request)
+    assert basket.quantity == 1
+    assert basket.total == 15
+
+
+def test_delete_basket_item_other_products_left(rf, basket, category):
+    basket_item = basket.items.first()
+    variant = basket_item.product
+    product = variant.product
+
+    # Make another variant for another product and add to basket
+    new_product = baker.make("shop.Product", name="Mug", category=category)
+    variant1 = baker.make("shop.ProductVariant", product=new_product, price=5, stock=5)
+    basket.add(variant1, quantity=1)
+    basket.update(request=None)
+    assert basket.quantity == 3
+    assert basket.total == 25
+
+    # product ID in post is the product variant
+    data = {"variant_id": variant.id}
+    request = rf.post(
+        reverse("shop:delete_basket_item", args=(basket_item.ref,)), data=data
+    )
+    request.session = {"BASKET_ID": basket.id}
+    # delete the original variant
+    resp = delete_basket_item(request, basket_item.ref)
+
+    # this hides the entire row for the deleted product
+    assert (
+        f"<div id='row-{product.identifier}' hx-swap-oob='true'></div>"
+        in resp.content.decode()
+    )
+    # this updates the total
+    assert f"<span id='total' hx-swap-oob='true'>5.00</span>" in resp.content.decode()
+
+    # refresh_from_db isn't enough to get the update basket here
+    basket = Basket.objects.get(id=basket.id)
+    basket.update(request)
+    assert basket.quantity == 1
+    assert basket.total == 5
+
+
+def test_delete_basket_item_unknown_ref(rf, basket):
+    basket_item = basket.items.first()
+    request = rf.post(
+        reverse("shop:delete_basket_item", args=("unknown",)),
+        {"variant_id": basket_item.product.id},
+    )
+    request.session = {"BASKET_ID": basket.id}
+    request.user = AnonymousUser()
+
+    with pytest.raises(Http404):
+        delete_basket_item(request, "unknown")
+    # no change to basket
+    assert Basket.objects.get(id=basket.id).quantity == 2
+
+
+## CHECKOUT VIEW
+
+
+def test_get_checkout_view(rf, basket):
+    request = rf.get(
+        reverse("shop:checkout") + "?payment-method=stripe&shipping-method=deliver"
+    )
+    request.session = {"BASKET_ID": basket.id}
+
+    resp = checkout_view(request)
+    assert resp.status_code == 200
+    basket = Basket.objects.get(id=basket.id)
+    assert basket.shipping_method == "deliver"
+    content = resp.rendered_content
+    assert '<p class="basket-options__help">Delivery</p>' in content
+    assert "shop-shipping-reminder" not in content
+
+
+def test_get_checkout_view_sale_prices(rf, basket, sale_with_items, freezer):
+    # The full price is shown crossed out, with the sale price and label, as in
+    # the basket
+    freezer.move_to("2022-01-01 09:00")
+    request = rf.get(
+        reverse("shop:checkout") + "?payment-method=stripe&shipping-method=collect"
+    )
+    request.session = {"BASKET_ID": basket.id}
+    content = checkout_view(request).rendered_content
+    assert '<s class="shop-was-price">£<span id="subtotal_' in content
+    assert ">20.00</span></s>" in content
+    assert '£<span id="total_' in content and ">16.00</span>" in content
+    assert "Sale: 20% off" in content
+
+
+def test_get_checkout_view_collect(rf, basket):
+    request = rf.get(
+        reverse("shop:checkout") + "?payment-method=stripe&shipping-method=collect"
+    )
+    request.session = {"BASKET_ID": basket.id}
+    content = " ".join(checkout_view(request).rendered_content.split())
+    # a warning about collecting in person
+    assert '<p class="basket-options__help">Collect in person</p>' in content
+    assert '<p class="shop-shipping-reminder">' in content
+    assert (
+        "Reminder: collection must be arranged with PINS in advance. If you haven't "
+        f'done this, you can <a href="{reverse("shop:basket")}">go back</a> to change delivery options.'
+    ) in content
+    assert COLLECT_NOTE not in content
+
+
+CHECKOUT_FORM_DATA = {
+    "email": "test@test.com",
+    "email1": "test@test.com",
+    "name": "Test",
+    "payment_method": "stripe",
+    "shipping_method": "collect",
+    "billing_address": "-",
+    "shipping_address": "-",
+    "consent": "on",
+}
+
+
+def checkout_request(rf, basket, payment_method="stripe"):
+    request = rf.post(
+        reverse("shop:checkout")
+        + f"?payment-method={payment_method}&shipping-method=collect",
+        data={**CHECKOUT_FORM_DATA, "payment_method": payment_method},
+    )
+    request.session = {"BASKET_ID": basket.id}
+    request.user = AnonymousUser()
+    return request
+
+
+@mock.patch("shop.payment.PayByStripe.basket_payment")
+def test_post_checkout_view(mock_basket_payment, rf, basket):
+    mock_basket_payment.return_value = "https://test-checkout"
+    resp = checkout_view(checkout_request(rf, basket))
+
+    # redirects to the stripe checkout url
+    assert resp.status_code == 302
+    assert resp.url == "https://test-checkout"
+    # customer details are saved on the basket before the payment is started
+    (paid_basket, _), _ = mock_basket_payment.call_args
+    assert paid_basket.id == basket.id
+    assert paid_basket.extra["email"] == "test@test.com"
+
+
+def test_post_checkout_view_invalid_form(rf, basket):
+    form_data = {
+        "email": "test@test.com",
+        "email1": "tst@test.com",
+        "name": "Test",
+        "payment_method": "stripe",
+        "shipping_method": "collect",
+        "billing_address": "-",
+        "shipping_address": "-",
+        "consent": "on",
+    }
+    request = rf.post(
+        reverse("shop:checkout") + "?payment-method=stripe&shipping-method=collect",
+        data=form_data,
+    )
+    request.session = {"BASKET_ID": basket.id}
+    resp = checkout_view(request)
+
+    # redirects to the stripe payment method from the mock checkout call
+    assert resp.status_code == 200
+    assert resp.context_data["form"].errors == {"email1": ["Email fields do not match"]}
+
+
+def test_post_checkout_view_non_stripe_payment_method(rf, basket):
+    # pay-in-advance isn't currently enabled in settings
+    with mock.patch.object(
+        payment_methods_pool, "_payments", [PayByStripe(), PayInAdvance()]
+    ):
+        request = checkout_request(rf, basket, "pay-in-advance")
+        resp = checkout_view(request)
+
+    # pay in advance creates the order and redirects to the new order status
+    order = Order.objects.get()
+    assert order.status == Order.Status.HOLD
+    assert resp.status_code == 302
+    assert resp.url == request.build_absolute_uri(
+        reverse("shop:new_order_status", args=(order.token,))
+    )
+
+
+@mock.patch("shop.payment.PayByStripe.basket_payment")
+def test_post_checkout_view_error(mock_basket_payment, rf, basket):
+    mock_basket_payment.side_effect = PaymentError("Sorry, payments aren't working")
+    resp = checkout_view(checkout_request(rf, basket))
+    assert resp.status_code == 200
+    # the payment error is shown to the customer
+    assert resp.context_data["checkout_error"] == "Sorry, payments aren't working"
+    assert "Sorry, payments aren&#x27;t working" in resp.rendered_content
+
+
+def test_post_checkout_view_invalid_payment_method_in_form(rf, basket):
+    # The posted payment method is validated by salesman's checkout serializer
+    request = checkout_request(rf, basket)
+    request.POST = request.POST.copy()
+    request.POST["payment_method"] = "unknown"
+    resp = checkout_view(request)
+    assert resp.status_code == 200
+    assert resp.context_data["checkout_error"] == "There was an error submitting this order"
+
+
+### ORDER STATUS VIEWS
+
+
+def test_order_status_view(rf, order):
+    request = rf.get("/")
+    resp = order_status_view(request, order.token)
+    assert resp.context_data["order"] == order
+    # the items as in the basket (name, variant), without a shipping status
+    # until it's paid
+    (item,) = resp.context_data["items"]
+    assert (item["product_type"], item["variant_name"], item["status"]) == ("Test Product", "Small", None)
+    assert resp.context_data["hide_basket"]
+    assert not resp.context_data["new_order"]
+    content = " ".join(resp.rendered_content.split())
+    assert f"Order {order.ref}</h2>" in content
+    assert "<dt>Status</dt> <dd>Awaiting payment</dd>" in content
+    assert "<strong>Test Product</strong> <span class=\"basket-item__variant\">Small</span>" in content
+    assert "Quantity: <span" in content and ">2</span>" in content
+    assert "<dt>Shipping method</dt> <dd>Collect in person</dd>" in content
+    assert "<span>Order total</span> <span>£20.00</span>" in content
+    assert "<span>Amount paid</span> <span>£0.00</span>" in content
+    assert "<span>Amount outstanding</span> <span>£20.00</span>" in content
+    assert "Thank you for your order!" not in resp.rendered_content
+
+
+def test_new_order_status_view(rf, order):
+    request = rf.get("/")
+    resp = new_order_view(request, order.token)
+    assert resp.context_data["hide_basket"]
+    assert resp.context_data["new_order"]
+    assert "Thank you for your order!" in resp.rendered_content
+
+
+def set_session_basket(client, basket):
+    session = client.session
+    session["BASKET_ID"] = basket.id
+    session.save()
+
+
+def assert_countdown(resp, seconds_left, time_left):
+    # the countdown, which the browser counts down from seconds_left
+    countdown = resp.content.decode()
+    assert f'data-seconds-left="{seconds_left}"' in countdown
+    assert f">{time_left}</span>" in countdown
+    assert 'hx-trigger="every 60s, countdown-ended delay:1s"' in countdown
+
+
+def test_basket_timeout_view(client, basket, freezer):
+    set_session_basket(client, basket)
+    url = reverse("shop:basket_timeout", args=(basket.id,))
+    headers = {"hx-request": True}
+    # Set current time
+    freezer.move_to(datetime(2023, 10, 1, 12, 0, tzinfo=timezone.utc))
+
+    # basket times out in 10 mins
+    basket.timeout = datetime(2023, 10, 1, 12, 10, tzinfo=timezone.utc)
+    basket.save()
+    resp = client.get(url, headers=headers)
+    assert_countdown(resp, 600, "10m 0s")
+
+    # basket times out in 5.5 mins
+    freezer.move_to(datetime(2023, 10, 1, 12, 4, 30, tzinfo=timezone.utc))
+    resp = client.get(url, headers=headers)
+    assert_countdown(resp, 330, "5m 30s")
+
+    # basket times out now
+    freezer.move_to(datetime(2023, 10, 1, 12, 10, tzinfo=timezone.utc))
+    resp = client.get(url, headers=headers)
+    assert_countdown(resp, 0, "0m 0s")
+
+    # basket has expired: its items are released, and the page reloads, saying
+    # so
+    freezer.move_to(datetime(2023, 10, 1, 12, 10, 30, tzinfo=timezone.utc))
+    resp = client.get(url, headers=headers)
+    assert resp.headers["HX-Refresh"] == "true"
+    assert [str(m) for m in get_messages(resp.wsgi_request)] == ["Your basket has expired."]
+    assert not basket.items.exists()
+    # the reloaded page shows the message
+    assert "Your basket has expired." in client.get(reverse("shop:basket")).content.decode()
+
+
+def test_basket_page_countdown(client, basket, freezer, settings):
+    settings.BASKET_TIMEOUT_MINUTES = 30
+    freezer.move_to(datetime(2023, 10, 1, 12, 0, tzinfo=timezone.utc))
+    set_session_basket(client, basket)
+    # (viewing the basket resets its timeout)
+    resp = client.get(reverse("shop:basket"))
+    assert_countdown(resp, 1800, "30m 0s")
+    content = resp.content.decode()
+    assert "shop/js/basket_countdown.js" in content
+    # the shop's other scripts are still there
+    assert "kit.fontawesome.com" in content
+
+    # part seconds are rounded up
+    basket.timeout = datetime(2023, 10, 1, 12, 10, 0, 500000, tzinfo=timezone.utc)
+    basket.save()
+    resp = client.get(reverse("shop:basket_timeout", args=(basket.id,)))
+    assert_countdown(resp, 601, "10m 1s")
+
+    # no countdown for an empty basket
+    basket.clear()
+    resp = client.get(reverse("shop:basket"))
+    assert 'id="countdown"' not in resp.content.decode()
+    assert "basket_countdown.js" not in resp.content.decode()
+
+
+def test_basket_timeout_view_cleared(client, basket, freezer):
+    # cleared by clear_expired (e.g. the cron job) while the page was open
+    set_session_basket(client, basket)
+    freezer.move_to(datetime(2023, 10, 1, 12, 0, tzinfo=timezone.utc))
+    basket.timeout = datetime(2023, 10, 1, 11, 0, tzinfo=timezone.utc)
+    basket.save()
+    assert Basket.clear_expired() == 1
+    resp = client.get(reverse("shop:basket_timeout", args=(basket.id,)))
+    assert resp.headers["HX-Refresh"] == "true"
+    assert [str(m) for m in get_messages(resp.wsgi_request)] == ["Your basket has expired."]
+
+
+def test_basket_timeout_view_emptied(client, basket):
+    # e.g. emptied in another tab: the page reloads, without a message
+    set_session_basket(client, basket)
+    basket.clear()
+    resp = client.get(reverse("shop:basket_timeout", args=(basket.id,)))
+    assert resp.headers["HX-Refresh"] == "true"
+    assert list(get_messages(resp.wsgi_request)) == []
+
+
+def test_basket_timeout_view_no_timeout(client, basket, freezer, settings):
+    # A basket with items but no timeout starts a countdown, so the items
+    # are released eventually
+    settings.BASKET_TIMEOUT_MINUTES = 30
+    freezer.move_to(datetime(2023, 10, 1, 12, 0, tzinfo=timezone.utc))
+    Basket.objects.filter(id=basket.id).update(timeout=None)
+    set_session_basket(client, basket)
+    url = reverse("shop:basket_timeout", args=(basket.id,))
+    resp = client.get(url, headers={"hx-request": True})
+    assert_countdown(resp, 1800, "30m 0s")
+    basket.refresh_from_db()
+    assert basket.timeout == datetime(2023, 10, 1, 12, 30, tzinfo=timezone.utc)
+
+
+@mock.patch("shop.payment.PayByStripe.basket_payment")
+def test_post_checkout_view_anonymous_checkout_not_allowed(
+    mock_basket_payment, rf, basket, settings
+):
+    settings.SALESMAN_ALLOW_ANONYMOUS_USER_CHECKOUT = False
+    resp = checkout_view(checkout_request(rf, basket))
+    assert resp.status_code == 200
+    assert resp.context_data["checkout_error"]
+    assert not mock_basket_payment.called
+

@@ -1,0 +1,2 @@
+{# The basket's countdown: basket_countdown.js counts down from seconds_left in the browser; the server is checked every minute (and when it reaches 0), replacing this with the up-to-date time left (or reloading the page if the basket has expired or changed) #}
+<span id="countdown" data-seconds-left="{{ seconds_left }}" hx-get="{{ countdown_url }}" hx-trigger="every 60s, countdown-ended delay:1s" hx-swap="outerHTML">{{ time_left }}</span>

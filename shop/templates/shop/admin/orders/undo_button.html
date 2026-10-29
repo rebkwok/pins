@@ -1,0 +1,2 @@
+{# Undo marking the item shipped (or collected) or won't be sent (in the order page's items form; OrderShipView asks to confirm) #}
+<button type="submit" name="undo" value="{{ item.pk }}" class="button button-small button-secondary shop-order__undo" aria-label="Undo marking {{ item.name }} as {% if item.shipping_status == 'not_sent' %}won't be sent{% elif order.is_collected %}collected{% else %}shipped{% endif %}">Undo</button>

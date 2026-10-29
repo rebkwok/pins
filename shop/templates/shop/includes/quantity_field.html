@@ -1,0 +1,2 @@
+{# The quantity field; its id is named with its form's id (form_id: the product's id on the shop and product pages, the variant's in the basket) #}
+<input type="number" min="1" inputmode="numeric" class="form-control quantity" aria-label="Quantity" id="id_quantity_{{ form_id }}" name="quantity" value="{{ value }}"{% if max_value %} max="{{ max_value }}"{% endif %}>

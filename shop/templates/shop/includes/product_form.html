@@ -1,0 +1,44 @@
+{# Choose a variant and quantity, and add to the basket (htmx: views.add_to_basket) #}
+<form class="shop-form" action="" method="POST">
+    {% csrf_token %}
+    <div id="id_select_variant_wrapper_{{ product.id }}">
+        {% include "shop/includes/select_variant_field.html" %}
+    </div>
+    {# What's in the basket from this product (quantity_buttons.js, from the variants' data-in-basket) #}
+    <p class="shop-in-basket" hidden><a href="{% url 'shop:basket' %}"></a></p>
+    {% if not product.out_of_stock %}
+        <div id="change_quantity_wrapper_{{ product.id }}" class="shop-card__buy">
+            <div class="input-group quantity">
+                <button
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    aria-label="Fewer"
+                    hx-trigger="click"
+                    hx-target="#id_quantity_wrapper_{{ product.id }}"
+                    hx-get="{% url 'shop:decrease_quantity' product.id %}"
+                    hx-include="[id='id_quantity_{{ product.id }}'],[id='id_variant_{{ product.id }}']"
+                >-</button>
+                <span id="id_quantity_wrapper_{{ product.id }}">
+                    {% include "shop/includes/quantity_field.html" with form_id=product.id value=1 %}
+                </span>
+                <button
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    aria-label="More"
+                    hx-trigger="click"
+                    hx-target="#id_quantity_wrapper_{{ product.id }}"
+                    hx-get="{% url 'shop:increase_quantity' product.id %}"
+                    hx-include="[id='id_quantity_{{ product.id }}'],[id='id_variant_{{ product.id }}']"
+                >+</button>
+            </div>
+            <input
+                type="submit"
+                class="btn basket-btn"
+                value="Add to basket"
+                hx-post="{% url 'shop:add_to_basket' product.id %}"
+                hx-trigger="click"
+                hx-target="#basket-icon"
+            >
+        </div>
+    {% endif %}
+</form>

@@ -1,0 +1,43 @@
+{% extends "shop/base.html" %}
+{% load wagtailcore_tags wagtailimages_tags static shoptags %}
+
+{% block title %}Basket{% endblock %}
+
+
+{% block content %}
+    {% include "shop/includes/header-hero.html" with title="Basket" %}
+    
+    
+    <div class="container shop-basket">
+        {% if basket.items %}
+            {% if seconds_left is not None %}
+                <p class="basket-countdown-alert" id="basket-countdown-container">
+                    <i class="fa-regular fa-clock" aria-hidden="true"></i>
+                    Your basket is held for {% include "shop/includes/basket_countdown.html" %}
+                </p>
+            {% endif %}
+            <div class="basket-layout">
+                <div class="basket-items">
+                    {% for product_identifier, items in basket.items.items %}
+                        {# (removed by id when the product's last item is removed) #}
+                        <div id="row-{{ product_identifier }}" class="basket-product">
+                            {% for item in items %}
+                                {% include "shop/includes/basket_item.html" with editable=True %}
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                    <p class="basket-continue"><a href="{% shop_url %}">Continue shopping</a></p>
+                </div>
+
+                {% include "shop/includes/basket_summary.html" %}
+            </div>
+        {% else %}
+            <p>Your basket is empty. <a href="{% shop_url %}">Continue shopping</a></p>
+        {% endif %}
+    </div>
+{% endblock content %}
+
+{% block extra_js %}
+    {{ block.super }}
+    {% if seconds_left is not None %}<script src="{% static 'shop/js/basket_countdown.js' %}" defer></script>{% endif %}
+{% endblock extra_js %}

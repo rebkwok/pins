@@ -1,0 +1,68 @@
+{% extends "shop/base.html" %}
+{% load shoptags %}
+
+{% block title %}Order Status{% endblock %}
+
+{% block content %}
+    {% include "shop/includes/header-hero.html" with title="Order status" %}
+
+    <div class="container shop-basket">
+        {% if new_order %}
+            <h2 class="basket-summary__title">Thank you for your order!</h2>
+        {% endif %}
+        <div class="basket-layout basket-layout--checkout">
+            <aside class="basket-summary" aria-label="Order details">
+                <h2 class="basket-summary__title">Order {{ order.ref }}</h2>
+                <dl class="order-details">
+                    <dt>Status</dt>
+                    <dd>{{ order.customer_display_status }}</dd>
+                    <dt>Order date</dt>
+                    <dd>{{ order.date_created|date:"d M Y" }}</dd>
+                    <dt>Shipping method</dt>
+                    <dd>{{ order.get_shipping_method_display }}</dd>
+                    {% if order.needs_delivery %}
+                        <dt>Shipping address</dt>
+                        <dd class="order-details__address">{{ order.shipping_address|linebreaksbr }}</dd>
+                        {% if order.safe_place %}
+                            <dt>Safe place</dt>
+                            <dd>{{ order.safe_place }}</dd>
+                        {% endif %}
+                    {% endif %}
+                    {% if order.phone %}
+                        <dt>Mobile number</dt>
+                        <dd>{{ order.phone }}</dd>
+                    {% endif %}
+                </dl>
+            </aside>
+
+            <div class="basket-details">
+                <h2 class="basket-summary__title">Items</h2>
+                {% for item in items %}
+                    {% include "shop/includes/basket_item.html" %}
+                {% endfor %}
+                {% include "shop/includes/basket_extra.html" with is_checkout=True %}
+                <p class="basket-line basket-line--total">
+                    <span>Order total</span>
+                    <span>£{{ order.total|floatformat:2 }}</span>
+                </p>
+                <p class="basket-line">
+                    <span>Amount paid</span>
+                    <span>£{{ order.amount_received|floatformat:2 }}</span>
+                </p>
+                {% if order.amount_refunded %}
+                    <p class="basket-line">
+                        <span>Amount refunded</span>
+                        <span>£{{ order.amount_refunded|floatformat:2 }}</span>
+                    </p>
+                {% endif %}
+                {% if order.amount_due %}
+                    <p class="basket-line">
+                        <span>Amount outstanding</span>
+                        <span>£{{ order.amount_due|floatformat:2 }}</span>
+                    </p>
+                {% endif %}
+                <p class="basket-continue"><a href="{% shop_url %}">Go to shop</a></p>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

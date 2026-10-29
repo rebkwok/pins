@@ -1,0 +1,19 @@
+{% extends "shop/base.html" %}
+{% load wagtailcore_tags wagtailimages_tags %}
+
+{% block title %}Payment Cancelled{% endblock %}
+
+
+{% block content %}
+    {% include "shop/includes/header-hero.html" with title="Payment cancelled" %}
+
+    <div class="container shop-basket">
+        <div class="row">
+            <div class="col-md-12">                
+                <p>Your payment was cancelled.</p>
+                <p><a class="btn basket-btn shop-main-btn shop-main-btn--inline" href="{% url 'shop:basket' %}">Return to your basket</a></p>
+
+            </div>
+        </div>
+    </div>
+{% endblock content %}

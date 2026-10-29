@@ -1,0 +1,49 @@
+{% extends 'wagtailadmin/reports/base_report_results.html' %}
+{% load wagtailadmin_tags %}
+{% comment %}
+Shop admin > Shop activity (admin_activity.ShopActivityView): the site history's
+results table, with each entry as a card on phones (where the table's columns
+are too narrow)
+{% endcomment %}
+
+{% block results %}
+    <table class="listing shop-activity">
+        <thead>
+            <tr>
+                <th class="title">Name</th>
+                <th>Type</th>
+                <th>Action</th>
+                <th>User</th>
+                <th class="updated">Date / Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in object_list %}
+                <tr>
+                    <td class="title" data-label="Name">
+                        {% if entry.edit_url %}
+                            <a href="{{ entry.edit_url }}" title="Edit this item">{{ entry.label }}</a>
+                        {% else %}
+                            {{ entry.label }}
+                        {% endif %}
+                    </td>
+                    <td data-label="Type">{{ entry.content_type|format_content_type }}</td>
+                    <td data-label="Action">{{ entry.message }}</td>
+                    <td data-label="User">
+                        {# (entries from checkout and the Stripe webhook have no user) #}
+                        {% if entry.user_id %}{{ entry.user_display_name }}{% else %}Customer / Stripe{% endif %}
+                    </td>
+                    <td class="updated" data-label="When">{% human_readable_date entry.timestamp %}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <style>
+        @media (max-width: 50em) {
+            .shop-activity thead { display: none; }
+            .shop-activity tr { display: block; padding: 0.75rem 0; border-bottom: 1px solid var(--w-color-border-furniture); }
+            .shop-activity td { display: flex; gap: 0.75rem; padding: 0.15rem 0; border: none; }
+            .shop-activity td::before { content: attr(data-label); flex: 0 0 4.5rem; font-weight: 600; }
+        }
+    </style>
+{% endblock %}

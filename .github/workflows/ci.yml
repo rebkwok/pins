@@ -49,3 +49,53 @@ jobs:
       - name: Run coverage
         run: |
           uv run coverage report
+
+      - name: Check shop coverage is 100%
+        run: |
+          uv run coverage report --include="shop/*" --fail-under=100
+
+  # The browser (end-to-end) tests, with Playwright (shop/tests/e2e)
+  e2e:
+    runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ci_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.13.1"
+
+      - name: psycopg2 prerequisites
+        run: sudo apt-get install libpq-dev
+
+      - name: Install Chromium for Playwright
+        run: uv run playwright install --with-deps chromium
+
+      - name: Run the browser tests
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost/ci_test
+        run: |
+          uv run pytest -m e2e -n 2 --tracing retain-on-failure --screenshot only-on-failure --output test-results
+
+      - name: Keep the failures' traces and screenshots
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-test-results
+          path: test-results
