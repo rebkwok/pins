@@ -413,9 +413,11 @@ if not TESTING and not env("LOCAL"):  # pragma: no cover
                 'handlers': ['console', 'file_app', 'mail_admins'],
                 'propagate': True,
             },
+            # (not passed on to the root logger as well, which would email
+            # each error twice)
             'django.request': {
                 'handlers': ['console', 'file_app', 'mail_admins'],
-                'propagate': True,
+                'propagate': False,
             },
             'home': {
                 'handlers': ['console', 'file_app', 'mail_admins'],
@@ -441,6 +443,16 @@ if not TESTING and not env("LOCAL"):  # pragma: no cover
                 "handlers": ["console", "file_app", "mail_admins"],
                 "level": LOG_LEVEL,
                 "propagate": False,
+            },
+            # (apps not listed only log warnings and errors, through the root
+            # logger: e.g. the Stripe app's info messages trace each payment)
+            **{
+                name: {
+                    "handlers": ["console", "file_app", "mail_admins"],
+                    "level": LOG_LEVEL,
+                    "propagate": False,
+                }
+                for name in ["salesman_stripe_connect", "salesman", "fundraising", "payments"]
             },
         },
     }
@@ -604,6 +616,10 @@ SHOP_PREVIEW = env.bool("SHOP_PREVIEW", default=False)
 # subjects and order log entries start "TEST:", and clear_shop_test_data can
 # clear them out. (Off in tests, which turn it on themselves.)
 SHOP_TEST_MODE = env.bool("SHOP_TEST_MODE", default=False) and not TESTING
+# Baskets' limits, so one basket can't take a lot of the shop's stock (items
+# are held while they're in a basket): of each item, and in all
+SHOP_MAX_ITEM_QUANTITY = env.int("SHOP_MAX_ITEM_QUANTITY", default=10)
+SHOP_MAX_BASKET_ITEMS = env.int("SHOP_MAX_BASKET_ITEMS", default=30)
 
 
 # Image uploads

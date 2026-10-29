@@ -192,7 +192,9 @@ def test_add_too_many_packs(rf, cards, single, pack):
     assert stock(cards) == 13
 
 
-def test_add_last_items_out_of_stock(rf, cards, single, pack):
+def test_add_last_items_out_of_stock(rf, cards, single, pack, settings):
+    # (more than a basket's limit of each item)
+    settings.SHOP_MAX_ITEM_QUANTITY = 20
     content = post_add(rf, cards, single, 13)
     assert "Added!" in content
     assert stock(cards) == 0

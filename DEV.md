@@ -197,6 +197,19 @@ Required unless a default is given.
   number); orders are numbered `TEST-2026-00012`; the shop's email subjects
   and order activity log entries start "TEST:"; and `clear_shop_test_data`
   only runs in test mode
+- `SHOP_MAX_ITEM_QUANTITY`, `SHOP_MAX_BASKET_ITEMS`: baskets' limits, so one
+  basket (e.g. a bot's) can't hold a lot of the shop's stock: of each item
+  (default 10), and in all (default 30). Products with no stock limit aren't
+  limited or counted. Baskets that reach a limit are logged (a warning, with
+  the visitor's address from nginx's `X-Real-IP`, which nginx's standard
+  `proxy_params` sets to the address that connected to it). If the site is
+  ever put behind Cloudflare, CloudFront or a load balancer, that address
+  would be theirs, not the visitor's: then configure nginx's `real_ip`
+  module (`set_real_ip_from` with the service's address ranges, and
+  `real_ip_header CF-Connecting-IP` for Cloudflare, or `X-Forwarded-For` for
+  CloudFront) so `$remote_addr`, and so `X-Real-IP`, is the visitor's again.
+  (The limits are per basket, so they'd still work; only the logged address
+  would be wrong.)
 - `SHOW_LOGIN`: show the header's Login link (default False: only auctions
   need users to log in; logged-in users always see the Account menu, and
   /login/ still works)
