@@ -107,6 +107,29 @@ UK = "United Kingdom"
 CHECKOUT_DETAILS = ("phone", "safe_place", "country", "consent_at")
 
 
+# Test mode's prefix for order numbers (SHOP_TEST_MODE)
+TEST_ORDER_PREFIX = "TEST-"
+
+
+def generate_order_ref(request):
+    """
+    An order's reference (SALESMAN_ORDER_REFERENCE_GENERATOR): the year and
+    the next number, e.g. 2026-00012, as salesman's own; in test mode
+    (SHOP_TEST_MODE) with a prefix, e.g. TEST-2026-00012. (Salesman's takes
+    the number from the last reference's second part, which the prefix would
+    break.) The numbers follow on across test and real orders.
+    """
+    year = timezone.now().year
+    last = (
+        Order.objects.filter(date_created__year=year, ref__isnull=False)
+        .order_by("-date_created", "-pk")
+        .first()
+    )
+    number = int(last.ref.rsplit("-", 1)[1]) + 1 if last and last.ref else 1
+    ref = f"{year}-{number:05d}"
+    return TEST_ORDER_PREFIX + ref if settings.SHOP_TEST_MODE else ref
+
+
 class Order(OrderAmountsMixin, BaseOrder):
     name = models.CharField(max_length=255, verbose_name="Name")
     shipping_method = models.CharField(

@@ -599,9 +599,11 @@ SHOW_LOGIN = env.bool("SHOW_LOGIN", default=False)
 # While the new shop is a hidden preview: its pages ask search engines not to
 # list them (a "noindex" robots meta tag), in case the address gets out
 SHOP_PREVIEW = env.bool("SHOP_PREVIEW", default=False)
-# A banner on the shop's pages saying it's in test mode: orders aren't real,
-# and payments are Stripe test payments (while using Stripe's test keys)
-SHOP_TEST_MODE = env.bool("SHOP_TEST_MODE", default=False)
+# Test mode (while using Stripe's test keys): a banner on the shop's pages
+# saying orders aren't real; orders are numbered TEST-..., the shop's emails'
+# subjects and order log entries start "TEST:", and clear_shop_test_data can
+# clear them out. (Off in tests, which turn it on themselves.)
+SHOP_TEST_MODE = env.bool("SHOP_TEST_MODE", default=False) and not TESTING
 
 
 # Image uploads
@@ -619,6 +621,8 @@ SALESMAN_ORDER_PAYMENT_MODEL = "shop.OrderPayment"
 SALESMAN_ORDER_NOTE_MODEL = "shop.OrderNote"
 # Salesman's statuses, with "Partially shipped"
 SALESMAN_ORDER_STATUS = "shop.status.OrderStatus"
+# e.g. 2026-00012, or in test mode TEST-2026-00012
+SALESMAN_ORDER_REFERENCE_GENERATOR = "shop.models.generate_order_ref"
 SALESMAN_PRODUCT_TYPES = {
     "shop.ProductVariant": "shop.serializers.ProductVariantSerializer",
 }
