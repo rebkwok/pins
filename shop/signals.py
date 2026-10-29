@@ -61,14 +61,20 @@ def _send_email_now(email, to, reply_to):
     rather than raised, so that a failed email can't fail the request that
     created or updated the order (e.g. the Stripe webhook).
     """
+    subject = email_subject(email.subject)
     message = EmailMultiAlternatives(
-        email.subject, email.text, settings.DEFAULT_FROM_EMAIL, to, reply_to=reply_to
+        subject, email.text, settings.DEFAULT_FROM_EMAIL, to, reply_to=reply_to
     )
     message.attach_alternative(email.html, "text/html")
     try:
         message.send()
     except Exception:
-        logger.exception("Error sending email '%s' to %s", email.subject, to)
+        logger.exception("Error sending email '%s' to %s", subject, to)
+
+
+def email_subject(subject):
+    """In test mode (SHOP_TEST_MODE), "TEST: " first, so test emails stand out"""
+    return f"TEST: {subject}" if settings.SHOP_TEST_MODE else subject
 
 
 def send_email(email, to, reply_to):

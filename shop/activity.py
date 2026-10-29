@@ -14,6 +14,7 @@ admin are attributed to whoever took them); entries logged outside the admin
 import re
 from decimal import Decimal
 
+from django.conf import settings
 from django.utils.text import Truncator
 from wagtail.log_actions import LogFormatter, log
 
@@ -45,6 +46,9 @@ def item_descriptions(items):
 
 
 def log_order(order, action, user=None, **data):
+    # (in test mode, marked as a test, so its message starts "TEST:")
+    if settings.SHOP_TEST_MODE:
+        data["test"] = True
     return log(order, action, user=user, data=data)
 
 
@@ -169,12 +173,43 @@ SHOP_SIMPLE_LOG_ACTIONS = {
 }
 
 
+def fixed_message(label, message):
+    """A formatter for an action with a fixed message"""
+
+    class FixedMessage(ShopLogFormatter):
+        def format_message(self, log_entry):
+            return message
+
+    FixedMessage.label = label
+    return FixedMessage
+
+
+def test_marked(formatter):
+    """
+    The formatter, with "TEST: " before the messages of entries logged in test
+    mode (log_order)
+    """
+
+    class TestMarked(formatter):
+        def format_message(self, log_entry):
+            message = super().format_message(log_entry)
+            return f"TEST: {message}" if self.data(log_entry, "test", False) else message
+
+    TestMarked.__name__ = formatter.__name__
+    return TestMarked
+
+
 def register(actions):
     """Register the shop's log actions (from the register_log_actions hook)"""
-    for action, formatter in SHOP_LOG_ACTIONS.items():
-        actions.register_action(action)(formatter)
-    for action, (label, message) in SHOP_SIMPLE_LOG_ACTIONS.items():
-        actions.register_action(action, label, message)
+    formatters = {
+        **SHOP_LOG_ACTIONS,
+        **{
+            action: fixed_message(label, message)
+            for action, (label, message) in SHOP_SIMPLE_LOG_ACTIONS.items()
+        },
+    }
+    for action, formatter in formatters.items():
+        actions.register_action(action)(test_marked(formatter))
 
 
 def amount_data(amount):

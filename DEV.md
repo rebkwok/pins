@@ -191,9 +191,12 @@ Required unless a default is given.
   breadcrumbs (default False)
 - `SHOP_PREVIEW`: while the new shop is a hidden preview, its pages ask search
   engines not to list them (a "noindex" robots meta tag; default False)
-- `SHOP_TEST_MODE`: a banner on the shop's pages saying it's in test mode
-  (orders aren't real; with Stripe's test card number), for while it uses
-  Stripe's test keys (default False)
+- `SHOP_TEST_MODE`: test mode, for while the shop uses Stripe's test keys
+  (default False; always off in tests, which turn it on themselves): a banner
+  on the shop's pages saying orders aren't real (with Stripe's test card
+  number); orders are numbered `TEST-2026-00012`; the shop's email subjects
+  and order activity log entries start "TEST:"; and `clear_shop_test_data`
+  only runs in test mode
 - `SHOW_LOGIN`: show the header's Login link (default False: only auctions
   need users to log in; logged-in users always see the Account menu, and
   /login/ still works)
@@ -397,13 +400,15 @@ Every deploy:
   (Stripe dashboard > Webhooks).
 
 **Launch**
-0. While the site still has Stripe's **test** keys: clear out the test data with
-   `python manage.py clear_shop_test_data` (it shows what it would delete:
-   test orders, baskets, used discount codes and the orders' log entries),
-   then again with `--delete` (type `delete test data` to confirm). It refuses
-   to run with live keys or a live account connected, so it can't delete real
-   orders. Then reset the stock: `import_shop_stock` with an up-to-date CSV
-   and `--reset-stock`.
+0. While the site is still in test mode (`SHOP_TEST_MODE`, Stripe's **test**
+   keys): clear out the test data with `python manage.py clear_shop_test_data`
+   (it shows what it would delete: the `TEST-` orders, baskets, the discount
+   codes those orders used and their log entries; `--all` for every order,
+   e.g. test orders from before orders were numbered `TEST-`), then again
+   with `--delete` (type `delete test data` to confirm). It refuses to run
+   outside test mode, with live keys, or with a live account connected, so it
+   can't delete real orders. Then reset the stock: `import_shop_stock` with an
+   up-to-date CSV and `--reset-stock`.
 1. In the platform's **live** Stripe dashboard, enable OAuth for Connect (same
    redirect URI) and create the live webhook endpoint (same events). Set the
    live secret key, client id and webhook secret, and `SHOP_TEST_MODE=False`,
