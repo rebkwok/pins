@@ -61,6 +61,7 @@
 }
 
 .shop-test-banner__title {
+  display: block;
   font-size: 1.75rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -78,6 +79,12 @@
   margin: 0;
   /* (the site sets every p's colour, so it isn't inherited) */
   color: var(--white);
+}
+
+.shop-sale-banner__title,
+.shop-sale-banner__content,
+.shop-sale-banner__end {
+  display: block;
 }
 
 .shop-sale-banner__title {

@@ -10,7 +10,7 @@ from playwright.sync_api import expect
 
 from shop.tests.e2e.conftest import log_in
 
-from .conftest import E2E
+from .conftest import E2E, PHONE
 
 pytestmark = E2E
 
@@ -118,6 +118,8 @@ def test_footer_at_bottom(page, live_server, site_pages, url):
     height = page.evaluate("innerHeight")
     assert page.evaluate("document.documentElement.scrollHeight") == height
     assert abs(footer["y"] + footer["height"] - height) < 2
+    # (the page's width, not shrunk to its content and centred)
+    assert (footer["x"], footer["width"]) == (0, page.evaluate("innerWidth"))
 
 
 def test_footer_after_long_content(page, live_server, site_pages):
@@ -128,3 +130,45 @@ def test_footer_after_long_content(page, live_server, site_pages):
     footer = page.locator("footer").bounding_box()
     assert footer["y"] > main["y"] + main["height"]
     assert page.evaluate("document.documentElement.scrollHeight") > 400
+
+
+@pytest.mark.parametrize(
+    "browser_context_args", [None, PHONE, {"viewport": {"width": 800, "height": 900}}], indirect=True,
+    ids=["desktop", "phone", "tablet"],
+)
+def test_no_sideways_scroll(page, live_server, site_pages, browser_context_args):
+    # (e.g. the home page's hero and promo rows stuck out)
+    for url in ["/", site_pages["standard"].get_url_parts()[2], site_pages["dog"].get_url_parts()[2], "/shop/"]:
+        page.goto(live_server.url + url)
+        assert page.evaluate("document.documentElement.scrollWidth") == page.evaluate("innerWidth"), url
+
+
+def test_footer_one_line(page, live_server, site_pages):
+    # on wide screens: the social icons on the left, then the footer text
+    from dashboard.models import SocialSettings
+    from home.models import FooterText
+
+    SocialSettings.objects.update_or_create(id=1, defaults={"facebook_url": "https://facebook.com/pins"})
+    FooterText.objects.create(body="<p>© Podencos in Need (PINS) | Privacy Policy</p>", live=True)
+    page.goto(live_server.url + "/")
+    icons = page.locator("footer .social-list").bounding_box()
+    text = page.locator("footer .copyright").bounding_box()
+    footer = page.locator("footer").bounding_box()
+    assert text["x"] > icons["x"] + icons["width"]
+    assert abs((text["y"] + text["height"] / 2) - (icons["y"] + icons["height"] / 2)) < 6
+    assert footer["height"] < 100
+
+
+@pytest.mark.parametrize(
+    "browser_context_args", [PHONE, {"viewport": {"width": 1400, "height": 900}}], indirect=True, ids=["phone", "wide"]
+)
+def test_home_hero_side_space(page, live_server, site_pages, browser_context_args):
+    # the hero (its background) is edge to edge; its text isn't up to the
+    # screen's edges (and is centred)
+    page.goto(live_server.url + "/")
+    width = page.evaluate("innerWidth")
+    background = page.locator(".hero-gradient-mask").bounding_box()
+    assert (background["x"], background["width"]) == (0, width)
+    title = page.locator(".home-hero h1").bounding_box()
+    left, right = title["x"], width - (title["x"] + title["width"])
+    assert left >= 20 and abs(left - right) < 2
