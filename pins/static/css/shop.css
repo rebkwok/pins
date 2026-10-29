@@ -1,4 +1,4 @@
-/* The shop's buttons and links use --pins-strong (main-v1.3.css), the darker
+/* The shop's buttons and links use --pins-strong (main-v1.x.css), the darker
    shade of the PINS pink, so white text on it, and it as text on white or the
    basket summary's cream, are readable */
 
@@ -1195,7 +1195,7 @@
   }
 }
 
-/* main-v1.3.css turns every a.btn grey on hover. Phones keep a link's :hover
+/* main-v1.x.css turns every a.btn grey on hover. Phones keep a link's :hover
    after it's tapped, and going back shows the page with it still applied, so
    the shop's link buttons ("Choose options", the basket link, ...) stay pink */
 a.btn.basket-btn:hover,
