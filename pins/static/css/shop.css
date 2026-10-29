@@ -38,6 +38,35 @@
   --sale: #b3261e;
 }
 
+/* Test mode (SHOP_TEST_MODE): impossible to miss, black on amber stripes */
+.shop-test-banner {
+  background: repeating-linear-gradient(
+    -45deg,
+    #ffc107,
+    #ffc107 24px,
+    #ffb000 24px,
+    #ffb000 48px
+  );
+  border-top: 6px solid #1a1a1a;
+  border-bottom: 6px solid #1a1a1a;
+  color: #1a1a1a;
+  text-align: center;
+  padding: 14px 0;
+}
+
+.shop-test-banner p {
+  margin: 0;
+  color: #1a1a1a;
+  font-weight: 600;
+}
+
+.shop-test-banner__title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .shop-sale-banner {
   background-color: var(--sale);
   text-align: center;

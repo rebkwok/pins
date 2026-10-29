@@ -191,6 +191,9 @@ Required unless a default is given.
   breadcrumbs (default False)
 - `SHOP_PREVIEW`: while the new shop is a hidden preview, its pages ask search
   engines not to list them (a "noindex" robots meta tag; default False)
+- `SHOP_TEST_MODE`: a banner on the shop's pages saying it's in test mode
+  (orders aren't real; with Stripe's test card number), for while it uses
+  Stripe's test keys (default False)
 - `SHOW_LOGIN`: show the header's Login link (default False: only auctions
   need users to log in; logged-in users always see the Account menu, and
   /login/ still works)
@@ -367,7 +370,8 @@ Every deploy:
   `SALESMAN_STRIPE_CONNECT_CLIENT_ID` (the test `ca_...`, from Settings →
   Connect → Onboarding options → OAuth, in test mode),
   `SALESMAN_STRIPE_CONNECT_WEBHOOK_SECRET` (from the test webhook endpoint),
-  `SALESMAN_STRIPE_CONNECT_PAGES_ENABLED=True`, and `SHOP_PREVIEW=True`.
+  `SALESMAN_STRIPE_CONNECT_PAGES_ENABLED=True`, `SHOP_PREVIEW=True` and
+  `SHOP_TEST_MODE=True`.
 - In the platform's Stripe dashboard (test mode): enable OAuth for Connect
   (Settings → Connect → Onboarding Options → OAuth Settings),
   with the redirect URI `https://podencosinneed.org/stripe/oauth/callback/`,
@@ -402,7 +406,8 @@ Every deploy:
    and `--reset-stock`.
 1. In the platform's **live** Stripe dashboard, enable OAuth for Connect (same
    redirect URI) and create the live webhook endpoint (same events). Set the
-   live secret key, client id and webhook secret, and restart.
+   live secret key, client id and webhook secret, and `SHOP_TEST_MODE=False`,
+   and restart.
 2. Disconnect the test account at /stripe/connect/disconnect/, connect PINS's
    live account at /stripe/connect/, then set
    `SALESMAN_STRIPE_CONNECT_PAGES_ENABLED=False` and restart.
@@ -410,7 +415,8 @@ Every deploy:
 4. Change the old Shop page's slug (e.g. `shop-old`), and delete the /shop/
    redirect Wagtail makes for it. Give the new shop page the slug `shop`, turn
    on "Show in menus", and publish. Then unpublish the old Shop page, and set
-   `SHOP_PREVIEW=False` (and restart).
+   `SHOP_PREVIEW=False` (and restart). (`SHOP_TEST_MODE=False` was set with the
+   live keys, in step 1.)
 5. Check the menus, /shop/, a product, the basket, and a small real payment
    (refunded from the order page), and watch the first orders' webhook events
    and emails.

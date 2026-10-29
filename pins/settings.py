@@ -599,6 +599,9 @@ SHOW_LOGIN = env.bool("SHOW_LOGIN", default=False)
 # While the new shop is a hidden preview: its pages ask search engines not to
 # list them (a "noindex" robots meta tag), in case the address gets out
 SHOP_PREVIEW = env.bool("SHOP_PREVIEW", default=False)
+# A banner on the shop's pages saying it's in test mode: orders aren't real,
+# and payments are Stripe test payments (while using Stripe's test keys)
+SHOP_TEST_MODE = env.bool("SHOP_TEST_MODE", default=False)
 
 
 # Image uploads

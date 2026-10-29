@@ -15,4 +15,6 @@ def shop_context(request):
         "current_sale": SimpleLazyObject(Sale.current_sale),
         # (shop/base.html: not listed by search engines while a hidden preview)
         "shop_preview": settings.SHOP_PREVIEW,
+        # (shop/base.html: a banner saying it's in test mode)
+        "shop_test_mode": settings.SHOP_TEST_MODE,
     }
