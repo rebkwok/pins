@@ -12,12 +12,13 @@
 {% block sale_banner %}
 {% if shop_test_mode %}
     {# (SHOP_TEST_MODE) #}
-    <div class="shop-test-banner" role="note" aria-label="Test mode">
+    {# (a landmark, so screen readers' landmark navigation finds it) #}
+    <aside class="shop-test-banner" aria-label="Test mode">
         <div class="container">
             <p class="shop-test-banner__title">Test shop</p>
             <p>This shop is in test mode: orders aren't real, and no real payments are taken. To test payments, use the test card 4242 4242 4242 4242 at checkout, with any future expiry date and any CVC.</p>
         </div>
-    </div>
+    </aside>
 {% endif %}
 {% include "shop/includes/sale_banner.html" %}
 {% endblock sale_banner %}

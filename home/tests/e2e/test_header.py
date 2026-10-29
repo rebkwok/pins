@@ -106,3 +106,25 @@ def test_messages(page, live_server, site_pages):
     expect(message).to_have_css("background-color", "rgb(245, 243, 233)")
     expect(message).to_have_css("border-left-color", PINS_STRONG)
     expect(message).to_have_css("color", "rgb(51, 51, 51)")
+
+
+@pytest.mark.parametrize("url", ["/", "basket"])
+def test_footer_at_bottom(page, live_server, site_pages, url):
+    # on short pages (e.g. an empty basket), the footer is at the bottom of
+    # the window, not straight after the content
+    url = reverse("shop:basket") if url == "basket" else url
+    page.goto(live_server.url + url)
+    footer = page.locator("footer").bounding_box()
+    height = page.evaluate("innerHeight")
+    assert page.evaluate("document.documentElement.scrollHeight") == height
+    assert abs(footer["y"] + footer["height"] - height) < 2
+
+
+def test_footer_after_long_content(page, live_server, site_pages):
+    # (on long pages, after the content as before)
+    page.set_viewport_size({"width": 1280, "height": 400})
+    page.goto(live_server.url + site_pages["dog"].get_url_parts()[2])
+    main = page.locator("main").bounding_box()
+    footer = page.locator("footer").bounding_box()
+    assert footer["y"] > main["y"] + main["height"]
+    assert page.evaluate("document.documentElement.scrollHeight") > 400
