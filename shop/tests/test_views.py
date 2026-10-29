@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 from unittest import mock
 
@@ -789,16 +790,21 @@ def test_post_checkout_view_non_stripe_payment_method(rf, basket):
 
 
 @mock.patch("shop.payment.PayByStripe.basket_payment")
-def test_post_checkout_view_error(mock_basket_payment, rf, basket):
+def test_post_checkout_view_error(mock_basket_payment, rf, basket, caplog):
     mock_basket_payment.side_effect = PaymentError("Sorry, payments aren't working")
     resp = checkout_view(checkout_request(rf, basket))
     assert resp.status_code == 200
     # the payment error is shown to the customer
     assert resp.context_data["checkout_error"] == "Sorry, payments aren't working"
     assert "Sorry, payments aren&#x27;t working" in resp.rendered_content
+    # logged as a warning, not an error (no email: e.g. a discount code that's
+    # been used; Stripe's problems are errors in salesman_stripe_connect)
+    assert [(r.levelname, r.getMessage()) for r in caplog.records if r.name == "shop.views"] == [
+        ("WARNING", "Checkout payment failed: Sorry, payments aren't working")
+    ]
 
 
-def test_post_checkout_view_invalid_payment_method_in_form(rf, basket):
+def test_post_checkout_view_invalid_payment_method_in_form(rf, basket, caplog):
     # The posted payment method is validated by salesman's checkout serializer
     request = checkout_request(rf, basket)
     request.POST = request.POST.copy()
@@ -806,6 +812,7 @@ def test_post_checkout_view_invalid_payment_method_in_form(rf, basket):
     resp = checkout_view(request)
     assert resp.status_code == 200
     assert resp.context_data["checkout_error"] == "There was an error submitting this order"
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
 
 
 ### ORDER STATUS VIEWS

@@ -1013,14 +1013,17 @@ def _checkout(request, basket, data):
         return None, CHECKOUT_ERROR
     basket.update(request)
     serializer = CheckoutSerializer(data=data, context={"request": request, "basket": basket})
+    # (warnings, not errors: e.g. the basket emptied in another tab, a payment
+    # already in progress, or a discount code that's been used; problems with
+    # Stripe are logged as errors by salesman_stripe_connect)
     if not serializer.is_valid():
-        logger.error("Checkout failed: %s", serializer.errors)
+        logger.warning("Checkout failed: %s", serializer.errors)
         return None, CHECKOUT_ERROR
     try:
         serializer.save()
     except PaymentError as e:
         # Payment errors are written for the customer
-        logger.error("Checkout payment failed: %s", e)
+        logger.warning("Checkout payment failed: %s", e)
         return None, str(e)
     return serializer.data["url"], None
 
