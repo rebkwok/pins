@@ -413,9 +413,11 @@ if not TESTING and not env("LOCAL"):  # pragma: no cover
                 'handlers': ['console', 'file_app', 'mail_admins'],
                 'propagate': True,
             },
+            # (not passed on to the root logger as well, which would email
+            # each error twice)
             'django.request': {
                 'handlers': ['console', 'file_app', 'mail_admins'],
-                'propagate': True,
+                'propagate': False,
             },
             'home': {
                 'handlers': ['console', 'file_app', 'mail_admins'],
@@ -441,6 +443,16 @@ if not TESTING and not env("LOCAL"):  # pragma: no cover
                 "handlers": ["console", "file_app", "mail_admins"],
                 "level": LOG_LEVEL,
                 "propagate": False,
+            },
+            # (apps not listed only log warnings and errors, through the root
+            # logger: e.g. the Stripe app's info messages trace each payment)
+            **{
+                name: {
+                    "handlers": ["console", "file_app", "mail_admins"],
+                    "level": LOG_LEVEL,
+                    "propagate": False,
+                }
+                for name in ["salesman_stripe_connect", "salesman", "fundraising", "payments"]
             },
         },
     }
