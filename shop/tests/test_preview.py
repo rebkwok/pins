@@ -40,7 +40,7 @@ def test_other_pages_indexed(client, shop, settings):
 
 # SHOP_TEST_MODE: a banner on the shop's pages
 
-TEST_BANNER = '<div class="shop-test-banner" role="note" aria-label="Test mode">'
+TEST_BANNER = '<aside class="shop-test-banner" aria-label="Test mode">'
 
 
 @pytest.mark.parametrize("test_mode", [True, False])

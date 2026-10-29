@@ -224,6 +224,8 @@ def test_sale(page, live_server, shop):
     SaleProduct.objects.create(sale=sale, product=shop["mug"], discount=20)
     page.goto(f"{live_server.url}/shop/")
     banner = page.locator(".shop-sale-banner")
+    # (a landmark, for screen readers)
+    expect(page.get_by_role("complementary", name="Sale")).to_be_visible()
     expect(banner).to_have_css("background-color", "rgb(179, 38, 30)")
     for text in ["Sale now on!", "Discounts across the shop.", "Sale ends on"]:
         expect(banner.get_by_text(text)).to_have_css("color", "rgb(255, 255, 255)")

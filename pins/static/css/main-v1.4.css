@@ -67,6 +67,14 @@ body {
   background: var(--white);
   color: var(--dark);
   min-height: 100vh;
+  /* the main content fills the window's height, so the footer is at the
+     bottom on short pages */
+  display: flex;
+  flex-direction: column;
+}
+
+body > main {
+  flex: 1 0 auto;
 }
 
 body.no-scroll {

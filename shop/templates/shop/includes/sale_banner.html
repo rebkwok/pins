@@ -1,5 +1,6 @@
 {% if current_sale.banner_title or current_sale.banner_content %}
-    <div class="shop-sale-banner">
+    {# (a landmark, so screen readers' landmark navigation finds it) #}
+    <aside class="shop-sale-banner" aria-label="Sale">
         <div class="container">
             {% if current_sale.banner_title %}
                 <p class="shop-sale-banner__title">{{ current_sale.banner_title }}</p>
@@ -11,5 +12,5 @@
                 <p class="shop-sale-banner__end">Sale ends on {{ current_sale.end_date|date:'d M Y' }} at {{ current_sale.end_date|date:'H:i' }}</p>
             {% endif %}
         </div>
-    </div>
+    </aside>
 {% endif %}
