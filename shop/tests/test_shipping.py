@@ -156,7 +156,7 @@ def test_ship_some_items(shop_variants, dispatcher, freezer, django_capture_on_c
         "Still to be shipped:\n"
         "- 2 x Card\n"
         "\n"
-        "View the status of your order: https://"
+        "View your order: https://"
     )
 
 
@@ -179,7 +179,7 @@ def test_ship_rest_of_items(shop_variants, dispatcher, django_capture_on_commit_
         "These items had already been shipped:\n"
         "- 2 x Test Product - Mug\n"
         "\n"
-        "View the status of your order: https://"
+        "View your order: https://"
     )
     assert "Still to be" not in email.body
 
@@ -482,9 +482,16 @@ def test_dispatcher_emailed_about_paid_order(
         "1 Road\n"
         "Town\n"
         "\n"
-        "Mark the items as sent once you've sent them: "
-        "https://podencosinneed.org/admin/shop/dispatch/"
+        "When you've sent them, mark them as sent in the shop admin.\n"
+        "\n"
+        "Go to admin: https://podencosinneed.org/admin/shop/dispatch/"
     )
+    # the HTML: the customer's email address a link, and the dispatcher view
+    # a button
+    html = email.alternatives[0].content
+    assert '<a href="mailto:c@test.com" style="color: #a35a47; text-decoration: underline;">c@test.com</a>' in html
+    assert ">Go to admin</a>" in html
+    assert 'href="https://podencosinneed.org/admin/shop/dispatch/" style="display: inline-block;' in html
 
 
 def test_dispatcher_emailed_about_collection(
@@ -495,8 +502,8 @@ def test_dispatcher_emailed_about_collection(
     assert email.subject == f"PINS shop order {order.ref}: items to be collected"
     assert f"PINS shop order {order.ref} has items to be collected from you:" in email.body
     assert (
-        "Mark the items as collected once they've been picked up: "
-        "https://podencosinneed.org/admin/shop/dispatch/"
+        "When they've been collected, mark them as collected in the shop admin.\n\n"
+        "Go to admin: https://podencosinneed.org/admin/shop/dispatch/"
     ) in email.body
     assert "Shipping method: Collect in person\n" in email.body
     assert email.body.endswith("https://podencosinneed.org/admin/shop/dispatch/")
@@ -662,7 +669,7 @@ def test_customer_order_email(shop_variants, django_capture_on_commit_callbacks)
         "\n"
         f"Total: £{order.total:.2f}\n"
         "\n"
-        f"View the status of your order: https://podencosinneed.org/shop/order/{order.token}/\n"
+        f"View your order: https://podencosinneed.org/shop/order/{order.token}/\n"
         "\n"
         "--\n"
         "Podencos In Need (PINS)\n"
@@ -673,6 +680,11 @@ def test_customer_order_email(shop_variants, django_capture_on_commit_callbacks)
     assert 'src="https://podencosinneed.org/static/images/logo.png"' in html
     assert "<li>2 x Test Product - Mug</li>" in html
     assert f'<a href="https://podencosinneed.org/shop/order/{order.token}/"' in html
+    # (a button, so it's clearly a link; and mail apps aren't to make e.g. the
+    # order number a link)
+    assert ">View your order</a>" in html
+    assert 'style="border-radius: 4px; background-color: #a35a47;"' in html
+    assert '<meta name="format-detection" content="telephone=no, address=no, email=no, date=no">' in html
     assert "Podencos In Need (PINS)<br>All proceeds from the shop support PINS&#x27;s work." in html
 
 

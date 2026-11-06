@@ -7,6 +7,8 @@ mail clients.
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    {# (Apple Mail: don't turn addresses, dates or numbers, e.g. order numbers, into links; the emails link phone numbers and email addresses themselves) #}
+    <meta name="format-detection" content="telephone=no, address=no, email=no, date=no">
     <title>{{ subject }}</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f5f3e9;">
@@ -32,7 +34,14 @@ mail clients.
                                         </ul>
                                     {% endwith %}
                                 {% elif item.type == "link" %}
-                                    <p style="margin: 0 0 16px;"><a href="{{ item.block.url }}" style="color: #a35a47;">{{ item.block.label }}</a></p>
+                                    {# a button (a table, for mail clients), so it's clearly something to tap #}
+                                    <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 4px 0 20px;">
+                                        <tr>
+                                            <td style="border-radius: 4px; background-color: #a35a47;">
+                                                <a href="{{ item.block.url }}" style="display: inline-block; padding: 12px 22px; border-radius: 4px; font-weight: 600; color: #ffffff; text-decoration: none;">{{ item.block.label }}</a>
+                                            </td>
+                                        </tr>
+                                    </table>
                                 {% endif %}
                             {% endfor %}
                         </td>

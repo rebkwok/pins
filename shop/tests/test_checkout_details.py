@@ -14,7 +14,6 @@ from salesman.core.utils import get_salesman_model
 
 from ..forms import UK_ONLY_NOTE, CheckoutForm, tidy_uk_postcode
 from ..models import UK
-from ..emails import Paragraph
 from ..signals import OUTSIDE_UK_WARNING, customer_details_blocks
 from ..views import checkout_view
 
@@ -211,8 +210,13 @@ def test_email_details(delivered_order):
     ]
     # (the warning in bold)
     assert customer_details_blocks(delivered_order)[2].as_html() == f"<strong>{OUTSIDE_UK_WARNING}</strong>"
+    # (the phone number to tap to call, underlined)
+    assert customer_details_blocks(delivered_order)[0].as_html() == (
+        'Mobile number: <a href="tel:07700900123" style="color: #a35a47; '
+        'text-decoration: underline;">07700 900123</a>'
+    )
     delivered_order.shipping_method = "collect"
-    assert customer_details_blocks(delivered_order) == [Paragraph("Mobile number: 07700 900123")]
+    assert [block.as_text() for block in customer_details_blocks(delivered_order)] == ["Mobile number: 07700 900123"]
 
 
 def test_admin_order_page(client, delivered_order):

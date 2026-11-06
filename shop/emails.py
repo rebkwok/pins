@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from django.conf import settings
 from django.templatetags.static import static
 from django.template.loader import render_to_string
-from django.utils.html import conditional_escape, strip_tags
+from django.utils.html import conditional_escape, format_html, strip_tags
 from django.utils.safestring import mark_safe
 
 
@@ -56,6 +56,8 @@ class Items:
 
 @dataclass
 class Link:
+    """A link to do something, shown as a button (in the text, "label: url")"""
+
     label: str
     url: str
 
@@ -92,6 +94,23 @@ class Email:
                 "site_url": f"https://{settings.DOMAIN}",
             },
         )
+
+
+# Links in text (e.g. phone numbers): underlined, so they're clearly links
+LINK_STYLE = "color: #a35a47; text-decoration: underline;"
+
+
+def inline_link(url, text):
+    return format_html('<a href="{}" style="{}">{}</a>', url, LINK_STYLE, text)
+
+
+def phone_link(phone):
+    """A phone number, to tap to call"""
+    return inline_link("tel:" + "".join(phone.split()), phone)
+
+
+def email_link(email):
+    return inline_link(f"mailto:{email}", email)
 
 
 def logo_url():

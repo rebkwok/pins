@@ -18,7 +18,7 @@ from wagtail.models import ModelLogEntry
 from salesman_stripe_connect import signals as stripe_signals
 
 from . import activity
-from .emails import Email, Items, Link, Paragraph
+from .emails import Email, Items, Link, Paragraph, email_link, phone_link
 from .models import (
     OrderItem,
     OrderPayment,
@@ -109,7 +109,7 @@ def send_refund_email(sender, order, amount, fully_refunded, **kwargs):
                 "you used for this order. It can take 5-10 working days to appear on "
                 "your statement."
             ),
-            Link("View the status of your order", order_status_url(order)),
+            Link("View your order", order_status_url(order)),
         ],
         footer=customer_footer(),
     )
@@ -132,7 +132,7 @@ def send_payment_failed_emails(order, released_code=False):
                 "has been cancelled and nothing will be sent. You're welcome to order "
                 "again."
             ),
-            Link("View the status of your order", order_status_url(order)),
+            Link("View your order", order_status_url(order)),
         ],
         footer=customer_footer(),
     )
@@ -265,8 +265,12 @@ def shop_order_email(order):
     blocks = [
         Paragraph(intro),
         Paragraph(
-            f"Customer: {order.name} ({order.email})\n"
-            f"Shipping method: {order.get_shipping_method_display()}"
+            format_html(
+                "Customer: {} ({})\nShipping method: {}",
+                order.name,
+                email_link(order.email),
+                order.get_shipping_method_display(),
+            )
         ),
         *customer_details_blocks(order),
         *order_items_lines(order, items, notes),
@@ -288,7 +292,7 @@ def customer_details_blocks(order):
     """
     blocks = []
     if order.phone:
-        blocks.append(Paragraph(f"Mobile number: {order.phone}"))
+        blocks.append(Paragraph(format_html("Mobile number: {}", phone_link(order.phone))))
     if order.needs_delivery:
         blocks.append(Paragraph(f"Shipping address:\n{order.shipping_address}"))
         if order.outside_uk:
@@ -317,15 +321,17 @@ def notify_dispatchers(order):
         if order.is_collected:
             about = ": items to be collected"
             title = f"PINS shop order {order.ref} has items to be collected from you:"
-            mark = "Mark the items as collected once they've been picked up"
+            mark = "When they've been collected, mark them as collected in the shop admin."
         else:
             about = ": items to send"
             title = f"PINS shop order {order.ref} has items for you to send:"
-            mark = "Mark the items as sent once you've sent them"
+            mark = "When you've sent them, mark them as sent in the shop admin."
         for dispatcher, dispatcher_items in by_dispatcher.items():
-            customer = f"Customer: {order.name} ({order.email})"
+            customer = format_html("Customer: {} ({})", order.name, email_link(order.email))
             if not order.needs_delivery:
-                customer += f"\nShipping method: {order.get_shipping_method_display()}"
+                customer = format_html(
+                    "{}\nShipping method: {}", customer, order.get_shipping_method_display()
+                )
             blocks = [
                 Items(
                     [f"{item.quantity} x {item.name}" for item in dispatcher_items],
@@ -333,7 +339,11 @@ def notify_dispatchers(order):
                 ),
                 Paragraph(customer),
                 *customer_details_blocks(order),
-                Link(mark, f"https://{settings.DOMAIN}{reverse('shop_dispatch:index')}"),
+                Paragraph(mark),
+                Link(
+                    "Go to admin",
+                    f"https://{settings.DOMAIN}{reverse('shop_dispatch:index')}",
+                ),
             ]
             _send_email_now(
                 Email(order_subject(order, about), blocks), [dispatcher.email], reply_to
@@ -369,7 +379,7 @@ def send_notification(sender, order, new_status, old_status, **kwargs):
                 ),
                 *collection_blocks(order),
             ]
-        blocks.append(Link("View the status of your order", order_status_url(order)))
+        blocks.append(Link("View your order", order_status_url(order)))
         send_email(
             Email(subject, blocks, footer=customer_footer()), [order.email], reply_to
         )
@@ -405,7 +415,7 @@ def customer_order_email(order):
         Paragraph(intro),
         *(collection_blocks(order) if order.status == order.Status.PROCESSING else []),
         *order_items_lines(order, list(order.items.all())),
-        Link("View the status of your order", order_status_url(order)),
+        Link("View your order", order_status_url(order)),
     ]
     return Email(order_subject(order, " has been received"), blocks, footer=customer_footer())
 
@@ -470,7 +480,7 @@ def send_items_shipped_email(sender, order, items, **kwargs):
         blocks.append(item_list(already_done, f"These items had already been {done}:"))
     if to_come:
         blocks.append(item_list(to_come, f"Still to be {done}:"))
-    blocks.append(Link("View the status of your order", order_status_url(order)))
+    blocks.append(Link("View your order", order_status_url(order)))
     send_email(Email(subject, blocks, footer=customer_footer()), [order.email], reply_to)
 
 

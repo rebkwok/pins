@@ -258,7 +258,7 @@ def test_order_email_links(django_capture_on_commit_callbacks):
     with django_capture_on_commit_callbacks(execute=True):
         order = baker.make(Order, status=Order.Status.PROCESSING, email="test@test.com")
     status_url = f"https://podencosinneed.org/shop/order/{order.token}/"
-    assert f"View the status of your order: {status_url}" in mail.outbox[0].body
+    assert f"View your order: {status_url}" in mail.outbox[0].body
 
 
 @pytest.mark.parametrize(
