@@ -223,6 +223,7 @@ def _can_increase_quantity(request, variant, value, in_basket=False):
 
 
 class ProductDetailView(DetailView):
+    # (by its slug, e.g. /shop/product/pins-hoodie/)
     queryset = Product.objects.filter(live=True)
     template_name = "shop/shop_product_page.html"
     context_object_name = "product"

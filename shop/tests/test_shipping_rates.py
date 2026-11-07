@@ -185,7 +185,7 @@ def test_shipping_rates_list(client, admin, standard, product):
 
 
 def test_product_page_delivery_cost(client, product):
-    url = reverse("shop:product_detail", args=(product.pk,))
+    url = reverse("shop:product_detail", args=(product.slug,))
     content = client.get(url).content.decode()
     assert "UK delivery £4.99." in content
     assert reverse("shop:faqs") in content

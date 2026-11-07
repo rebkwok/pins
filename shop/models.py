@@ -1506,6 +1506,18 @@ class ProductAdminForm(RelativeStockFormMixin, WagtailAdminModelForm):
         return cleaned_data
 
 
+def unique_product_slug(name, pk=None):
+    """
+    A web address for a product from its name, e.g. "pins-hoodie", numbered if
+    another product has it ("pins-hoodie-2")
+    """
+    base = slugify(name)[:240] or "product"
+    slug, number = base, 2
+    while Product.objects.exclude(pk=pk).filter(slug=slug).exists():
+        slug, number = f"{base}-{number}", number + 1
+    return slug
+
+
 class Product(ClusterableModel):
     """
     Product, used to subgroup products in display.
@@ -1519,6 +1531,15 @@ class Product(ClusterableModel):
     )
 
     name = models.CharField(max_length=255)
+    slug = models.SlugField(
+        max_length=255,
+        unique=True,
+        blank=True,
+        # (not in the admin: always made from the name, when the product's
+        # created; a developer can change it if ever needed)
+        editable=False,
+        help_text="For the product URL; leave blank to generate from the name",
+    )
 
     description = RichTextField(help_text="Shown with the product in the shop.", blank=True)
     price = models.DecimalField(
@@ -1665,6 +1686,8 @@ class Product(ClusterableModel):
         return self.name
 
     def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = unique_product_slug(self.name, self.pk)
         if self.requires_shipping and self.shipping_rate_id is None:
             # e.g. imported products: the default rate
             self.shipping_rate = ShippingRate.get_default()
@@ -1880,7 +1903,7 @@ class Product(ClusterableModel):
         return images
 
     def get_absolute_url(self):
-        return reverse("shop:product_detail", kwargs={"pk": self.pk})
+        return reverse("shop:product_detail", kwargs={"slug": self.slug})
 
 
 # The image collection that the shop's images are filed in (created by migration

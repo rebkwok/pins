@@ -106,7 +106,7 @@ def test_get_basket_item_data(rf, basket):
 
 
 def test_get_product_detail_view(client, product):
-    resp = client.get(reverse("shop:product_detail", args=(product.id,)))
+    resp = client.get(reverse("shop:product_detail", args=(product.slug,)))
     assert resp.status_code == 200
 
 

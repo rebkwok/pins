@@ -148,7 +148,7 @@ def basket_session(request, basket=None):
 
 def test_dropdown(client, cards, single, pack):
     content = " ".join(
-        client.get(reverse("shop:product_detail", args=(cards.id,))).content.decode().split()
+        client.get(reverse("shop:product_detail", args=(cards.slug,))).content.decode().split()
     )
     # the prices differ, so are shown; stock only if it's low (2 packs of 5 left)
     assert "From <strong>£2.00</strong>" in content
@@ -160,7 +160,7 @@ def test_dropdown_pack_out_of_stock(client, cards, single, pack):
     cards.stock = 4
     cards.save()
     content = " ".join(
-        client.get(reverse("shop:product_detail", args=(cards.id,))).content.decode().split()
+        client.get(reverse("shop:product_detail", args=(cards.slug,))).content.decode().split()
     )
     assert "Single – £2.00 (only 4 left)" in content
     assert "disabled> Pack of 5 – £8.00 (out of stock) </option>" in content

@@ -181,5 +181,5 @@ def test_no_photo(client, shop):
     page, products = shop
     content = client.get("/shop/").content.decode()
     assert content.count("No photo available") == 4
-    url = f"/shop/product/{products['Hoodie'].id}/"
+    url = f"/shop/product/{products['Hoodie'].slug}/"
     assert "No photo available" in client.get(url).content.decode()

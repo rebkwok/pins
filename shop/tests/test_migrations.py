@@ -122,3 +122,23 @@ def test_shop_data_existing(migrations):
     assert Collection.objects.get(pk=events.pk).name == "Events"
     assert list(apps.get_model("shop", "ShippingRate").objects.values_list("name", flat=True)) == ["Small items"]
     assert list(apps.get_model("shop", "ShopFAQ").objects.values_list("question", flat=True)) == ["Our own?"]
+
+
+
+@pytest.mark.django_db(transaction=True)
+def test_product_slugs_migration(migrations):
+    # existing products' slugs, from their names: numbered if the same
+    apps = migrations([("shop", "0003_product_slug")])
+    Category = apps.get_model("shop", "Category")
+    Product = apps.get_model("shop", "Product")
+    category = Category.objects.create(title="Mugs", slug="mugs")
+    names = ["Podenco mug", "Podenco mug", "2026", ""]
+    products = [Product.objects.create(category=category, name=name, price=1) for name in names]
+    apps = migrations([("shop", "0004_product_slugs_data")])
+    Product = apps.get_model("shop", "Product")
+    assert [Product.objects.get(pk=product.pk).slug for product in products] == [
+        "podenco-mug",
+        "podenco-mug-2",
+        "2026",
+        "product",
+    ]

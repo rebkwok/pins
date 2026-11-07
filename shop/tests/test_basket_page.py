@@ -125,7 +125,7 @@ def test_shop_quantity_no_max(client, basket):
         {"variant_id": variant.id, "quantity": 1},
     ).content.decode()
     assert "max=" not in content
-    content = client.get(reverse("shop:product_detail", args=(variant.product.id,))).content.decode()
+    content = client.get(reverse("shop:product_detail", args=(variant.product.slug,))).content.decode()
     assert f'value="{variant.id}" data-available="{variant.available}"' in content
 
 
@@ -275,7 +275,7 @@ def test_in_basket_tag(rf, basket):
 
 def test_in_basket_on_product_page(basket_client, basket):
     variant = basket.get_items()[0].product
-    content = get(basket_client, reverse("shop:product_detail", args=(variant.product.id,)))
+    content = get(basket_client, reverse("shop:product_detail", args=(variant.product.slug,)))
     assert f'data-available="{variant.available}" data-in-basket="2"' in content
     # (filled in by quantity_buttons.js)
     assert f'<p class="shop-in-basket" hidden><a href="{reverse("shop:basket")}"></a></p>' in content
@@ -288,7 +288,7 @@ def test_in_basket_when_out_of_stock(basket_client, basket):
     baker.make("shop.ProductVariant", product=variant.product, variant_name="Large", stock=0)
     variant.stock = 0
     variant.save()
-    content = get(basket_client, reverse("shop:product_detail", args=(variant.product.id,)))
+    content = get(basket_client, reverse("shop:product_detail", args=(variant.product.slug,)))
     assert "Out of stock" in content
     assert 'name="variant_id"' not in content
     assert '<input type="hidden" data-in-basket="2" data-name="Small">' in content
@@ -349,6 +349,6 @@ def test_in_basket_variant_names(basket_client, basket):
     # variant is selected
     variant = basket.get_items()[0].product
     baker.make("shop.ProductVariant", product=variant.product, variant_name="Large", stock=5)
-    content = get(basket_client, reverse("shop:product_detail", args=(variant.product.id,)))
+    content = get(basket_client, reverse("shop:product_detail", args=(variant.product.slug,)))
     assert f'value="{variant.id}" data-available="{variant.available}" data-in-basket="2" data-name="Small"' in content
     assert 'data-in-basket="0" data-name="Large"' in content

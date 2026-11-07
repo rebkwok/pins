@@ -78,7 +78,7 @@ def get_page(client, page, products):
     elif page == "category":
         url = "/shop/?category=category"
     else:
-        url = reverse("shop:product_detail", args=(products[0].id,))
+        url = reverse("shop:product_detail", args=(products[0].slug,))
     resp = client.get(url)
     assert resp.status_code == 200
     parser = CardParser()
@@ -148,7 +148,7 @@ def test_product_cards_first_image(client, shop_pages, page):
     assert parser.carousels == []
     assert parser.indicators == []
     for product in shop_pages:
-        detail_url = reverse("shop:product_detail", args=(product.id,))
+        detail_url = reverse("shop:product_detail", args=(product.slug,))
         # (the image, the name, and "Choose options", for products with a
         # choice of options)
         assert parser.image_links.count(detail_url) == 3
@@ -195,7 +195,7 @@ def test_product_card_alt_text(client, shop_pages):
     baker.make(
         "shop.ProductImage", product=product, image=wagtail_factories.ImageFactory(title="Side")
     )
-    content = client.get(reverse("shop:product_detail", args=(product.id,))).content.decode()
+    content = client.get(reverse("shop:product_detail", args=(product.slug,))).content.decode()
     assert 'alt="Mug front"' in content
     # an image without alt text uses its title
     assert 'alt="Side"' in content
@@ -222,7 +222,7 @@ def test_sale_banner_shown_during_sale(client, shop_pages, freezer):
     )
     SaleProduct.objects.create(sale=sale, product=shop_pages[0], discount=20)
 
-    for url in ["/shop/", "/shop/?category=category", reverse("shop:product_detail", args=(shop_pages[0].id,))]:
+    for url in ["/shop/", "/shop/?category=category", reverse("shop:product_detail", args=(shop_pages[0].slug,))]:
         content = client.get(url).content.decode()
         assert "Summer sale!" in content, url
         assert "20% off mugs" in content
@@ -242,7 +242,7 @@ def test_product_page_columns_stack_on_phones(client, shop_pages):
     product = shop_pages[0]
     product.description = "<p>A lovely mug</p>"
     product.save()
-    content = client.get(reverse("shop:product_detail", args=(product.id,))).content.decode()
+    content = client.get(reverse("shop:product_detail", args=(product.slug,))).content.decode()
     # full width on phones, side by side from tablet width
     assert content.count('<div class="col-12 col-md-6">') == 2
 

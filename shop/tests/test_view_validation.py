@@ -42,12 +42,13 @@ def add_data(variant, **params):
 def test_product_detail_not_live(client, product):
     product.live = False
     product.save()
-    resp = client.get(reverse("shop:product_detail", args=(product.id,)))
+    resp = client.get(reverse("shop:product_detail", args=(product.slug,)))
     assert resp.status_code == 404
 
 
-def test_product_detail_non_numeric_id(client):
+def test_product_detail_unknown(client):
     assert client.get("/shop/product/abc/").status_code == 404
+    assert client.get("/shop/product/1234/").status_code == 404
 
 
 # Quantity buttons

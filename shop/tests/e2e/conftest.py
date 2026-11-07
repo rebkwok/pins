@@ -178,7 +178,7 @@ def card(page, name):
 
 def add_to_basket(page, live_server, product, quantity=1, option=None):
     """Add the product to the basket from its page (choosing the option, e.g. "Black, S")"""
-    page.goto(f"{live_server.url}{reverse('shop:product_detail', args=(product.pk,))}")
+    page.goto(f"{live_server.url}{reverse('shop:product_detail', args=(product.slug,))}")
     form = page.locator(".shop-product")
     if option:
         choose_option(form, option)

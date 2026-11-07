@@ -17,7 +17,7 @@ def shop_urls(shop):
     page, products = shop
     return [
         page.url,
-        reverse("shop:product_detail", args=(products["Podenco mug"].pk,)),
+        reverse("shop:product_detail", args=(products["Podenco mug"].slug,)),
         reverse("shop:basket"),
         reverse("shop:faqs"),
     ]

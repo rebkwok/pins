@@ -153,7 +153,7 @@ def test_product_page_breadcrumbs(client, mugs):
     # the category links to the shop page with it selected
     product = mugs.products.get()
     content = html.unescape(
-        client.get(reverse("shop:product_detail", args=(product.id,))).content.decode()
+        client.get(reverse("shop:product_detail", args=(product.slug,))).content.decode()
     )
     assert '<a href="/shop/?category=mugs-gifts">Mugs & Gifts</a>' in content
     assert '<li aria-current="page">Podenco mug</li>' in content

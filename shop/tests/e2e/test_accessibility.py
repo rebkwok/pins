@@ -47,7 +47,7 @@ def shop_pages(live_server, shop, order):
     return {
         "shop": "/shop/",
         "category": "/shop/?category=clothing",
-        "product": reverse("shop:product_detail", args=(shop["tshirt"].pk,)),
+        "product": reverse("shop:product_detail", args=(shop["tshirt"].slug,)),
         "basket": reverse("shop:basket"),
         "checkout": reverse("shop:checkout") + "?payment-method=stripe&shipping-method=deliver",
         "order status": reverse("shop:order_status", args=(order.token,)),

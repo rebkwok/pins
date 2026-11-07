@@ -79,7 +79,7 @@ def test_order_doesnt_count_stock(entry):
 
 
 def test_shop_page_and_quantity(client, entries, entry):
-    content = client.get(reverse("shop:product_detail", args=(entries.id,))).content.decode()
+    content = client.get(reverse("shop:product_detail", args=(entries.slug,))).content.decode()
     # no stock note, no limit for the quantity buttons
     assert "left" not in content
     assert "Out of stock" not in content
@@ -99,7 +99,7 @@ def test_shop_page_options(client, entries, entry):
     other = baker.make("shop.ProductVariant", product=entries, variant_name="Junior", stock=0, price=1)
     entry.variant_name = "Adult"
     entry.save()
-    content = " ".join(client.get(reverse("shop:product_detail", args=(entries.id,))).content.decode().split())
+    content = " ".join(client.get(reverse("shop:product_detail", args=(entries.slug,))).content.decode().split())
     # neither option is disabled (or out of stock)
     assert f'<option value="{other.id}" data-in-basket="0" data-name="Junior">' in content
     assert " disabled" not in content.split("</select>")[0].split("<select")[1]

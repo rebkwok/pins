@@ -41,7 +41,7 @@ def test_browse_and_add(page, live_server, shop):
 
 def test_quantity_limits(page, live_server, shop):
     # Black, S has 2 left: "+" stops at 2
-    page.goto(f"{live_server.url}{reverse('shop:product_detail', args=(shop['tshirt'].pk,))}")
+    page.goto(f"{live_server.url}{reverse('shop:product_detail', args=(shop['tshirt'].slug,))}")
     form = page.locator(".shop-product")
     more, fewer = form.get_by_role("button", name="More"), form.get_by_role("button", name="Fewer")
     expect(fewer).to_be_disabled()
@@ -73,7 +73,7 @@ def test_adding_the_last_ones(page, live_server, shop):
 
 def test_stock_taken_meanwhile(page, live_server, shop):
     # the page shows 2 left; someone else buys them before "+" is pressed
-    page.goto(f"{live_server.url}{reverse('shop:product_detail', args=(shop['tshirt'].pk,))}")
+    page.goto(f"{live_server.url}{reverse('shop:product_detail', args=(shop['tshirt'].slug,))}")
     ProductVariant.objects.filter(product=shop["tshirt"], size="S").update(stock=0)
     form = page.locator(".shop-product")
     form.get_by_role("button", name="Add to basket").click()
