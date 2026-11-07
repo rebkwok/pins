@@ -1,4 +1,4 @@
-{% load shoptags %}
+{% load shoptags wagtailimages_tags %}
 {# (data-available: how many can be added, none if there's no stock limit; see quantity_buttons.js) #}
 {# The variant to add to the basket: a drop-down if there's a choice (with selected_variant_id selected, if given). (Updated by htmx after adding to the basket, see views.add_to_basket, or when more can't be added, see views._variant_options_oob_html.) #}
 {% if product.out_of_stock %}
@@ -18,7 +18,7 @@
             <label class="visually-hidden" for="id_variant_{{ product.id }}">Option</label>
             <select name="variant_id" required id="id_variant_{{ product.id }}" class="form-select shop-card__variant">
                 {% for variant in variants %}
-                    <option value="{{ variant.id }}"{% if variant.available is not None %} data-available="{{ variant.available }}"{% endif %} data-in-basket="{% in_basket variant %}" data-name="{{ variant.variant_full_name|default:product.name }}"{% if variant.id == selected_variant_id %} selected{% endif %}{% if variant.available is not None and variant.available <= 0 %} disabled{% endif %}>
+                    <option value="{{ variant.id }}"{% if variant.available is not None %} data-available="{{ variant.available }}"{% endif %} data-in-basket="{% in_basket variant %}" data-name="{{ variant.variant_full_name|default:product.name }}"{% if variant.image_id %} data-image-id="{{ variant.image_id }}"{% image variant.image fill-400x400-c100 as card_image %} data-card-image="{{ card_image.url }}"{% endif %}{% if variant.id == selected_variant_id %} selected{% endif %}{% if variant.available is not None and variant.available <= 0 %} disabled{% endif %}>
                         {{ variant.variant_full_name|default:product.name }}{% if product.price_summary.varies %} – {{ variant.current_price|gbp }}{% endif %}{% with note=variant.stock_note %}{% if note %} ({{ note|lower }}){% endif %}{% endwith %}
                     </option>
                 {% endfor %}

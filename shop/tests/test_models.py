@@ -208,6 +208,16 @@ def test_product_images(product):
     ]
 
 
+def test_product_images_repeated(product):
+    # an image added to the product twice, or shared by variants: once
+    image1, image2 = baker.make("wagtailimages.Image", _quantity=2)
+    baker.make("shop.ProductImage", product=product, image=image1, sort_order=0, alt_text="Front")
+    baker.make("shop.ProductImage", product=product, image=image1, sort_order=1, alt_text="Again")
+    baker.make("shop.ProductVariant", product=product, variant_name="Black, S", image=image2)
+    baker.make("shop.ProductVariant", product=product, variant_name="Black, M", image=image2)
+    assert product.images == [CarouselImage(image1, "Front"), CarouselImage(image2, "Black, S")]
+
+
 def test_carousel_image_alt():
     image = baker.prepare("wagtailimages.Image", title="Photo", description="")
     # the alt text, or the image's default alt text (description or title)

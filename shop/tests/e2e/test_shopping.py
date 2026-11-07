@@ -1,7 +1,7 @@
 """Browsing the shop, and the basket"""
 
 import re
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from django.urls import reverse
@@ -249,4 +249,63 @@ def test_banners_not_paragraphs_as_headings(page, live_server, shop, settings):
     expect(page.get_by_role("complementary", name="Sale")).to_be_visible()
     result = Axe().run(page, options={"runOnly": ["p-as-heading"]}).response
     assert result["violations"] == []
+
+
+
+def test_option_image(page, live_server, shop):
+    # on the product page, choosing an option with its own image shows it in
+    # the carousel, which then slides on as usual
+    import wagtail_factories
+
+    from ...models import ProductImage
+
+    tshirt = shop["tshirt"]
+    front = wagtail_factories.ImageFactory(title="Front")
+    ProductImage.objects.create(product=tshirt, image=front, sort_order=0)
+    white = tshirt.variants.get(colour="White")
+    white.image = wagtail_factories.ImageFactory(title="White")
+    white.save()
+    # (time stopped before the page loads, so the carousel only moves when the
+    # test says: Bootstrap slides on every 5 seconds)
+    page.clock.install(time=datetime(2026, 1, 1, tzinfo=UTC))
+    page.clock.pause_at(datetime(2026, 1, 1, 0, 0, 1, tzinfo=UTC))
+    page.goto(f"{live_server.url}{reverse('shop:product_detail', args=(tshirt.slug,))}")
+    page.wait_for_load_state()
+    active = page.locator(".shop-product .carousel-item.active")
+    expect(active).to_have_attribute("data-image-id", str(front.id))
+    choose_option(page.locator(".shop-product"), "White, M")
+    page.clock.run_for(1000)
+    # an option without its own image leaves it there
+    choose_option(page.locator(".shop-product"), "Black, S")
+    page.clock.run_for(1000)
+    expect(active).to_have_attribute("data-image-id", str(white.image_id))
+    # and it slides on (every 5 seconds)
+    page.clock.run_for(5000)
+    expect(active).to_have_attribute("data-image-id", str(front.id))
+
+
+def test_card_option_image(page, live_server, shop):
+    # on the shop page, choosing an option with its own image switches the
+    # card's image to it; one without, back to the product's
+    import wagtail_factories
+
+    from ...models import ProductImage
+
+    tshirt = shop["tshirt"]
+    front = wagtail_factories.ImageFactory(title="Front")
+    ProductImage.objects.create(product=tshirt, image=front, sort_order=0)
+    white = tshirt.variants.get(colour="White")
+    white.image = wagtail_factories.ImageFactory(title="White")
+    white.save()
+    page.goto(f"{live_server.url}/shop/")
+    page.wait_for_load_state()
+    tshirt_card = card(page, "PINS T-shirt")
+    img = tshirt_card.locator(".shop-card__img")
+    front_url = front.get_rendition("fill-400x400-c100").url
+    white_url = white.image.get_rendition("fill-400x400-c100").url
+    expect(img).to_have_attribute("src", front_url)
+    choose_option(tshirt_card, "White, M")
+    expect(img).to_have_attribute("src", white_url)
+    choose_option(tshirt_card, "Black, S")
+    expect(img).to_have_attribute("src", front_url)
 

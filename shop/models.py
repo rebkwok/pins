@@ -1892,13 +1892,17 @@ class Product(ClusterableModel):
         The product's images in order, then its live variants' images (with the
         variant's name as alt text), without duplicates. Returns CarouselImages.
         """
-        images = [
-            CarouselImage(product_image.image, product_image.alt_text)
-            for product_image in self.product_images.select_related("image")
-        ]
+        images = []
+        seen = set()
+        for product_image in self.product_images.select_related("image"):
+            # (an image added to the product twice is shown once)
+            if product_image.image_id not in seen:
+                seen.add(product_image.image_id)
+                images.append(CarouselImage(product_image.image, product_image.alt_text))
         variants = self.live_variants.filter(image__isnull=False).select_related("image")
         for variant in variants:
-            if variant.image not in [image.image for image in images]:
+            if variant.image_id not in seen:
+                seen.add(variant.image_id)
                 images.append(CarouselImage(variant.image, variant.variant_full_name()))
         return images
 

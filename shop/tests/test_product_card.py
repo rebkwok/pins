@@ -179,6 +179,32 @@ def test_product_page_carousel(client, shop_pages):
     assert parser.nested_links == 0
 
 
+def test_product_page_image_ids(client, shop_pages):
+    # the slides, and the options with their own image, have its id (for
+    # variant_images.js: choosing an option shows its image); and the script
+    product = shop_pages[0]
+    add_images(product, 3)
+    content = " ".join(client.get(reverse("shop:product_detail", args=(product.slug,))).content.decode().split())
+    for image in product.images:
+        assert f'class="carousel-item' in content
+        assert f'data-image-id="{image.image.id}">' in content
+    for variant in product.variants.exclude(image=None):
+        card_image = variant.image.get_rendition("fill-400x400-c100")
+        assert (
+            f'data-name="{variant.variant_full_name()}" data-image-id="{variant.image_id}" '
+            f'data-card-image="{card_image.url}"'
+        ) in content
+    assert "/static/shop/js/variant_images.js" in content
+
+
+def test_shop_card_image_class(client, shop_pages):
+    # (the card's image, for variant_images.js to switch)
+    add_images(shop_pages[0], 2)
+    content = client.get("/shop/").content.decode()
+    assert 'class="shop-card__img"' in content
+    assert "/static/shop/js/variant_images.js" in content
+
+
 def test_product_page_single_image(client, shop_pages):
     add_images(shop_pages[0], 1)
     parser = get_page(client, "product", shop_pages)

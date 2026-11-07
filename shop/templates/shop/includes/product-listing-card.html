@@ -6,7 +6,8 @@
         <a href="{% url 'shop:product_detail' product.slug %}" class="shop-card__image" tabindex="-1" aria-hidden="true">
             {% with image=product.images.0 %}
                 {% if image %}
-                    {% image image.image fill-400x400-c100 loading="lazy" alt="" %}
+                    {# (switched to a chosen option's own image, see variant_images.js) #}
+                    {% image image.image fill-400x400-c100 loading="lazy" alt="" class="shop-card__img" %}
                 {% else %}
                     {% include "shop/includes/no_photo.html" %}
                 {% endif %}
