@@ -745,7 +745,8 @@ def test_customer_email_footer_from_settings(shop_variants, django_capture_on_co
     mail.outbox.clear()
     paid_order(shop_variants, django_capture_on_commit_callbacks)
     (email,) = emails_to("c@test.com")
-    assert "--" not in email.body
+    # (the separator, "--" on its own line: the order link's token may have "--")
+    assert "\n--\n" not in email.body
     assert "Charity number" not in email.alternatives[0].content
 
 

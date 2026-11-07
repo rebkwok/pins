@@ -133,7 +133,7 @@ def test_held_then_failed(shop_variants, notify_settings, django_capture_on_comm
         "put back in stock, and its discount code (PINS5OFF) can be used again. The "
         "customer has been emailed."
     ) in shop.body
-    assert "--" not in shop.body
+    assert "\n--\n" not in shop.body
 
 
 def test_failed_no_notify_addresses(shop_variants, django_capture_on_commit_callbacks):
