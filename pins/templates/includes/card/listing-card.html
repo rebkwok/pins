@@ -2,13 +2,14 @@
 
 <div class="listing-card">
     <a class="listing-card__link" href="{{ page.url }}">
+        {# (the image, with the page's title beside it in the link: no alt text, so it isn't read twice) #}
         {% if page.image %}
             <figure class="listing-card__image">
-                {% image page.image fill-180x180-c100 loading="lazy" %}
+                {% image page.image fill-180x180-c100 loading="lazy" alt="" %}
             </figure>
         {% elif page.cover_image %}
             <figure class="listing-card__image">
-                {% image page.cover_image fill-180x180-c100 loading="lazy" %}
+                {% image page.cover_image fill-180x180-c100 loading="lazy" alt="" %}
             </figure>
         {% endif %}
         <div class="listing-card__contents">

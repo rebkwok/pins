@@ -16,11 +16,12 @@
                                 <a class="listing-card__link" href="{% pageurl result.specific %}">
                                     {% if result.specific.image %}
                                         <figure class="listing-card__image">
-                                            {% image result.specific.image fill-180x180-c100 loading="lazy" %}
+                                            {# (no alt text: the page's title is beside it in the link) #}
+                                            {% image result.specific.image fill-180x180-c100 loading="lazy" alt="" %}
                                         </figure>
                                     {% elif result.specific.cover_image %}
                                         <figure class="listing-card__image">
-                                            {% image result.specific.cover_image fill-180x180-c100 loading="lazy" %}
+                                            {% image result.specific.cover_image fill-180x180-c100 loading="lazy" alt="" %}
                                         </figure>
                                     {% endif %}
                                     <div class="listing-card__contents">

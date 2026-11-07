@@ -733,3 +733,40 @@ def test_facebook_changes_menu_item(rf, pending, classname):
     with patch.object(FacebookAlbums, "pending_changes", return_value=changes):
         component = item.render_component(rf.get("/admin/"))
     assert component.classname == classname
+
+
+# ---------------------------------------------------------------------------
+# Gallery images' alt text
+# ---------------------------------------------------------------------------
+
+def jpeg():
+    from io import BytesIO
+
+    from PIL import Image as PILImage
+
+    out = BytesIO()
+    PILImage.new("RGB", (10, 10)).save(out, "JPEG")
+    return out.getvalue()
+
+
+class TestGalleryImageAltText:
+    """Photos from Facebook: the dog's name as their alt text (their title,
+    e.g. fred_1449151267425157, looks like a file name to accessibility
+    checkers, e.g. Wagtail's)"""
+
+    @pytest.fixture(autouse=True)
+    def patch_update_fb(self):
+        with patch.object(DogPage, 'update_facebook_info'):
+            yield
+
+    def test_created_with_dogs_name(self, status_pages):
+        from wagtail.models import Collection
+
+        page = DogPageFactory(parent=status_pages["needs_offer"], title="Fred", slug="fred")
+        tracker = FacebookAlbumTracker()
+        with patch("dogs.models.requests.get") as get:
+            get.return_value.content = jpeg()
+            tracker.create_gallery_image(page, Collection.get_first_root_node(), "1449", "https://fb/1.jpg")
+        image = page.gallery_images.get().image
+        assert image.title == "fred_1449"
+        assert image.default_alt_text == "Fred"

@@ -86,3 +86,27 @@ def test_fb_albums(freezer):
     # updating a single album doesn't change the updated date for the whole container
     assert albums_container.date_updated.date() == date(2023, 5, 22)
     assert albums_container.get_album("1") == {}
+
+
+def test_listing_card_image_no_alt(client, home_page):
+    # a dog's card on its status page: its photo has no alt text, as the dog's
+    # name is beside it in the link (and the photo's title, e.g.
+    # fred_1449151267425157, looks like a file name to accessibility checkers)
+    import re
+    from unittest.mock import patch
+
+    from wagtail.models import Site
+
+    from dogs.models import DogPageGalleryImage
+
+    Site.objects.filter(is_default_site=True).update(root_page=home_page)
+    index = DogsIndexPageFactory(parent=home_page)
+    status = DogStatusPageFactory(parent=index, live=True)
+    with patch.object(DogPage, "update_facebook_info"):
+        dog = DogPageFactory(parent=status, title="Fred", live=True)
+    image = wagtail_factories.ImageFactory(title="fred_1449151267425157")
+    DogPageGalleryImage.objects.create(page=dog, image=image)
+    content = client.get(status.url).content.decode()
+    card_images = re.findall(r'<figure class="listing-card__image">\s*(<img[^>]*>)', content)
+    assert card_images and all('alt=""' in img for img in card_images)
+    assert "fred_1449151267425157" not in content

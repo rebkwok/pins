@@ -474,6 +474,9 @@ class FacebookAlbumTracker:
         photo_name = f"{page.slug}_{image_id}"
         image = Image(
             title=photo_name,
+            # (its alt text: the dog's name, not the title, which looks like a
+            # file name to accessibility checkers, e.g. Wagtail's)
+            description=page.title,
             file=ImageFile(BytesIO(image_resp.content), name=f"{photo_name}.jpg"),
             collection=collection,
         )
