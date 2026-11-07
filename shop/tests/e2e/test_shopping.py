@@ -251,6 +251,19 @@ def test_banners_not_paragraphs_as_headings(page, live_server, shop, settings):
     assert result["violations"] == []
 
 
+def test_price_not_paragraph_as_heading(page, live_server, shop):
+    # the product page's price (bold, and larger than the text after it) isn't
+    # a paragraph styled as a heading (axe's p-as-heading, which Wagtail's
+    # checker shows editors); nor are the shop page's
+    from axe_playwright_python.sync_playwright import Axe
+
+    for url in [shop["mug"].get_absolute_url(), "/shop/"]:
+        page.goto(f"{live_server.url}{url}")
+        expect(page.locator(".shop-card__price").first).to_be_visible()
+        result = Axe().run(page, options={"runOnly": ["p-as-heading"]}).response
+        assert result["violations"] == [], url
+
+
 
 def test_option_image(page, live_server, shop):
     # on the product page, choosing an option with its own image shows it in

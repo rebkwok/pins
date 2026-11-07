@@ -58,9 +58,19 @@ def site_pages(home_page):
     """One page of each type (with some content and images), in the menus"""
     Site.objects.update(root_page=home_page, is_default_site=True)
     image = wagtail_factories.ImageFactory(title="Podenco running on a beach")
-    body = "<p>Some text with <a href=\"/\">a link</a>.</p>"
+    # (long paragraphs, after short introductions, as on the real pages: so an
+    # introduction mustn't look like a heading, axe's p-as-heading)
+    text = "Podencos are gentle, affectionate dogs who love company and long walks. " * 4
+    body = f"<p>Some text with <a href=\"/\">a link</a>. {text}</p>"
+    introduction = "We rescue podencos from Spain and find them homes."
+    sections = f"<h2>Adopting</h2>{body}<h3>Costs</h3><p>{text}</p>"
     pages = {"home": home_page}
-    pages["standard"] = add(home_page, StandardPage(title="About us", body=body, image=image, show_in_menus=True))
+    pages["standard"] = add(
+        home_page,
+        StandardPage(
+            title="About us", introduction=introduction, body=sections, image=image, show_in_menus=True
+        ),
+    )
     faq = FAQPage(title="FAQs", introduction=body, show_in_menus=True)
     faq.faqs.add(FAQ(question="How do I adopt?", answer=body))
     pages["faq"] = add(home_page, faq)
@@ -76,7 +86,8 @@ def site_pages(home_page):
     pages["dogs index"] = add(home_page, DogsIndexPage(title="Dogs", body=body, image=image, show_in_menus=True))
     pages["dog status"] = add(
         pages["dogs index"], DogStatusPage(
-            title="Dogs for adoption", short_description="Ready for homes", image=image, show_in_menus=True
+            title="Dogs for adoption", short_description="Ready for homes", intro=f"<p>{introduction}</p>",
+            image=image, show_in_menus=True,
         )
     )
     pages["dog"] = add(pages["dog status"], DogPage(title="Rex", description=body, location="Spain"))
@@ -92,5 +103,7 @@ def site_pages(home_page):
             donor="Ann", donor_email="ann@test.com", starting_bid=10,
         ),
     )
-    pages["shop"] = ShopPageFactory(parent=home_page, title="Shop", slug="shop")
+    pages["shop"] = ShopPageFactory(
+        parent=home_page, title="Shop", slug="shop", introduction=introduction, body=sections
+    )
     return pages

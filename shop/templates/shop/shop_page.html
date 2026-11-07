@@ -15,7 +15,8 @@
 
     <div class="container shop-detail">
         {% if page.introduction %}
-            <p class="shop-detail__introduction">{{ page.introduction }}</p>
+            {# (a div, not a paragraph: short and large before the body's text, it looks like a heading to accessibility checkers, e.g. Wagtail's) #}
+            <div class="shop-detail__introduction">{{ page.introduction }}</div>
         {% endif %}
         {{ page.body|richtext }}
         <p class="shop-detail__faqs"><a href="{% url 'shop:faqs' %}">Delivery and other FAQs</a></p>

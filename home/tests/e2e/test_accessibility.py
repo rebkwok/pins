@@ -17,11 +17,16 @@ from .conftest import E2E, PHONE
 pytestmark = E2E
 
 
+# (as well as axe's default rules: paragraphs styled as headings, which
+# Wagtail's checker shows editors)
+AXE_OPTIONS = {"rules": {"p-as-heading": {"enabled": True}}}
+
+
 def issues(page):
     """axe's issues on the page: [(rule, impact, [elements])]"""
     return [
         (violation["id"], violation["impact"], [" ".join(node["target"]) for node in violation["nodes"]][:5])
-        for violation in Axe().run(page).response["violations"]
+        for violation in Axe().run(page, options=AXE_OPTIONS).response["violations"]
     ]
 
 
