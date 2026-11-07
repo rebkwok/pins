@@ -213,8 +213,14 @@ def test_product_images_repeated(product):
     image1, image2 = baker.make("wagtailimages.Image", _quantity=2)
     baker.make("shop.ProductImage", product=product, image=image1, sort_order=0, alt_text="Front")
     baker.make("shop.ProductImage", product=product, image=image1, sort_order=1, alt_text="Again")
-    baker.make("shop.ProductVariant", product=product, variant_name="Black, S", image=image2)
-    baker.make("shop.ProductVariant", product=product, variant_name="Black, M", image=image2)
+    # (in order, as the product form and import_shop_stock set it: the first
+    # variant with the image gives its alt text)
+    baker.make(
+        "shop.ProductVariant", product=product, variant_name="Black, S", image=image2, sort_order=0
+    )
+    baker.make(
+        "shop.ProductVariant", product=product, variant_name="Black, M", image=image2, sort_order=1
+    )
     assert product.images == [CarouselImage(image1, "Front"), CarouselImage(image2, "Black, S")]
 
 
