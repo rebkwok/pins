@@ -113,7 +113,19 @@ def test_order_nothing_to_ship_completed(shop_variants, django_capture_on_commit
     # one email (the order received email), saying it's complete
     (email,) = mail.outbox
     assert email.subject == f"PINS shop order {order.ref} has been received"
-    assert "Thank you for your order! It's complete: nothing needs sending." in email.body
+    # (thanks, the summary, then that it's complete)
+    assert email.body.startswith(
+        "Thank you for your order!\n"
+        "\n"
+        "Items:\n"
+        "- 1 x Raffle ticket\n"
+        "\n"
+        f"Total: £{order.total:.2f}\n"
+        "\n"
+        "Your order is complete.\n"
+        "\n"
+        "View your order: https://"
+    )
 
 
 @pytest.mark.parametrize("status", [OrderStatus.HOLD, OrderStatus.CREATED])

@@ -402,8 +402,9 @@ def customer_order_email(order):
     if order.status == order.Status.HOLD:
         intro = "Thank you for your order! It will be processed once payment has been received."
     elif order.status == order.Status.COMPLETED:
-        # e.g. nothing in the order needs shipping
-        intro = "Thank you for your order! It's complete: nothing needs sending."
+        # e.g. nothing in the order needs shipping (a donation): "Your order is
+        # complete", after the summary
+        intro = "Thank you for your order!"
     elif order.is_collected:
         intro = "Thank you for your order! It's being processed."
     else:
@@ -415,6 +416,7 @@ def customer_order_email(order):
         Paragraph(intro),
         *(collection_blocks(order) if order.status == order.Status.PROCESSING else []),
         *order_items_lines(order, list(order.items.all())),
+        *([Paragraph("Your order is complete.")] if order.status == order.Status.COMPLETED else []),
         Link("View your order", order_status_url(order)),
     ]
     return Email(order_subject(order, " has been received"), blocks, footer=customer_footer())
