@@ -37,11 +37,11 @@ def page_description(page):
 
 def page_image(page):
     """
-    The page's image: its image field, or method (e.g. an auction item's first
-    photo); or a dog's chosen photo; or one for previews (e.g. the shop page's,
-    from its products)
+    The page's image: one chosen for previews (e.g. the shop page's), or its
+    image field, or method (e.g. an auction item's first photo), or a dog's
+    chosen photo
     """
-    for name in ["image", "cover_image", "preview_image"]:
+    for name in ["preview_image", "image", "cover_image"]:
         image = getattr(page, name, None)
         if callable(image):
             image = image()

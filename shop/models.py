@@ -2238,30 +2238,41 @@ class ShopPage(Page):
         help_text="Landscape mode only; horizontal width between 1000px and 3000px.",
     )
     body = RichTextField(verbose_name="Page body", blank=True)
+    preview_image = models.ForeignKey(
+        "wagtailimages.Image",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text=(
+            "Shown when a link to the shop is shared, e.g. in Messenger (not on the "
+            "page). Landscape, at least 1200px wide. If blank, the image above, or "
+            "the logo."
+        ),
+    )
 
     content_panels = Page.content_panels + [
         FieldPanel("introduction"),
         FieldPanel("body"),
         FieldPanel("image"),
     ]
+    promote_panels = Page.promote_panels + [FieldPanel("preview_image")]
 
     parent_page_types = ["home.HomePage"]
     subpage_types = ["home.FormPage", "home.StandardPage"]
 
-    def preview_image(self, category=None):
+    def category_preview_image(self, category):
         """
-        For link previews (home/templatetags/previewtags.py) if the page has no
-        image: the first image of the first product, in the shop's order, that
-        has one. Or, for a category (?category=<slug>), in that category.
+        For a category's link preview (?category=<slug>; see
+        home/templatetags/previewtags.py): the first image of its first product,
+        in the shop's order, that has one
         """
         products = (
-            Product.objects.filter(live=True, variants__live=True)
+            Product.objects.filter(live=True, variants__live=True, category=category)
             .filter(Q(product_images__isnull=False) | Q(variants__image__isnull=False))
             .distinct()
             .order_by(*SHOP_PRODUCT_ORDER)
         )
-        if category is not None:
-            products = products.filter(category=category)
         for product in products:
             # (usually the first: unless its only images are its hidden variants')
             images = product.images
@@ -2306,7 +2317,7 @@ class ShopPage(Page):
             query=query,
             category=category,
             # (for its link preview: the shop's, if none of its products has an image)
-            category_preview_image=self.preview_image(category) if category else None,
+            category_preview_image=self.category_preview_image(category) if category else None,
             category_slug=category_slug,
             total=total,
             # (the categories with live products, for the category buttons)

@@ -144,45 +144,17 @@ def rendition_url(image):
     return f"http://testserver{image.get_rendition('fill-1200x630-c100').url}"
 
 
-def test_shop_page_products_image(client, shop_page, category):
-    # without its own image: the first image of the first product (in the
-    # shop's order) that has one; live products, with live variants
-    def make(name, sort_order, live=True, variant_live=True, image=True, variant_image=False):
-        product = baker.make(
-            "shop.Product", name=name, category=category, sort_order=sort_order, live=live
-        )
-        variant = baker.make("shop.ProductVariant", product=product, stock=1, live=variant_live)
-        if image:
-            image = wagtail_factories.ImageFactory()
-            baker.make("shop.ProductImage", product=product, image=image)
-        if variant_image:
-            variant.image = image = wagtail_factories.ImageFactory()
-            variant.save()
-        return image
-
-    make("Hidden", 0, live=False)
-    make("Sold out of all", 1, variant_live=False)
-    make("No photos", 2, image=False)
-    # (its only image is a hidden variant's)
-    make("Hidden variant's photo", 3, image=False)
-    baker.make(
-        "shop.ProductVariant",
-        product=Product.objects.get(name="Hidden variant's photo"),
-        variant_name="Hidden",
-        live=False,
-        image=wagtail_factories.ImageFactory(),
-    )
-    mug = make("Mug", 4, image=False, variant_image=True)
-    make("Card", 5)
-    assert get_meta(client, shop_page.url)["og:image"] == rendition_url(mug)
-    # its own image, if it has one
-    shop_page.image = wagtail_factories.ImageFactory()
-    shop_page.save()
-    assert get_meta(client, shop_page.url)["og:image"] == rendition_url(shop_page.image)
-
-
-def test_shop_page_no_products_image(client, shop_page):
+def test_shop_page_preview_image(client, shop_page):
+    # the preview image (Promote tab), if it has one: before the page's image;
+    # otherwise the logo (not a product's photo)
+    product = baker.make("shop.Product", name="Mug", category=baker.make("shop.Category"))
+    baker.make("shop.ProductVariant", product=product, stock=1)
+    baker.make("shop.ProductImage", product=product, image=wagtail_factories.ImageFactory())
     assert get_meta(client, shop_page.url)["og:image"] == "http://testserver/static/images/logo.png"
+    shop_page.image = wagtail_factories.ImageFactory()
+    shop_page.preview_image = wagtail_factories.ImageFactory()
+    shop_page.save()
+    assert get_meta(client, shop_page.url)["og:image"] == rendition_url(shop_page.preview_image)
 
 
 def test_page_image():
@@ -192,7 +164,7 @@ def test_page_image():
     assert page_image(SimpleNamespace(image=image)) is image
     assert page_image(SimpleNamespace(image=lambda: image)) is image
     assert page_image(SimpleNamespace(cover_image=lambda: image)) is image
-    assert page_image(SimpleNamespace(image=None, preview_image=lambda: image)) is image
+    assert page_image(SimpleNamespace(image=object(), preview_image=image)) is image
     assert page_image(SimpleNamespace(image=lambda: None, cover_image=lambda: None)) is None
     assert page_image(SimpleNamespace()) is None
 
@@ -214,26 +186,52 @@ def test_no_site(rf):
 
 
 def test_shop_category(client, shop_page, category):
-    # ?category=<slug>: the category's title, description and first photo
+    # ?category=<slug>: the category's title, description and first photo (of
+    # the first product, in the shop's order, that has one: live products,
+    # with live variants)
     shop_page.introduction = "PINS merchandise"
     shop_page.save()
     mugs = baker.make("shop.Category", title="Mugs", slug="mugs", description="<p>Big mugs</p>")
-    for name, product_category in [("Card", category), ("Mug", mugs)]:
-        product = baker.make("shop.Product", name=name, category=product_category)
-        baker.make("shop.ProductVariant", product=product, stock=1)
-        baker.make("shop.ProductImage", product=product, image=wagtail_factories.ImageFactory())
-    mug_image = Product.objects.get(name="Mug").images[0].image
+
+    def make(name, sort_order, product_category=mugs, live=True, variant_live=True, image=True):
+        product = baker.make(
+            "shop.Product", name=name, category=product_category, sort_order=sort_order, live=live
+        )
+        baker.make("shop.ProductVariant", product=product, stock=1, live=variant_live)
+        if image:
+            image = wagtail_factories.ImageFactory()
+            baker.make("shop.ProductImage", product=product, image=image)
+        return product, image
+
+    make("Card", 0, product_category=category)
+    make("Hidden", 1, live=False)
+    make("Sold out of all", 2, variant_live=False)
+    make("No photos", 3, image=False)
+    # (its only image is a hidden variant's)
+    hidden_variants_photo, _ = make("Hidden variant's photo", 4, image=False)
+    baker.make(
+        "shop.ProductVariant",
+        product=hidden_variants_photo,
+        variant_name="Hidden",
+        live=False,
+        image=wagtail_factories.ImageFactory(),
+    )
+    # (its photo is a variant's)
+    mug, _ = make("Mug", 5, image=False)
+    mug.variants.update(image=wagtail_factories.ImageFactory())
+    make("Big mug", 6)
     tags = get_meta(client, f"{shop_page.url}?category=mugs")
     assert tags["og:title"] == f"Mugs - {shop_page.title}"
     assert tags["og:description"] == "Big mugs"
-    assert tags["og:image"] == rendition_url(mug_image)
+    assert tags["og:image"] == rendition_url(mug.variants.first().image)
     # without a description, or photos: the shop's
-    card_image = Product.objects.get(name="Card").images[0].image
+    shop_page.preview_image = wagtail_factories.ImageFactory()
+    shop_page.save()
     baker.make("shop.Category", title="Empty", slug="empty", description="")
     tags = get_meta(client, f"{shop_page.url}?category=empty")
     assert tags["og:title"] == f"Empty - {shop_page.title}"
     assert tags["og:description"] == "PINS merchandise"
-    assert tags["og:image"] == rendition_url(card_image)
+    assert tags["og:image"] == rendition_url(shop_page.preview_image)
     # an unknown category: the shop's preview
     tags = get_meta(client, f"{shop_page.url}?category=nope")
     assert tags["og:title"] == shop_page.title
