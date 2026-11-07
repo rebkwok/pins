@@ -2223,6 +2223,10 @@ class ProductVariant(Orderable):
         return str(self.id)
 
 
+# The order the shop shows its products in
+SHOP_PRODUCT_ORDER = ("category__sort_order", "category__title", "sort_order", "name")
+
+
 class ShopPage(Page):
     introduction = models.TextField(help_text="Text to describe the page", blank=True)
     image = models.ForeignKey(
@@ -2244,6 +2248,27 @@ class ShopPage(Page):
     parent_page_types = ["home.HomePage"]
     subpage_types = ["home.FormPage", "home.StandardPage"]
 
+    def preview_image(self, category=None):
+        """
+        For link previews (home/templatetags/previewtags.py) if the page has no
+        image: the first image of the first product, in the shop's order, that
+        has one. Or, for a category (?category=<slug>), in that category.
+        """
+        products = (
+            Product.objects.filter(live=True, variants__live=True)
+            .filter(Q(product_images__isnull=False) | Q(variants__image__isnull=False))
+            .distinct()
+            .order_by(*SHOP_PRODUCT_ORDER)
+        )
+        if category is not None:
+            products = products.filter(category=category)
+        for product in products:
+            # (usually the first: unless its only images are its hidden variants')
+            images = product.images
+            if images:
+                return images[0].image
+        return None
+
     def categories(self):
         return Category.objects.all()
 
@@ -2263,7 +2288,7 @@ class ShopPage(Page):
             Product.objects.filter(live=True, variants__live=True)
             .distinct()
             .select_related("category")
-            .order_by("category__sort_order", "category__title", "sort_order", "name")
+            .order_by(*SHOP_PRODUCT_ORDER)
         )
         total = products.count()
         if query:
@@ -2275,10 +2300,13 @@ class ShopPage(Page):
         if category_slug:
             products = products.filter(category__slug=category_slug)
         products = list(products)
+        category = Category.objects.filter(slug=category_slug).first() if category_slug else None
 
         context.update(
             query=query,
-            category=Category.objects.filter(slug=category_slug).first() if category_slug else None,
+            category=category,
+            # (for its link preview: the shop's, if none of its products has an image)
+            category_preview_image=self.preview_image(category) if category else None,
             category_slug=category_slug,
             total=total,
             # (the categories with live products, for the category buttons)

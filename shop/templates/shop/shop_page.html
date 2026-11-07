@@ -1,5 +1,14 @@
 {% extends "shop/base.html" %}
-{% load wagtailcore_tags shoptags %}
+{% load previewtags wagtailcore_tags shoptags %}
+
+{# A category's link preview (?category=<slug>): its title, description and first photo, or the shop's #}
+{% block link_preview %}
+    {% if category %}
+        {% link_preview title=category.title|add:" - "|add:page.title description=category.description|default:None image=category_preview_image %}
+    {% else %}
+        {{ block.super }}
+    {% endif %}
+{% endblock %}
 
 {% block content %}
     {% include "shop/includes/header-hero.html" with shop=True %}

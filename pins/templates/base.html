@@ -1,4 +1,4 @@
-{% load navigation_tags static wagtailuserbar %}
+{% load navigation_tags previewtags static wagtailuserbar %}
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -15,14 +15,10 @@
                 | {{ settings.dashboard.SiteSettings.title_suffix }}
             {% endblock %}
         </title>
-        <meta name="description" content="{% if page.search_description %}{{ page.search_description }}{% else %}PINS{% endif %}">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
-
-        <meta property="og:url" content="{{ request.build_absolute_uri }}" />
-        <meta property="og:title" content="{% if page.seo_title %}{{ page.seo_title }}{% else %}{{ page.title }}{% endif %}" />
-        <meta property="og:description" content="{% if page.search_description %}{{ page.search_description }}{% endif %}" />
-        <meta property="og:image" content="{% static 'images/logo.png' %}" />
+        {# The page's title, description and image (or the logo) for link previews, e.g. in Messenger #}
+        {% block link_preview %}{% link_preview %}{% endblock %}
 
         {# Force all links in the live preview panel to be opened in a new tab #}
         {% if request.in_preview_panel %}
