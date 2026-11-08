@@ -71,8 +71,8 @@ uv run python manage.py runserver 0.0.0.0:7700
 (The Stripe notes below assume port 7700.)
 
 Emails are printed to the console with `LOCAL=True`. To see them in a browser
-instead, run mailcatcher and set `USE_MAILCATCHER=True` with `LOCAL` off (on
-port 1025; the web interface is at http://127.0.0.1:1080).
+instead, run mailcatcher and set `USE_MAILCATCHER=True` as well (on port 1025;
+the web interface is at http://127.0.0.1:1080).
 
 Set `LOG_LEVEL=DEBUG` to see the site's debug logs (e.g. the shop's stock
 checks).
@@ -164,9 +164,11 @@ Required unless a default is given.
 
 **Email** (production: Amazon SES)
 - `AWS_SES_ACCESS_KEY_ID`, `AWS_SES_SECRET_ACCESS_KEY`, `AWS_SES_REGION_NAME`,
-  `AWS_SES_REGION_ENDPOINT`: only needed when none of `LOCAL`, `CI` or
-  `USE_MAILCATCHER` is set (i.e. production), so they're not in `env_sample`
-- `USE_MAILCATCHER`: send emails to mailcatcher (default False; with `LOCAL` off)
+  `AWS_SES_REGION_ENDPOINT`: required unless `LOCAL` is set (i.e. in production;
+  not in tests, which use an in-memory email backend), so they're not in
+  `env_sample`
+- `USE_MAILCATCHER`: with `LOCAL`, send emails to mailcatcher instead of the
+  console (default False)
 
 **Media storage** (production: S3, with the server's IAM role)
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`: local only (with `LOCAL` or
