@@ -57,7 +57,7 @@ dependencies = [
 [tool.uv.sources]
 # Fork to allow django 6+
 django-salesman = { git = "https://github.com/rebkwok/django-salesman.git", rev="12a6cdb0d36bbd544590c151aa2e0422fb72489e" }
-django-salesman-stripe-connect = { git = "https://github.com/rebkwok/django-salesman-stripe-connect.git", rev="95cf15d06771502e68fb412444793597c8072273" }
+django-salesman-stripe-connect = { git = "https://github.com/rebkwok/django-salesman-stripe-connect.git", rev="46b0931fa641c5231c1ceb21a59214d0f4b927e1" }
 
 
 [tool.pytest]

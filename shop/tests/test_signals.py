@@ -1,5 +1,6 @@
+from datetime import UTC, datetime
 from smtplib import SMTPException
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 from model_bakery import baker
@@ -295,7 +296,7 @@ def test_account_deauthorized_email(shop_settings, django_capture_on_commit_call
         stripe_signals.account_deauthorized.send(sender=None, account_id="acct_1")
     (email,) = mail.outbox
     assert email.to == ["admin@test.com", "another_admin@test.com"]
-    assert email.subject == "PINS shop: Stripe account disconnected, card payments are unavailable"
+    assert email.subject == "PINS shop: Stripe account disconnected, payments are unavailable"
     assert "The Stripe account acct_1 has been disconnected" in email.body
     assert "https://podencosinneed.org/stripe/connect/" in email.body
 
@@ -303,4 +304,115 @@ def test_account_deauthorized_email(shop_settings, django_capture_on_commit_call
 def test_account_deauthorized_no_notify_addresses(django_capture_on_commit_callbacks):
     with django_capture_on_commit_callbacks(execute=True):
         stripe_signals.account_deauthorized.send(sender=None, account_id="acct_1")
+    assert mail.outbox == []
+
+
+def stripe_account(**params):
+    return Mock(**{"charges_enabled": True, "payouts_enabled": True, **params})
+
+
+def send_account_updated(account, changes, capture):
+    with capture(execute=True):
+        stripe_signals.account_updated.send(sender=None, account=account, changes=changes)
+
+
+def test_account_updated_charges_disabled_email(
+    shop_settings, django_capture_on_commit_callbacks
+):
+    send_account_updated(
+        stripe_account(charges_enabled=False),
+        {
+            "charges_enabled": (True, False),
+            "requirements.disabled_reason": (None, "requirements.past_due"),
+        },
+        django_capture_on_commit_callbacks,
+    )
+    (email,) = mail.outbox
+    assert email.to == ["admin@test.com", "another_admin@test.com"]
+    assert email.subject == "PINS shop: URGENT - Stripe has stopped payments"
+    assert "Stripe has stopped payments on the connected account." in email.body
+    assert "Go to the Stripe dashboard: https://dashboard.stripe.com/" in email.body
+
+
+def test_account_updated_all_changes_email(
+    shop_settings, django_capture_on_commit_callbacks
+):
+    # (shown as the date in the UK)
+    deadline = int(datetime(2026, 11, 16, 23, 30, tzinfo=UTC).timestamp())
+    send_account_updated(
+        stripe_account(charges_enabled=False, payouts_enabled=False),
+        {
+            "charges_enabled": (True, False),
+            "payouts_enabled": (True, False),
+            "requirements.current_deadline": (None, deadline),
+        },
+        django_capture_on_commit_callbacks,
+    )
+    (email,) = mail.outbox
+    # the most important change is the subject; the email has them all
+    assert email.subject == "PINS shop: URGENT - Stripe has stopped payments"
+    body = email.body
+    assert (
+        body.index("Stripe has stopped payments")
+        < body.index("by Monday 16 November 2026")
+        < body.index("Stripe has paused payouts")
+    )
+
+
+@pytest.mark.parametrize(
+    "account,changes,subject,text",
+    [
+        (
+            stripe_account(),
+            {"requirements.current_deadline": (None, 1795000000)},
+            "PINS shop: Stripe needs more information",
+            "If it doesn't have it by then, it may stop payments or payouts.",
+        ),
+        (
+            stripe_account(payouts_enabled=False),
+            {"payouts_enabled": (True, False)},
+            "PINS shop: Stripe has paused payouts",
+            "Stripe has paused payouts from the connected account.",
+        ),
+        (
+            stripe_account(),
+            {"charges_enabled": (False, True)},
+            "PINS shop: payments are working again",
+            "Stripe has started payments on the connected account again.",
+        ),
+        (
+            stripe_account(),
+            {"payouts_enabled": (False, True)},
+            "PINS shop: Stripe payouts have started again",
+            "Stripe has started payouts from the connected account again.",
+        ),
+    ],
+)
+def test_account_updated_email(
+    shop_settings, django_capture_on_commit_callbacks, account, changes, subject, text
+):
+    send_account_updated(account, changes, django_capture_on_commit_callbacks)
+    (email,) = mail.outbox
+    assert email.subject == subject
+    assert text in email.body
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"requirements.current_deadline": (1795000000, None)},
+        {"requirements.disabled_reason": ("requirements.past_due", None)},
+    ],
+)
+def test_account_updated_no_email(shop_settings, django_capture_on_commit_callbacks, changes):
+    send_account_updated(stripe_account(), changes, django_capture_on_commit_callbacks)
+    assert mail.outbox == []
+
+
+def test_account_updated_no_notify_addresses(django_capture_on_commit_callbacks):
+    send_account_updated(
+        stripe_account(charges_enabled=False),
+        {"charges_enabled": (True, False)},
+        django_capture_on_commit_callbacks,
+    )
     assert mail.outbox == []

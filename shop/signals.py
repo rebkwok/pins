@@ -1,5 +1,6 @@
 # signals.py
 import logging
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from django.conf import settings
@@ -10,7 +11,9 @@ from django.db.models import ProtectedError
 from django.db.models.signals import post_delete, post_init, post_save, pre_delete, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
+from django.utils.dateformat import format as date_format
 from django.utils.html import format_html
+from django.utils.timezone import localtime
 
 from salesman.core.utils import get_salesman_model
 from salesman.orders.signals import status_changed
@@ -175,16 +178,16 @@ def send_dispute_notification(sender, order, message, signal, **kwargs):
 
 @receiver(stripe_signals.account_deauthorized)
 def send_account_deauthorized_notification(sender, account_id, **kwargs):
-    """Tell the shop that card payments can't be taken"""
+    """Tell the shop that payments can't be taken"""
     notify_emails, reply_to = get_email_settings()
     if not notify_emails:
         return
     email = Email(
-        "PINS shop: Stripe account disconnected, card payments are unavailable",
+        "PINS shop: Stripe account disconnected, payments are unavailable",
         [
             Paragraph(
                 f"The Stripe account {account_id} has been disconnected from the "
-                "website, so the shop can't take card payments until a Stripe account "
+                "website, so the shop can't take payments until a Stripe account "
                 "is connected again. (If the connect page has been disabled, it needs "
                 "to be enabled again.)"
             ),
@@ -192,6 +195,67 @@ def send_account_deauthorized_notification(sender, account_id, **kwargs):
                 "Connect a Stripe account",
                 f"https://{settings.DOMAIN}{reverse('stripe-connect')}",
             ),
+        ],
+    )
+    send_email(email, notify_emails, reply_to)
+
+
+@receiver(stripe_signals.account_updated)
+def send_account_updated_notification(sender, account, changes, **kwargs):
+    """
+    Warn the shop that Stripe has stopped (or restarted) payments or
+    payouts, or needs more information by a deadline
+    """
+    notify_emails, reply_to = get_email_settings()
+    if not notify_emails:
+        return
+    # (subject, paragraph) for each change, most important first
+    messages = []
+    if "charges_enabled" in changes and not account.charges_enabled:
+        messages.append((
+            "PINS shop: URGENT - Stripe has stopped payments",
+            "Stripe has stopped payments on the connected account. Stripe usually does this "
+            "when it needs more information about the account. Payments will "
+            "start again once Stripe has what it needs.",
+        ))
+    deadline = changes.get("requirements.current_deadline", (None, None))[1]
+    if deadline:
+        deadline = date_format(
+            localtime(datetime.fromtimestamp(deadline, tz=UTC)), "l j F Y"
+        )
+        messages.append((
+            "PINS shop: Stripe needs more information",
+            f"Stripe needs more information about the connected account by "
+            f"{deadline}. If it doesn't have it by then, it may stop payments "
+            "or payouts.",
+        ))
+    if "payouts_enabled" in changes and not account.payouts_enabled:
+        messages.append((
+            "PINS shop: Stripe has paused payouts",
+            "Stripe has paused payouts from the connected account.",
+        ))
+    if "charges_enabled" in changes and account.charges_enabled:
+        messages.append((
+            "PINS shop: payments are working again",
+            "Stripe has started payments on the connected account again.",
+        ))
+    if "payouts_enabled" in changes and account.payouts_enabled:
+        messages.append((
+            "PINS shop: Stripe payouts have started again",
+            "Stripe has started payouts from the connected account again.",
+        ))
+    if not messages:
+        # e.g. only the deadline was removed
+        return
+    email = Email(
+        messages[0][0],
+        [Paragraph(paragraph) for _, paragraph in messages]
+        + [
+            Paragraph(
+                "Log in to the PINS Stripe account to see what Stripe needs, or why "
+                "it has made the change."
+            ),
+            Link("Go to the Stripe dashboard", "https://dashboard.stripe.com/"),
         ],
     )
     send_email(email, notify_emails, reply_to)

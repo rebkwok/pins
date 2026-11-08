@@ -271,6 +271,9 @@ testing), not in the PINS account:
   - account.application.deauthorized (PINS disconnected their account from the
     platform: the saved account is removed and the shop emailed; payments can't
     be taken until an account is connected again at /stripe/connect/)
+  - account.updated (Stripe has stopped or restarted the PINS account's
+    payments or payouts, or set a deadline for more information: the shop is
+    emailed; other changes to the account are ignored)
 - The endpoint has its own signing secret (whsec_...); set it as
   SALESMAN_STRIPE_CONNECT_WEBHOOK_SECRET in that environment (production's
   envdir).
@@ -319,15 +322,40 @@ stripe accounts retrieve (to set your account API keys)
 stripe config --list (to check)
 # --forward-connect-to forwards events from connected accounts (not --forward-to,
 # which only forwards the platform account's events)
-stripe listen --forward-connect-to localhost:7700/stripe/webhook/ --events checkout.session.completed,checkout.session.expired,charge.refunded,charge.refund.updated,charge.dispute.created,charge.dispute.closed,account.application.authorized,account.application.deauthorized --log-level=debug
+stripe listen --forward-connect-to localhost:7700/stripe/webhook/ --events checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,checkout.session.expired,charge.refunded,charge.refund.updated,charge.dispute.created,charge.dispute.closed,account.application.authorized,account.application.deauthorized,account.updated --log-level=debug
 ```
 
 It will print a webhook signing secret (one secret covers both platform and connected
 account events) - add it to your .env's SALESMAN_STRIPE_CONNECT_WEBHOOK_SECRET and restart the dev server. 
 
-(Note: if you see the checkout.session.completed firing but it's not calling the webhook endpoint, the
-alternative is to set up a tunnel with zrok.io and add a real webhook in the stripe test environment
-that listens for the checkout.session.completed event.)
+### Testing with a real sandbox webhook
+
+`stripe listen` can't send events in a specific API version (and sometimes
+doesn't forward events that Stripe shows as sent). To test with the same API
+version as the live webhook endpoint, use a sandbox webhook endpoint with a
+[zrok](https://zrok.io) tunnel to the local server.
+
+Set up the zrok namespace (only needed once):
+```
+zrok2 create name pins-shop
+```
+
+Run the tunnel, and note the public URL:
+```
+zrok2 share public localhost:7700 -n public:pins-shop
+```
+
+In the stripe dashboard in sandbox mode, add a webhook endpoint:
+- Listen to events on connected accounts
+- Use the same API version and events as the live webhook endpoint (see Webhooks above)
+- Set the URL to `<zrok public URL>/stripe/webhook/`
+
+Add the endpoint's signing secret to your .env's SALESMAN_STRIPE_CONNECT_WEBHOOK_SECRET and
+restart the dev server. Use this secret instead of the one from `stripe listen`, and stop
+`stripe listen` if it's running.
+
+The tunnel needs `LOCAL` set in your .env, so that the dev server accepts the zrok host.
+Disable the webhook endpoint when you've finished testing.
 
 
 # Tests
