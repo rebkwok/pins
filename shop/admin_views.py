@@ -140,9 +140,10 @@ class DispatchersView(WagtailAdminTemplateMixin, TemplateView):
 
     def pending(self):
         """
-        Items still to send or collect, by dispatcher id (None for products
-        without a dispatcher): {"to_send", "to_collect", "count", "oldest",
-        "overdue"}
+        Orders with items still to send or collect, by dispatcher id (None
+        for products without a dispatcher): {"to_send", "to_collect", "count",
+        "oldest", "overdue"} (counts of orders, not items: an order with two of
+        a dispatcher's products in it is one thing for them to do)
         """
         pending = {}
         rows = (
@@ -151,8 +152,12 @@ class DispatchersView(WagtailAdminTemplateMixin, TemplateView):
             )
             .values("dispatcher")
             .annotate(
-                to_collect=Count("id", filter=Q(order__shipping_method=SHIPPING_COLLECT)),
-                count=Count("id"),
+                to_collect=Count(
+                    "order",
+                    distinct=True,
+                    filter=Q(order__shipping_method=SHIPPING_COLLECT),
+                ),
+                count=Count("order", distinct=True),
                 oldest=Min("order__date_created"),
             )
         )

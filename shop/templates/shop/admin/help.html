@@ -74,7 +74,7 @@ in view), above on phones.
                     <p>To keep track:</p>
                     <ul>
                         <li><a href="{% url 'shop_orders:index' %}">Orders</a>: filter by status, "Has items to ship or collect", dispatcher or product, and download them to Excel.</li>
-                        <li><a href="{% url 'shop_dispatchers:index' %}">Dispatcher activity</a>: who has items to send, oldest first. Items waiting more than {{ overdue_days }} days are highlighted.</li>
+                        <li><a href="{% url 'shop_dispatchers:index' %}">Dispatcher activity</a>: how many orders each dispatcher has to send, oldest first. Orders waiting more than {{ overdue_days }} days are highlighted.</li>
                     </ul>
                 </section>
 

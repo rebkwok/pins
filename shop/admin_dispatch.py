@@ -185,7 +185,8 @@ class DispatchView(OrderItemsExportMixin, WagtailAdminTemplateMixin, TemplateVie
         context = super().get_context_data(**kwargs)
         user = self.dispatcher
         to_send = list(items_to_send(user))
-        context["to_send_count"] = len(to_send)
+        # (orders, not items: an order with two of their products is one to send)
+        context["to_send_count"] = len({item.order_id for item in to_send})
         context["showing_sent"] = self.showing_sent
         if self.showing_sent:
             sent = OrderItem.objects.filter(

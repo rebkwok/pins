@@ -1,16 +1,23 @@
-{# The order's items, collapsed (ItemsColumn) #}
+{% comment %}
+The order's items (ItemsColumn), e.g. "4 × PINS Calendar 2027", each on one
+line, cut short if it's too long, and only the first few if there are more;
+clicking them shows them all in full (index_results.html has the styles).
+(Spans, not a list: a summary can only hold text.)
+{% endcomment %}
 <td class="shop-orders-items">
     {% with items=instance.items.all %}
         <details>
-            <summary>{{ items|length }} item{{ items|length|pluralize }}</summary>
-            <ul>
+            <summary>
                 {% for item in items %}
-                    <li>
-                        {{ item.quantity }} x {{ item.name }}
+                    <span class="shop-orders-items__item{% if forloop.counter > 3 %} shop-orders-items__more{% endif %}">
+                        {{ item.quantity }} × {{ item.name }}
                         <small>({{ item.status_label|lower }})</small>
-                    </li>
+                    </span>
                 {% endfor %}
-            </ul>
+                {% if items|length > 3 %}
+                    <span class="shop-orders-items__count">+ {{ items|length|add:"-3" }} more</span>
+                {% endif %}
+            </summary>
         </details>
     {% endwith %}
 </td>

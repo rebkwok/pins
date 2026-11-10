@@ -571,7 +571,7 @@ def test_shop_help(client, group, sections):
     headings = re.findall(r'shop-help__group" id="([a-z]+)"', content)
     assert headings == sections
     assert f'<a href="{ORDERS_URL}">Orders</a>' in content
-    assert "Items waiting more than 3 days are highlighted." in content
+    assert "Orders waiting more than 3 days are highlighted." in content
 
 
 def test_shop_help_dispatchers(client):

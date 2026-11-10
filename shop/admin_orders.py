@@ -195,15 +195,15 @@ class SelectColumn(BaseColumn):
 
 
 class ItemsColumn(BaseColumn):
-    """The order's items, collapsed ("3 items"), with their shipping status"""
+    """The order's items ("4 × PINS Calendar 2027"), with their shipping status"""
 
     cell_template_name = "shop/admin/orders/tables/items_cell.html"
 
 
 def customer_display(order):
-    return format_html(
-        "{}<br><small>{}</small>", order.name or "-", order.email
-    )
+    # (not the email, unless there's no name: emails are long and don't wrap,
+    # and the order's page shows it; search still finds orders by email)
+    return order.name or order.email or "-"
 
 
 class OrderItemsExportMixin(SpreadsheetExportMixin):
@@ -738,14 +738,17 @@ class OrderViewSet(ModelViewSet):
     add_to_admin_menu = True
 
     index_view_class = OrderIndexView
+    # (each column's classname places its cells in the phone layout's cards,
+    # see orders/index_results.html)
     list_display = [
         SelectColumn("select"),
         # (Wagtail only links the first column to the order page)
         TitleColumn(
             "ref",
-            label="Reference",
+            label="Order No.",
             sort_key="ref",
             get_url=lambda order: reverse(f"{URL_NAMESPACE}:edit", args=(order.pk,)),
+            classname="shop-orders-ref",
         ),
         Column(
             "date_created",
@@ -753,11 +756,27 @@ class OrderViewSet(ModelViewSet):
             accessor=lambda order: date_format(
                 localtime(order.date_created), "j M Y, H:i"
             ),
+            classname="shop-orders-date",
         ),
-        Column("customer", label="Customer", accessor=customer_display),
-        ItemsColumn("items", label="Items"),
-        Column("total", label="Total", accessor=lambda order: gbp(order.total)),
-        Column("status", label="Status", accessor="display_status"),
+        Column(
+            "customer",
+            label="Customer",
+            accessor=customer_display,
+            classname="shop-orders-customer",
+        ),
+        ItemsColumn("items", label="Items", classname="shop-orders-items"),
+        Column(
+            "total",
+            label="Total",
+            accessor=lambda order: gbp(order.total),
+            classname="shop-orders-total",
+        ),
+        Column(
+            "status",
+            label="Status",
+            accessor="display_status",
+            classname="shop-orders-status",
+        ),
     ]
     filterset_class = OrderFilterSet
     # (and the orders' items, e.g. "hoodie": see OrderIndexView.search_queryset)

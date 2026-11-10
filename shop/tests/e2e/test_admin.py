@@ -139,9 +139,9 @@ def test_shop_admin(page, live_server, paid_order):
         expect(menu.get_by_text(item, exact=True).first).to_be_visible()
     # (not Images: they add images from products' pages)
     expect(menu.get_by_text("Images", exact=True)).to_have_count(0)
-    # Dispatcher activity: Ann has 1 item pending; the T-shirt has no dispatcher
+    # Dispatcher activity: Ann has 1 order pending; the T-shirt has no dispatcher
     page.goto(live_server.url + reverse("shop_dispatchers:index"))
-    expect(page.get_by_role("link", name="Pending items (1)")).to_have_count(2)
+    expect(page.get_by_role("link", name="1 order", exact=True)).to_have_count(2)
 
 
 def test_shop_manager_starts_at_orders(page, live_server, paid_order):
@@ -177,17 +177,24 @@ def test_order_page_buttons_on_phone(page, live_server, admin_user, paid_order):
 
 @pytest.mark.parametrize("browser_context_args", [PHONE], indirect=True)
 def test_orders_list_on_phone(page, live_server, admin_user, paid_order):
-    # wider than the screen (a long email, the items open): the list scrolls
-    # sideways, not the page (Wagtail's main area would cut it off)
-    paid_order.email = "catherine.customer.with.a.long.address@example.com"
-    paid_order.save()
+    # each order is a card that fits the screen (a long item name, the items
+    # open): nothing scrolls sideways, and "select all" and sorting stay
+    item = paid_order.items.get(product_data__name__startswith="PINS T-shirt")
+    item.product_data["name"] = "PINS Anti-escape Harnesses and Safety Lead - Red, S"
+    item.save()
     log_in(page, live_server, admin_user)
     page.goto(live_server.url + reverse("shop_orders:index"))
-    page.get_by_text("2 items").click()
     scroll = page.locator(".shop-orders-scroll")
     width = page.evaluate("innerWidth")
+    item = page.locator(".shop-orders-items__item", has_text="Harnesses")
+    # (cut short until it's opened)
+    assert item.evaluate("e => e.scrollWidth > e.clientWidth")
+    page.locator(".shop-orders-items summary").click()
+    assert not item.evaluate("e => e.scrollWidth > e.clientWidth")
     assert page.evaluate("document.documentElement.scrollWidth") == width
-    assert scroll.evaluate("e => e.scrollWidth > e.clientWidth")
-    status = page.locator("table.listing td", has_text="Paid – ready to ship")
-    status.scroll_into_view_if_needed()
-    expect(status).to_be_in_viewport()
+    assert not scroll.evaluate("e => e.scrollWidth > e.clientWidth")
+    for text in [paid_order.ref, "£", "Cat Customer", "Paid – ready to ship"]:
+        expect(page.locator("table.listing tbody td", has_text=text).first).to_be_in_viewport()
+    expect(page.get_by_role("checkbox", name=re.compile("Select all orders"))).to_be_visible()
+    expect(page.get_by_role("link", name="Order No.")).to_be_visible()
+    expect(page.locator("table.listing thead th", has_text="Status")).to_be_hidden()

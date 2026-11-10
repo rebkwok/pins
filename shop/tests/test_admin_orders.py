@@ -118,7 +118,14 @@ def test_orders_list(admin_client, shop_variants):
     assert order_url(order) in content
     assert f"£{order.total:.2f}" in content
     assert "Paid – ready to ship" in content
+    # (no name: the email instead)
     assert "c@test.com" in content
+    # the customer's name, not their email
+    order.name = "Maria Lopez"
+    order.save()
+    content = admin_client.get(INDEX_URL).content.decode()
+    assert "Maria Lopez" in content
+    assert "c@test.com" not in content
     # orders can't be added
     assert reverse("shop_orders:index") + "new/" not in content
 
@@ -433,15 +440,25 @@ def test_orders_list_items(admin_client, shop_variants, dispatcher):
     order = paid_order(shop_variants)
     order.mark_items_shipped([order.items.get(product_id=mug.id)], dispatcher)
     content = " ".join(html.unescape(admin_client.get(INDEX_URL).content.decode()).split())
-    assert "<summary>3 items</summary>" in content
-    assert "<li> 2 x Test Product - Mug <small>(shipped)</small> </li>" in content
-    assert "<li> 2 x Card <small>(ready to send)</small> </li>" in content
-    assert "<li> 2 x Raffle ticket <small>(no shipping needed)</small> </li>" in content
+    assert '<span class="shop-orders-items__item"> 2 × Test Product - Mug <small>(shipped)</small> </span>' in content
+    assert '<span class="shop-orders-items__item"> 2 × Card <small>(ready to send)</small> </span>' in content
+    assert '<span class="shop-orders-items__item"> 2 × Raffle ticket <small>(no shipping needed)</small> </span>' in content
+    assert "more</span>" not in content
     collection = paid_order([card], shipping_method="collect")
     content = " ".join(html.unescape(admin_client.get(INDEX_URL).content.decode()).split())
-    assert "<summary>1 item</summary>" in content
-    assert "<li> 2 x Card <small>(ready to collect)</small> </li>" in content
+    assert '<span class="shop-orders-items__item"> 2 × Card <small>(ready to collect)</small> </span>' in content
     assert collection.ref in content
+
+
+def test_orders_list_items_more(admin_client, shop_variants):
+    # only the first 3 show until it's opened
+    mug, card, raffle = shop_variants
+    pen_product = baker.make("shop.Product", category=mug.product.category, name="Pen", price=1)
+    pen = baker.make("shop.ProductVariant", product=pen_product, price=1, stock=10)
+    paid_order([mug, card, raffle, pen])
+    content = " ".join(html.unescape(admin_client.get(INDEX_URL).content.decode()).split())
+    assert '<span class="shop-orders-items__item shop-orders-items__more"> 2 × Pen' in content
+    assert '<span class="shop-orders-items__count">+ 1 more</span>' in content
 
 
 # Permissions
@@ -1035,7 +1052,7 @@ def test_awaiting_payment_items(admin_client, shop_variants):
     assert "Awaiting payment" in content
     assert "Ready to send" not in content
     content = " ".join(html.unescape(admin_client.get(INDEX_URL).content.decode()).split())
-    assert "<li> 2 x Test Product - Mug <small>(awaiting payment)</small> </li>" in content
+    assert "2 × Test Product - Mug <small>(awaiting payment)</small> </span>" in content
     resp = admin_client.get(INDEX_URL, {"export": "xlsx"})
     sheet = load_workbook(io.BytesIO(b"".join(resp.streaming_content))).active
     rows = list(sheet.values)

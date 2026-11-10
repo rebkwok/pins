@@ -87,7 +87,7 @@ def test_orders_to_send(dispatcher_client, shop_variants, dispatcher):
     assert "<title>Items to send" in page
     nav = re.search(r'<nav[^>]*aria-label="Breadcrumb">(.*?)</nav>', page, re.S).group(1)
     assert "Items to send" in " ".join(re.sub(r"<[^>]+>", " ", nav).split())
-    assert "To send (2 items)" in page
+    assert "To send (items from 2 orders)" in page
     assert f"Order {older.ref}" in page
     assert "1 Road<br>Town" in page
     assert "2 x</strong> Test Product - Mug" in page
@@ -186,7 +186,7 @@ def test_sent(dispatcher_client, shop_variants, dispatcher):
     assert "Shipped 1 Oct 2026" in page
     assert "by Sam" in page
     assert "Mark as shipped" not in page
-    assert "To send (1 item)" in page
+    assert "To send (items from 1 order)" in page
 
 
 def test_nothing_sent(dispatcher_client):
@@ -314,7 +314,7 @@ def test_dispatchers_page_links(client, dispatcher):
     assert f'href="{URL}?dispatcher={dispatcher.pk}"' not in page
 
 
-# Dispatcher activity: each dispatcher's pending items
+# Dispatcher activity: the orders each dispatcher has items to send in
 
 
 DISPATCHERS_URL = reverse("shop_dispatchers:index")
@@ -344,15 +344,29 @@ def test_dispatcher_activity(client, shop_variants, dispatcher):
     # the oldest is over 3 days old
     assert ann.pending["overdue"]
     page = " ".join(content(resp).split())
-    assert f'<a href="{URL}?dispatcher={dispatcher.pk}">Pending items (2)</a>' in page
+    assert f'<a href="{URL}?dispatcher={dispatcher.pk}">2 orders</a>' in page
     assert "1 to send, 1 to collect" in page
     assert f"Oldest: {timezone.localtime(oldest):%-d %b} (over 3 days)" in page
     # the card has no dispatcher (and the raffle ticket isn't shipped)
     without = resp.context["pending_without_dispatcher"]
     assert (without["count"], without["to_send"], without["overdue"]) == (1, 1, True)
     orders_url = reverse("shop_orders:index")
-    assert f'<a href="{orders_url}?no_dispatcher=true">Pending items (1)</a>' in page
+    assert f'<a href="{orders_url}?no_dispatcher=true">1 order</a>' in page
     assert "No dispatcher" in page
+
+
+def test_dispatcher_activity_counts_orders(client, shop_variants, dispatcher):
+    # an order with two of a dispatcher's products in it is one order to send
+    mug, card, raffle = shop_variants
+    card.product.dispatcher = dispatcher
+    card.product.save()
+    order_with([mug, card])
+    shop_admin(client)
+    resp = client.get(DISPATCHERS_URL)
+    (ann,) = resp.context["dispatchers"]
+    assert (ann.pending["count"], ann.pending["to_send"], ann.pending["to_collect"]) == (1, 1, 0)
+    page = " ".join(content(resp).split())
+    assert f'<a href="{URL}?dispatcher={dispatcher.pk}">1 order</a>' in page
 
 
 def test_dispatcher_activity_order(client, shop_variants, dispatcher):

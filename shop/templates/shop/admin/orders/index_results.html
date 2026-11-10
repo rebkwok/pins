@@ -9,16 +9,56 @@
     <style>
         .shop-orders-download-help { margin: 1rem 0 0.5rem; }
         .shop-orders-scroll { overflow-x: auto; }
-        /* "3 items": a link, with an arrow (▸, ▾ when open) */
-        .shop-orders-items summary { cursor: pointer; white-space: nowrap; list-style: none; color: var(--w-color-text-link-default); text-decoration: underline; }
+        /* The items (items_cell.html): one line each, cut short ("..."), and
+           only the first 3; clicking them shows them all, in full. A dotted
+           underline (solid on hover), so they're clearly a link. */
+        .shop-orders-items summary { cursor: pointer; list-style: none; }
         .shop-orders-items summary::-webkit-details-marker { display: none; }
-        .shop-orders-items summary::before { content: "\25B8\00a0"; content: "\25B8\00a0" / ""; display: inline-block; text-decoration: none; }
-        .shop-orders-items details[open] summary::before { content: "\25BE\00a0"; content: "\25BE\00a0" / ""; }
-        .shop-orders-items summary:hover { color: var(--w-color-text-link-hover); }
-        .shop-orders-items ul { margin: 0.4rem 0 0; padding-inline-start: 1.1rem; min-width: 14rem; }
-        .shop-orders-items li + li { margin-top: 0.25rem; }
+        .shop-orders-items summary:focus-visible .shop-orders-items__item { text-decoration-style: solid; }
+        @media (hover: hover) { .shop-orders-items summary:hover .shop-orders-items__item { text-decoration-style: solid; } }
+        .shop-orders-items__item { display: block; max-width: 18rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-decoration: underline dotted; text-underline-offset: 0.2em; }
+        .shop-orders-items__item + .shop-orders-items__item { margin-top: 0.25rem; }
+        .shop-orders-items .shop-orders-items__more { display: none; }
+        .shop-orders-items__count { display: block; margin-top: 0.25rem; font-size: 0.9em; color: var(--w-color-text-link-default); text-decoration: underline; }
+        .shop-orders-items summary:hover .shop-orders-items__count { color: var(--w-color-text-link-hover); }
+        .shop-orders-items details[open] .shop-orders-items__item { display: block; min-width: 14rem; white-space: normal; }
+        .shop-orders-items details[open] .shop-orders-items__count { display: none; }
+        /* Phones: each order as a card (no sideways scrolling), with the
+           checkbox, order number and date on top (like the dispatcher's
+           cards), then the customer and total, the items (each line still cut
+           short), and the status. The headings only keep "select all" and
+           sorting by order number. */
+        @media (max-width: 50em) {
+            .shop-orders-scroll table.listing,
+            .shop-orders-scroll table.listing tbody { display: block; }
+            .shop-orders-scroll table.listing thead tr { display: flex; align-items: center; gap: 0.75rem; padding: 0 1.25rem 0.5rem; }
+            .shop-orders-scroll table.listing thead th:not(.shop-orders-select):not(.shop-orders-ref) { display: none; }
+            .shop-orders-scroll table.listing tbody tr {
+                display: grid;
+                grid-template-columns: auto minmax(0, 1fr) auto;
+                grid-template-areas:
+                    "select ref      date"
+                    ".      customer total"
+                    ".      items    items"
+                    ".      status   status";
+                column-gap: 0.75rem;
+                row-gap: 0.3rem;
+                padding: 0.75rem 1.25rem;
+            }
+            .shop-orders-scroll table.listing thead th,
+            .shop-orders-scroll table.listing tbody td { padding: 0; border: none; height: auto; }
+            .shop-orders-scroll table.listing tbody td.shop-orders-select { grid-area: select; }
+            .shop-orders-scroll table.listing tbody td.shop-orders-ref { grid-area: ref; }
+            .shop-orders-scroll table.listing tbody td.shop-orders-total { grid-area: total; font-weight: 600; text-align: end; }
+            .shop-orders-scroll table.listing tbody td.shop-orders-customer { grid-area: customer; overflow-wrap: anywhere; }
+            .shop-orders-scroll table.listing tbody td.shop-orders-date { grid-area: date; align-self: center; font-size: 0.9em; color: var(--w-color-text-meta); text-align: end; }
+            .shop-orders-scroll table.listing tbody td.shop-orders-items { grid-area: items; min-width: 0; }
+            .shop-orders-scroll table.listing tbody td.shop-orders-status { grid-area: status; font-size: 0.9em; color: var(--w-color-text-meta); }
+            .shop-orders-items__item { max-width: none; }
+            .shop-orders-items details[open] .shop-orders-items__item { min-width: 0; }
+        }
     </style>
-    {# (scrolls sideways if it's wider than the screen, e.g. on phones: Wagtail's main area hides what's wider) #}
+    {# (scrolls sideways if it's wider than the screen, e.g. a narrow window just wider than the phone layout: Wagtail's main area hides what's wider) #}
     <div class="shop-orders-scroll">
         {{ block.super }}
     </div>
