@@ -2120,7 +2120,7 @@ requires-dist = [
     { name = "reportlab", specifier = "<=5.0.1" },
     { name = "shortuuid", specifier = "<=1.0.13" },
     { name = "stripe", specifier = ">=16.0.0,<17" },
-    { name = "wagtail", specifier = "<=8.0" },
+    { name = "wagtail", specifier = "<=8.1" },
     { name = "wagtail-django-recaptcha", specifier = "<=2.2.0" },
     { name = "wagtail-json-widget", specifier = "<=0.0.9" },
     { name = "wagtail-modeladmin", specifier = "<=2.5.0" },
