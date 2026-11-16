@@ -3,8 +3,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from django.core.management import call_command
+from facebook import GraphAPIError
 
 from dogs.models import FacebookAlbums, FacebookAlbumTracker, FacebookTokenManager
+from dogs.tests.test_models import DogsIndexPageFactory, DogStatusPageFactory
 
 
 pytestmark = pytest.mark.django_db
@@ -207,6 +209,27 @@ class TestSyncFacebookTokenErrors:
             run_sync()
         mock_tracker.update_all.assert_called_once()
 
+    def test_expires_soon_sends_report_when_extension_fails(self, albums_obj, tmp_path, settings):
+        """The real tracker extends an expiring token; if Facebook refuses, the
+        sync should still run with the current token and send the report."""
+        DogStatusPageFactory(parent=DogsIndexPageFactory(parent=None), title="Needs Offer")
+        settings.FB_ACCESS_TOKEN_PATH = tmp_path / ".fb_access_token"
+        settings.FB_ACCESS_TOKEN_PATH.write_text("expiring_token")
+        error = GraphAPIError({"error": {"message": "Invalid token exchange"}})
+        with (
+            patch.object(FacebookTokenManager, "get_token_status", return_value="expires_soon"),
+            patch.object(FacebookTokenManager, "extend_token", side_effect=error),
+            patch("dogs.models.GraphAPI") as mock_graph_api,
+            patch.object(FacebookAlbumTracker, "get_album_data", return_value=None),
+            patch("dogs.management.commands.sync_facebook.send_mail") as mock_mail,
+        ):
+            mock_graph_api.return_value.get_all_connections.return_value = [{"id": "album1"}]
+            run_sync(["--email"])
+        subjects = [call.kwargs["subject"] for call in mock_mail.call_args_list]
+        assert len(subjects) == 2
+        assert "expiring soon" in subjects[0]
+        assert subjects[1].startswith("album report")
+
 
 # ---------------------------------------------------------------------------
 # Specific album update mode
@@ -248,7 +271,6 @@ class TestSyncFacebookCheckMode:
         mock_tracker.update_all.assert_not_called()
 
     def test_check_mode_outputs_stored_data(self, albums_obj, mock_token_manager, mock_tracker):
-        from dogs.tests.test_models import DogsIndexPageFactory, DogStatusPageFactory
         index = DogsIndexPageFactory(parent=None)
         status_page = DogStatusPageFactory(parent=index, title="Needs Offer")
         albums_obj.update_album("album1", {"name": "Bella"})

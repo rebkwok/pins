@@ -5,6 +5,7 @@ import pytest
 from django.utils import timezone
 
 import wagtail_factories
+from facebook import GraphAPIError
 
 from dogs.models import (
     DogsIndexPage,
@@ -718,6 +719,29 @@ class TestFacebookTokenManager:
             assert status == "rate_limited"
             albums_obj.refresh_from_db()
             assert albums_obj.is_rate_limited
+
+
+class TestFacebookAlbumTrackerApi:
+
+    @pytest.fixture(autouse=True)
+    def expiring_token(self, tmp_path, settings):
+        settings.FB_ACCESS_TOKEN_PATH = tmp_path / ".fb_access_token"
+        settings.FB_ACCESS_TOKEN_PATH.write_text("expiring_token")
+        with patch.object(FacebookTokenManager, "get_token_status", return_value="expires_soon"):
+            yield
+
+    def test_expiring_token_is_extended_and_saved(self, settings):
+        with patch.object(FacebookTokenManager, "extend_token", return_value="extended_token"):
+            api = FacebookAlbumTracker().api
+        assert api.access_token == "extended_token"
+        assert settings.FB_ACCESS_TOKEN_PATH.read_text() == "extended_token"
+
+    def test_failed_extension_keeps_current_token(self, settings):
+        error = GraphAPIError({"error": {"message": "Invalid token exchange"}})
+        with patch.object(FacebookTokenManager, "extend_token", side_effect=error):
+            api = FacebookAlbumTracker().api
+        assert api.access_token == "expiring_token"
+        assert settings.FB_ACCESS_TOKEN_PATH.read_text() == "expiring_token"
 
 
 # The admin menu item

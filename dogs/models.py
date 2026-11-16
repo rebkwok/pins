@@ -435,9 +435,13 @@ class FacebookAlbumTracker:
                     raise Exception("Access token session has expired.")
             elif token_status == "expires_soon":
                 # Extend before it lapses and persist the new long-lived token.
-                self._api = GraphAPI(access_token=token)
-                token = self.token_manager.extend_token(self._api)
-                settings.FB_ACCESS_TOKEN_PATH.write_text(token)
+                # If Facebook won't extend it, carry on with the current token
+                # (still valid for up to a day); sync_facebook emails a warning.
+                try:
+                    token = self.token_manager.extend_token(GraphAPI(access_token=token))
+                    settings.FB_ACCESS_TOKEN_PATH.write_text(token)
+                except GraphAPIError as e:
+                    logger.error("Could not extend expiring access token: %s", e)
             self._api = GraphAPI(access_token=token)
         return self._api
 
