@@ -590,8 +590,8 @@ class FacebookAlbumTracker:
             recreated = self.create_new_pages(missing_page_albums)
             new_pages.update(recreated)
 
-        removed = self.remove_pages(changes["removed"])
-        failed_to_delete = set(changes["removed"]) - removed
+        removed, already_removed = self.remove_pages(changes["removed"])
+        failed_to_delete = set(changes["removed"]) - already_removed - removed
 
         # Check status-page routing for all pre-existing albums, not just title-changed ones,
         # in case a page was manually moved or its parent was wrong before the delete/recreate.
@@ -685,6 +685,7 @@ class FacebookAlbumTracker:
 
     def remove_pages(self, removed_fb_albums):
         deleted = set()
+        already_deleted = set()
         for album_id in removed_fb_albums:
             # Only delete if the album is genuinely gone from Facebook (raises
             # GraphAPIError) or is in the ignore list. This guards against
@@ -700,8 +701,8 @@ class FacebookAlbumTracker:
                     DogPage.objects.get(facebook_album_id=album_id).delete()
                     deleted.add(album_id)
                 except DogPage.DoesNotExist:
-                    pass
-        return deleted
+                    already_deleted.add(album_id)
+        return deleted, already_deleted
 
     def update_albums(self, album_ids, force_update=False):
         for i, album_id in enumerate(album_ids, start=1):

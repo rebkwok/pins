@@ -270,7 +270,7 @@ class TestUpdateAllBaselineAdvance:
         tracker = FacebookAlbumTracker()
         with patch.object(tracker, 'fetch_all', return_value={"1": {"name": "dog 1"}}):
             with patch.object(tracker, 'create_new_pages', return_value={}):
-                with patch.object(tracker, 'remove_pages', return_value=set()):
+                with patch.object(tracker, 'remove_pages', return_value=(set(), set())):
                     with patch.object(tracker, 'apply_title_routing', return_value={}):
                         tracker.update_all()
 
@@ -289,12 +289,59 @@ class TestUpdateAllBaselineAdvance:
             with patch.object(tracker, 'create_new_pages', return_value={
                 "2": {"facebook_album_name": "dog 2", "page_title": "Dog 2"}
             }):
-                with patch.object(tracker, 'remove_pages', return_value=set()):
+                with patch.object(tracker, 'remove_pages', return_value=(set(), set())):
                     with patch.object(tracker, 'apply_title_routing', return_value={}):
                         tracker.update_all()
 
         albums_obj.refresh_from_db()
         assert albums_obj.reporting_baseline == {}
+
+
+# ---------------------------------------------------------------------------
+# FacebookAlbumTracker.remove_pages
+# ---------------------------------------------------------------------------
+
+class TestRemovePages:
+
+    @pytest.fixture(autouse=True)
+    def patch_update_fb(self):
+        with patch.object(DogPage, 'update_facebook_info'):
+            yield
+
+    @pytest.fixture
+    def tracker(self):
+        tracker = FacebookAlbumTracker()
+        error = GraphAPIError({"error": {"message": "Unsupported get request"}})
+        with patch.object(tracker, 'get_album_metadata', side_effect=error):
+            yield tracker
+
+    def test_deletes_page_for_album_gone_from_facebook(self, tracker, needs_offer_page):
+        needs_offer_page.add_child(instance=DogPage(title="Bella", facebook_album_id="album1"))
+        assert tracker.remove_pages(["album1"]) == ({"album1"}, set())
+        assert not DogPage.objects.filter(facebook_album_id="album1").exists()
+
+    def test_page_already_deleted(self, tracker):
+        assert tracker.remove_pages(["album1"]) == (set(), {"album1"})
+
+    def test_keeps_page_for_album_still_on_facebook(self, tracker, needs_offer_page):
+        needs_offer_page.add_child(instance=DogPage(title="Bella", facebook_album_id="album1"))
+        tracker.get_album_metadata.side_effect = None
+        assert tracker.remove_pages(["album1"]) == (set(), set())
+        assert DogPage.objects.filter(facebook_album_id="album1").exists()
+
+
+class TestUpdateAllFailedToDelete:
+
+    def test_only_albums_still_on_facebook_fail_to_delete(self, albums_obj):
+        albums_obj.update_all({"1": {"name": "dog 1"}, "2": {"name": "dog 2"}, "3": {"name": "dog 3"}})
+        albums_obj.acknowledge()
+        tracker = FacebookAlbumTracker()
+        with patch.object(tracker, 'fetch_all', return_value={"4": {"name": "dog 4"}}):
+            with patch.object(tracker, 'create_new_pages', return_value={}):
+                with patch.object(tracker, 'remove_pages', return_value=({"1"}, {"2"})):
+                    with patch.object(tracker, 'apply_title_routing', return_value={}):
+                        changes = tracker.update_all()
+        assert changes["failed_to_delete"] == {"3"}
 
 
 # ---------------------------------------------------------------------------
