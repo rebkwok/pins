@@ -1178,11 +1178,11 @@ wheels = [
 
 [[package]]
 name = "gunicorn"
-version = "26.2.0"
+version = "27.0.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d9/8a/e4ef6ee11701b6cd64702848415ffb69eeff85cb388a3c6c7fe86f22f3f8/gunicorn-26.2.0.tar.gz", hash = "sha256:62b864895d9ebff0b2f9867ba04fe811c93121596540830c9c916d0769668447", size = 787921, upload-time = "2026-08-24T15:05:59.3Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0e/fc/7fd4bbebc1d17394a5c98f0ef565da3341dbb664748d1bebedefead356ee/gunicorn-27.0.1.tar.gz", hash = "sha256:b1514965361c8b7e8107a80aa2a92636878df1ccfac6dd204a676426e04d9e3e", size = 876901, upload-time = "2026-11-12T22:41:11.334Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fe/85/7522a52e5e2f42faf1a129113ab63e548c42e103e9af395b7bfe65e403e2/gunicorn-26.2.0-py3-none-any.whl", hash = "sha256:bd249d0b3f7972f7432f0a6b6ff3b3ee2d129f70cd1ff6c09a9dd9e29a2b88e3", size = 228389, upload-time = "2026-08-24T15:05:57.67Z" },
+    { url = "https://files.pythonhosted.org/packages/f7/46/19ce73424bc4bcac3f0c104950fa776abdfa4515f25104916a62b63b672a/gunicorn-27.0.1-py3-none-any.whl", hash = "sha256:378b26b9a38adcf4592f28828233c1716acc55e833ea06bf48719782efaa0d10", size = 263696, upload-time = "2026-11-12T22:41:09.798Z" },
 ]
 
 [[package]]
@@ -2111,7 +2111,7 @@ requires-dist = [
     { name = "django-storages", extras = ["boto3"], specifier = "<=1.14.6" },
     { name = "envdir", specifier = "<=1.0.1" },
     { name = "facebook-sdk", specifier = "<=3.1.0" },
-    { name = "gunicorn", specifier = "<=26.2.0" },
+    { name = "gunicorn", specifier = "<=27.0.1" },
     { name = "html2text", specifier = "<=2025.4.15" },
     { name = "htmx", specifier = "<=0.0.0" },
     { name = "psycopg2", specifier = "<=2.9.13" },
@@ -2119,8 +2119,8 @@ requires-dist = [
     { name = "pymemcache", specifier = "<=4.0.0" },
     { name = "reportlab", specifier = "<=5.0.1" },
     { name = "shortuuid", specifier = "<=1.0.13" },
-    { name = "stripe", specifier = ">=16.0.0,<17" },
-    { name = "wagtail", specifier = "<=8.0" },
+    { name = "stripe", specifier = ">=16.0.0,<18" },
+    { name = "wagtail", specifier = "<=8.1" },
     { name = "wagtail-django-recaptcha", specifier = "<=2.2.0" },
     { name = "wagtail-json-widget", specifier = "<=0.0.9" },
     { name = "wagtail-modeladmin", specifier = "<=2.5.0" },
@@ -2824,15 +2824,15 @@ wheels = [
 
 [[package]]
 name = "stripe"
-version = "16.0.0"
+version = "16.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "requests" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0b/a7/4a8546b293a09f39a2b55ca8a11539ae9654126df59065868c5d3993f0dd/stripe-16.0.0.tar.gz", hash = "sha256:5016068d54aebb43e61b3c377ef45bede4e0b4eb1817d7a12af81630c55a23d2", size = 1665584, upload-time = "2026-10-01T00:42:03.388Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/08/2d/f105dfd56ada798dc698a13a992d9153802cbdabf7a6bab8084c0c187e3f/stripe-16.1.0.tar.gz", hash = "sha256:21e72b6779b8cff337ca8d2b8d30138f2d68f6a8d739701076f06a418ad75b8c", size = 1624677, upload-time = "2026-10-29T19:53:41.12Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b5/de/5141ae3990862cc3d61a1cdd4acff72bcb587afb7b4d31c52eaddbb6bc8f/stripe-16.0.0-py3-none-any.whl", hash = "sha256:6a401baf2fc19c59ccb59005e674f8da8fa256e8db319ad8c50292f4cddf8c26", size = 2543794, upload-time = "2026-10-01T00:42:01.65Z" },
+    { url = "https://files.pythonhosted.org/packages/94/50/4ecff21d2ff5f867aa05c48b5f4338c80bae51d9dcbd943b373cb52ca71c/stripe-16.1.0-py3-none-any.whl", hash = "sha256:3798e07a0603c8923710414cd1942ae847ed43cebbf34c3258417c189711ea70", size = 2645741, upload-time = "2026-10-29T19:53:39.094Z" },
 ]
 
 [[package]]
